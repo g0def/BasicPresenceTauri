@@ -121,7 +121,8 @@ Le coffre `vault.db` (chiffré) ne contient encore qu'un placeholder ; il accuei
 
 ## Limites connues & Phase 2
 
-- **AES-256-CBC = confidentialité forte mais NON authentifiée** (pas de HMAC par page comme le SQLCipher complet) → pas de détection d'altération du fichier. L'intégrité au repos est un durcissement Phase 2. Le matériel de clé, lui, reste authentifié (XChaCha20-Poly1305).
+- **AES-256-CBC = confidentialité forte mais NON authentifiée** (pas de HMAC par page comme le SQLCipher complet) → pas de détection d'altération du fichier. L'intégrité au repos est un durcissement Phase 2. Le matériel de clé, lui, reste authentifié (XChaCha20-Poly1305). _Note : libSQL 0.9 n'expose que `Cipher::Aes256Cbc` — aucun cipher AEAD n'est disponible côté at-rest, c'est une contrainte de la lib, pas un choix._
+- **Brute-force hors-ligne du `keystore.db`** : le keystore est en clair et contient `wrapped_dek`, `kek_salt`, `dek_nonce` et `password_hash`. Un attaquant ayant un accès **lecture au fichier** peut le copier et tester des mots de passe **hors-ligne**, contournant le verrouillage 5-tentatives (qui ne protège que l'application en cours d'exécution). C'est **inhérent** au chiffrement local dérivé d'un mot de passe ; la seule barrière est le coût Argon2id (profil OWASP 46 MiB). Durcissement Phase 2 possible : sceller un secret supplémentaire dans le trousseau de l'OS (Keychain / DPAPI / libsecret) pour rendre le keystore inutilisable hors de l'appareil.
 - `change_password` (peu coûteux : ré-envelopper le DEK, sans re-chiffrer tout le coffre).
 - Idle-timeout en complément de l'expiration absolue.
 - Multi-comptes par appareil (le v1 est mono-utilisateur, cohérent avec la clé dérivée du mot de passe).
