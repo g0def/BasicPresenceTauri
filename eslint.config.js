@@ -1,0 +1,75 @@
+import js from "@eslint/js";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import prettier from "eslint-config-prettier";
+
+export default tseslint.config(
+  // Ignore build output, deps and the Rust side
+  {
+    ignores: [
+      "dist",
+      "node_modules",
+      "src-tauri",
+      "coverage",
+      "*.config.js",
+      "*.config.ts",
+    ],
+  },
+
+  // Base JS + TS recommended
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+
+  // App source (browser env)
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+    plugins: {
+      "react-hooks": reactHooks,
+      "react-refresh": reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      "react-refresh/only-export-components": [
+        "warn",
+        { allowConstantExport: true },
+      ],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/consistent-type-imports": "warn",
+      // Architecture guard: only core/ipc.ts may talk to @tauri-apps/api.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@tauri-apps/api",
+              message:
+                "Only src/core/ipc.ts may import @tauri-apps/api. Go through a repository.",
+            },
+          ],
+          patterns: ["@tauri-apps/api/*"],
+        },
+      ],
+    },
+  },
+
+  // Allow the Tauri boundary + tests to import @tauri-apps/api directly
+  {
+    files: [
+      "src/core/ipc.ts",
+      "src/test/**/*.{ts,tsx}",
+      "src/**/*.{test,spec}.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+
+  // MUST be last: disable formatting rules so Prettier owns formatting
+  prettier,
+);
