@@ -1,0 +1,30 @@
+{
+  "common": {
+    "loading": "Loading…"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "registerTitle": "Create an account",
+    "loginSubtitle": "Enter your password to unlock your data.",
+    "registerSubtitle": "First time here: create your owner account.",
+    "username": "Username",
+    "password": "Password",
+    "submitting": "Please wait…",
+    "submitRegister": "Create account",
+    "submitLogin": "Sign in"
+  },
+  "home": {
+    "logout": "Log out",
+    "greeting": "Hello {{username}} 👋",
+    "intro": "You are signed in. Your presence data is unlocked and encrypted locally."
+  },
+  "session": {
+    "label": "Session: {{time}}",
+    "tooltip": "Time left before automatic logout"
+  },
+  "language": {
+    "label": "Language",
+    "fr": "Français",
+    "en": "English"
+  }
+}

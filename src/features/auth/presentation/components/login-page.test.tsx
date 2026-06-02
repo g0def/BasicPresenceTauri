@@ -39,4 +39,35 @@ describe("auth flow", () => {
 
     expect(await screen.findByText(/Bonjour alice/)).toBeInTheDocument();
   });
+
+  it("switches the UI language to English", async () => {
+    mockIPC((cmd) => {
+      switch (cmd) {
+        case "account_exists":
+          return true;
+        default:
+          throw new Error(`unexpected command: ${cmd}`);
+      }
+    });
+
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <App />
+      </AuthProvider>,
+    );
+
+    // Starts in French (pinned by the test setup).
+    await screen.findByRole("heading", { name: "Connexion" });
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Langue" }),
+      "en",
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+  });
 });

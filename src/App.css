@@ -126,6 +126,29 @@ input:focus {
   font-weight: 600;
 }
 
+/* ---- Language switcher ---- */
+.auth-card-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.language-switcher {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.3em 0.6em;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #0f0f0f;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
+.language-switcher:hover {
+  border-color: #396cd8;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
@@ -133,7 +156,8 @@ input:focus {
   }
 
   input,
-  button {
+  button,
+  .language-switcher {
     color: #ffffff;
     background-color: #0f0f0f98;
   }

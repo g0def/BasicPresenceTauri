@@ -1,11 +1,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
+import { LanguageSwitcher } from "@/shared/components/language-switcher";
 
 export function LoginPage() {
   const { login, register, accountExists, error, isSubmitting, clearError } =
     useAuth();
+  const { t } = useTranslation();
   const isRegister = accountExists === false;
 
   const [username, setUsername] = useState("");
@@ -25,16 +28,17 @@ export function LoginPage() {
 
   return (
     <main className="auth-card">
-      <h1>{isRegister ? "Créer un compte" : "Connexion"}</h1>
+      <div className="auth-card-toolbar">
+        <LanguageSwitcher />
+      </div>
+      <h1>{isRegister ? t("auth.registerTitle") : t("auth.loginTitle")}</h1>
       <p className="auth-subtitle">
-        {isRegister
-          ? "Première utilisation : créez votre compte propriétaire."
-          : "Entrez votre mot de passe pour déverrouiller vos données."}
+        {isRegister ? t("auth.registerSubtitle") : t("auth.loginSubtitle")}
       </p>
 
       <form className="auth-form" onSubmit={onSubmit}>
         <label className="auth-field">
-          <span>Nom d'utilisateur</span>
+          <span>{t("auth.username")}</span>
           <input
             value={username}
             autoFocus
@@ -47,7 +51,7 @@ export function LoginPage() {
         </label>
 
         <label className="auth-field">
-          <span>Mot de passe</span>
+          <span>{t("auth.password")}</span>
           <input
             type="password"
             value={password}
@@ -67,10 +71,10 @@ export function LoginPage() {
 
         <button type="submit" disabled={disabled}>
           {isSubmitting
-            ? "Veuillez patienter…"
+            ? t("auth.submitting")
             : isRegister
-              ? "Créer le compte"
-              : "Se connecter"}
+              ? t("auth.submitRegister")
+              : t("auth.submitLogin")}
         </button>
       </form>
     </main>

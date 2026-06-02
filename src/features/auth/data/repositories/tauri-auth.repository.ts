@@ -25,7 +25,10 @@ export class TauriAuthRepository implements AuthRepository {
   }
 
   async register({ username, password }: Credentials): Promise<User> {
-    const dto = await invoke<UserDto>(COMMANDS.register, { username, password });
+    const dto = await invoke<UserDto>(COMMANDS.register, {
+      username,
+      password,
+    });
     return toUser(dto);
   }
 
@@ -38,7 +41,9 @@ export class TauriAuthRepository implements AuthRepository {
   }
 
   async checkSession(token: string): Promise<SessionStatus> {
-    const dto = await invoke<SessionStatusDto>(COMMANDS.checkSession, { token });
+    const dto = await invoke<SessionStatusDto>(COMMANDS.checkSession, {
+      token,
+    });
     return toSessionStatus(dto);
   }
 

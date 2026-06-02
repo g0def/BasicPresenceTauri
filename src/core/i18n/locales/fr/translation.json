@@ -1,0 +1,30 @@
+{
+  "common": {
+    "loading": "Chargement…"
+  },
+  "auth": {
+    "loginTitle": "Connexion",
+    "registerTitle": "Créer un compte",
+    "loginSubtitle": "Entrez votre mot de passe pour déverrouiller vos données.",
+    "registerSubtitle": "Première utilisation : créez votre compte propriétaire.",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "submitting": "Veuillez patienter…",
+    "submitRegister": "Créer le compte",
+    "submitLogin": "Se connecter"
+  },
+  "home": {
+    "logout": "Se déconnecter",
+    "greeting": "Bonjour {{username}} 👋",
+    "intro": "Vous êtes connecté. Vos données de présence sont déverrouillées et chiffrées localement."
+  },
+  "session": {
+    "label": "Session : {{time}}",
+    "tooltip": "Temps restant avant déconnexion automatique"
+  },
+  "language": {
+    "label": "Langue",
+    "fr": "Français",
+    "en": "English"
+  }
+}

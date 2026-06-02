@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { COUNTDOWN_WARNING_MS } from "@/core/config";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 
@@ -10,14 +12,15 @@ function formatRemaining(ms: number): string {
 
 export function SessionCountdown() {
   const { remainingMs } = useAuth();
+  const { t } = useTranslation();
   const isWarning = remainingMs <= COUNTDOWN_WARNING_MS;
 
   return (
     <span
       className={isWarning ? "countdown countdown--warning" : "countdown"}
-      title="Temps restant avant déconnexion automatique"
+      title={t("session.tooltip")}
     >
-      Session&nbsp;: {formatRemaining(remainingMs)}
+      {t("session.label", { time: formatRemaining(remainingMs) })}
     </span>
   );
 }
