@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 
-import "@/App.css";
 import { Home } from "@/features/auth/presentation/components/home";
 import { LoginPage } from "@/features/auth/presentation/components/login-page";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
@@ -19,8 +18,8 @@ export default function App() {
 
   if (accountExists === null) {
     return (
-      <main className="auth-card">
-        <p>{t("common.loading")}</p>
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <p className="text-muted-foreground">{t("common.loading")}</p>
       </main>
     );
   }

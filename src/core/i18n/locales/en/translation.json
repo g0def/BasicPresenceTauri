@@ -26,5 +26,8 @@
     "label": "Language",
     "fr": "Français",
     "en": "English"
+  },
+  "theme": {
+    "toggle": "Toggle theme"
   }
 }

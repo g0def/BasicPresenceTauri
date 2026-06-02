@@ -1,5 +1,12 @@
 import { useTranslation } from "react-i18next";
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supportedLngs } from "@/core/i18n/resources";
 
 /**
@@ -10,17 +17,24 @@ export function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
 
   return (
-    <select
-      className="language-switcher"
-      aria-label={t("language.label")}
+    <Select
       value={i18n.resolvedLanguage ?? "fr"}
-      onChange={(e) => void i18n.changeLanguage(e.currentTarget.value)}
+      onValueChange={(value) => void i18n.changeLanguage(value)}
     >
-      {supportedLngs.map((lng) => (
-        <option key={lng} value={lng}>
-          {t(`language.${lng}`)}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger
+        size="sm"
+        aria-label={t("language.label")}
+        className="w-auto gap-2"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {supportedLngs.map((lng) => (
+          <SelectItem key={lng} value={lng}>
+            {t(`language.${lng}`)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

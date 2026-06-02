@@ -60,10 +60,8 @@ describe("auth flow", () => {
     // Starts in French (pinned by the test setup).
     await screen.findByRole("heading", { name: "Connexion" });
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Langue" }),
-      "en",
-    );
+    await user.click(screen.getByRole("combobox", { name: "Langue" }));
+    await user.click(await screen.findByRole("option", { name: "English" }));
 
     expect(
       await screen.findByRole("heading", { name: "Sign in" }),

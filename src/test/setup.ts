@@ -5,6 +5,28 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 
 import i18n from "@/core/i18n";
 
+// Radix UI (used by the shadcn Select) relies on a few DOM APIs that jsdom
+// does not implement. Polyfill them so the components can be driven in tests.
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+}
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = () => {};
+}
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 // Reset the DOM and Tauri mocks between tests so state never leaks.
 afterEach(() => {
   cleanup();
