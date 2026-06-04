@@ -22,6 +22,10 @@ pub const VAULT_MIGRATIONS: &[Migration] = &[
         version: 2,
         sql: include_str!("../../../migrations/vault/0002_add_profiles.sql"),
     },
+    Migration {
+        version: 3,
+        sql: include_str!("../../../migrations/vault/0003_add_presence.sql"),
+    },
 ];
 
 /// Idempotently apply migrations in version order, tracking applied versions in

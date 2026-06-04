@@ -27,7 +27,14 @@ pub async fn open_encrypted_db(path: &Path, dek: &[u8]) -> Result<Database, Doma
         .map_err(map_storage)
 }
 
-/// Open a connection to a built database.
-pub fn connect(db: &Database) -> Result<Connection, DomainError> {
-    db.connect().map_err(map_storage)
+/// Open a connection to a built database, enabling SQLite foreign-key
+/// enforcement on it. Foreign keys are off by default and the setting is
+/// **per connection**, so this must run on every connection for the
+/// `ON DELETE CASCADE` constraints (e.g. profile → presence) to actually fire.
+pub async fn connect(db: &Database) -> Result<Connection, DomainError> {
+    let conn = db.connect().map_err(map_storage)?;
+    conn.execute("PRAGMA foreign_keys = ON", ())
+        .await
+        .map_err(map_storage)?;
+    Ok(conn)
 }

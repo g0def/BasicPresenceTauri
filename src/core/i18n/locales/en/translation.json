@@ -14,9 +14,7 @@
     "submitLogin": "Sign in"
   },
   "home": {
-    "logout": "Log out",
-    "greeting": "Hello {{username}} 👋",
-    "intro": "You are signed in. Your presence data is unlocked and encrypted locally."
+    "logout": "Log out"
   },
   "session": {
     "label": "Session: {{time}}",
@@ -53,5 +51,17 @@
     "profilesLabel": "Profiles",
     "deleteConfirmTitle": "Delete this profile?",
     "deleteConfirmBody": "The profile \"{{name}}\" will be permanently deleted."
+  },
+  "presence": {
+    "chooseType": "Choose a presence type for this day.",
+    "delete": "Delete",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "types": {
+      "office": "Office",
+      "remote": "Remote",
+      "vacation": "Vacation",
+      "holiday": "Holiday"
+    }
   }
 }

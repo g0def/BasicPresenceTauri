@@ -13,15 +13,19 @@ use tauri::Manager;
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
+use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
+use crate::application::use_cases::list_presences::ListPresencesUseCase;
 use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
 use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
+use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::update_profile::UpdateProfileUseCase;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::account_repository::AccountRepository;
+use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::key_service::KeyService;
@@ -37,10 +41,11 @@ use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
 use crate::infrastructure::persistence::db::{connect, open_plain_db};
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
+use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
 use crate::infrastructure::persistence::profile_repository::LibsqlProfileRepository;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
-use crate::presentation::commands::{auth, profile};
+use crate::presentation::commands::{auth, presence, profile};
 use crate::presentation::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -72,7 +77,10 @@ pub fn run() {
             profile::list_profiles,
             profile::update_profile,
             profile::delete_profile,
-            profile::set_active_profile
+            profile::set_active_profile,
+            presence::set_presence,
+            presence::list_presences,
+            presence::delete_presence
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -83,7 +91,7 @@ pub fn run() {
 async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
     // Keystore (plaintext): auth credentials + wrapped key material.
     let keystore_db = open_plain_db(&config.keystore_path).await?;
-    let keystore_conn = connect(&keystore_db)?;
+    let keystore_conn = connect(&keystore_db).await?;
     migrations::run(&keystore_conn, KEYSTORE_MIGRATIONS).await?;
 
     // Infrastructure implementations (behind domain ports).
@@ -107,6 +115,8 @@ async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
     let vault: Arc<dyn VaultManager> = vault_impl.clone();
     let profiles: Arc<dyn ProfileRepository> =
         Arc::new(LibsqlProfileRepository::new(vault_impl.clone()));
+    let presences: Arc<dyn PresenceRepository> =
+        Arc::new(LibsqlPresenceRepository::new(vault_impl.clone()));
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
 
     Ok(AppState {
@@ -134,6 +144,9 @@ async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
         update_profile: UpdateProfileUseCase::new(profiles.clone(), clock.clone()),
         delete_profile: DeleteProfileUseCase::new(profiles.clone()),
         set_active_profile: SetActiveProfileUseCase::new(profiles.clone()),
+        set_presence: SetPresenceUseCase::new(presences.clone(), clock.clone()),
+        list_presences: ListPresencesUseCase::new(presences.clone()),
+        delete_presence: DeletePresenceUseCase::new(presences.clone()),
         keystore_db,
     })
 }

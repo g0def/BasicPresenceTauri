@@ -1,5 +1,7 @@
 # Revue de code & checklist « projet propre »
 
+A faire avant que l'utilisateur commit. Donc check le diff et appliquer la checklist pour donner un compte rendu de la situation a l'utilisateurs.
+
 > Référence d'architecture : [../Claude.md](../Claude.md) · Sécurité : [auth.md](auth.md) · Persistance : [turso.md](turso.md)
 
 Checklist pratique à dérouler **avant d'ouvrir une PR** et **pendant une revue**. Le but :
@@ -45,6 +47,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 ## 2. Backend Rust (`src-tauri/`)
 
 ### 2.1 Domain — pur, aucune dépendance externe
+
 [../src-tauri/src/domain/](../src-tauri/src/domain/)
 
 - [ ] Entités = données + invariants métier (`User`, `Account`, `Session`, `Profile`). Validation **à la construction** (refuser un état invalide plutôt que de le valider plus tard).
@@ -54,6 +57,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Les DTO de requête ≠ les entités persistées (ne pas réutiliser une struct de transport comme entité).
 
 ### 2.2 Application — use cases, dépend du Domain uniquement
+
 [../src-tauri/src/application/](../src-tauri/src/application/)
 
 - [ ] Un use case = une intention (`LoginUseCase`, `CreateProfileUseCase`, `ListProfilesUseCase`…). Il **orchestre** des ports, il n'implémente pas l'accès technique.
@@ -63,6 +67,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Pas de logique technique (SQL, chiffrement) dans le use case — ça vit dans l'infra.
 
 ### 2.3 Infrastructure — implémente les ports
+
 [../src-tauri/src/infrastructure/](../src-tauri/src/infrastructure/)
 
 - [ ] Chaque impl correspond à un port du domaine (`LibsqlAccountRepository : AccountRepository`, `Argon2PasswordHasher : PasswordHasher`, …).
@@ -72,6 +77,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Le choix keystore (clair) vs vault (chiffré) est respecté : 🔒 toute donnée de présence/CO₂ va dans `vault/`, jamais dans `keystore/`.
 
 ### 2.4 Presentation — commandes Tauri (frontière IPC)
+
 [../src-tauri/src/presentation/](../src-tauri/src/presentation/)
 
 - [ ] ⛔ **Aucune logique métier** dans une `#[tauri::command]` : elle récupère le `State`, appelle le use case, mappe l'erreur. C'est tout.
@@ -80,6 +86,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Nouvelle commande = enregistrée dans le `invoke_handler` de [lib.rs](../src-tauri/src/lib.rs) **et** son nom ajouté côté front dans [config.ts](../src/core/config.ts).
 
 ### 2.5 Composition root & qualité Rust
+
 - [ ] Toute la DI vit dans `build_state` ([lib.rs](../src-tauri/src/lib.rs)) ; [main.rs](../src-tauri/src/main.rs) reste minimal. Plus `main`/`lib` est mince, plus la zone testable est large.
 - [ ] ⛔ Pas d'`unwrap()` / `expect()` / `panic!` dans les chemins d'exécution (un `Mutex` empoisonné = crash). Propager un `Result`.
 - [ ] 🔒 Matériel sensible (mot de passe, KEK, DEK) effacé via `Zeroizing` / `zeroize` (cf. [login.rs](../src-tauri/src/application/use_cases/login.rs) ligne `Zeroizing::new`).
@@ -91,6 +98,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 ## 3. Frontend React (`src/`) — feature-first
 
 ### 3.1 core/ — transverse
+
 [../src/core/](../src/core/)
 
 - [ ] ⛔ **Seul** [core/ipc.ts](../src/core/ipc.ts) importe `@tauri-apps/api` (règle ESLint `no-restricted-imports`). Tout le reste passe par les repositories.
@@ -98,6 +106,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Les erreurs IPC sont normalisées via [errors.ts](../src/core/errors.ts) (`AppError` / `normalizeError`).
 
 ### 3.2 domain/ (feature) — entités, interfaces, use cases purs
+
 ex. [../src/features/profile/domain/](../src/features/profile/domain/)
 
 - [ ] ⛔ Le domaine front n'importe ni React, ni `@tauri-apps/*`, ni la couche `data/`. 100 % framework-agnostique.
@@ -105,6 +114,7 @@ ex. [../src/features/profile/domain/](../src/features/profile/domain/)
 - [ ] Les entités du domaine sont distinctes des DTO de transport.
 
 ### 3.3 data/ (feature) — DTO, mappers, repository
+
 ex. [../src/features/profile/data/](../src/features/profile/data/)
 
 - [ ] L'impl de repository (`TauriProfileRepository`) appelle `invoke(...)` via `core/ipc` puis **mappe** DTO → entité du domaine (un mapper dédié, testé).
@@ -112,6 +122,7 @@ ex. [../src/features/profile/data/](../src/features/profile/data/)
 - [ ] Le mapping vit dans `mappers/` (pas dans le composant, pas dans le hook).
 
 ### 3.4 presentation/ (feature) — provider, hooks, composants
+
 ex. [../src/features/profile/presentation/](../src/features/profile/presentation/)
 
 - [ ] ⛔ Les **composants** ne font ni appel IPC, ni logique métier : ils consomment des hooks. UI séparée de la logique.
@@ -120,6 +131,7 @@ ex. [../src/features/profile/presentation/](../src/features/profile/presentation
 - [ ] Composant nettoie ses effets (`useEffect` cleanup : timers, listeners — cf. [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts)).
 
 ### 3.5 Qualité React / TypeScript
+
 - [ ] ⛔ Typage strict — **pas d'`any`** (ni `as` abusif). Préférer `unknown` + narrowing.
 - [ ] Alias `@/...` partout — **pas de `../../../`**.
 - [ ] Conventions de nommage : fichiers `kebab-case`, composants `PascalCase`, hooks `useCamelCase`.

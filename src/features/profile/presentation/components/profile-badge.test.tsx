@@ -17,7 +17,7 @@ const ADA = {
 };
 
 describe("profile home", () => {
-  it("greets by the active profile and shows it in the header badge", async () => {
+  it("shows the presence calendar and the active profile in the header badge", async () => {
     mockIPC((cmd) => {
       switch (cmd) {
         case "account_exists":
@@ -30,6 +30,8 @@ describe("profile home", () => {
           };
         case "list_profiles":
           return { profiles: [ADA], activeProfileId: ADA.id };
+        case "list_presences":
+          return [];
         default:
           throw new Error(`unexpected command: ${cmd}`);
       }
@@ -47,8 +49,9 @@ describe("profile home", () => {
     await user.type(screen.getByLabelText("Mot de passe"), "secret123");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));
 
-    // Greeting uses the active profile's first name; badge shows the full name.
-    expect(await screen.findByText(/Bonjour Ada/)).toBeInTheDocument();
+    // The calendar is the main view (legend label proves it rendered) and the
+    // header badge shows the active profile's full name.
+    expect(await screen.findByText("Bureau")).toBeInTheDocument();
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
   });
 });

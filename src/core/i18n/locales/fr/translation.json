@@ -14,9 +14,7 @@
     "submitLogin": "Se connecter"
   },
   "home": {
-    "logout": "Se déconnecter",
-    "greeting": "Bonjour {{username}} 👋",
-    "intro": "Vous êtes connecté. Vos données de présence sont déverrouillées et chiffrées localement."
+    "logout": "Se déconnecter"
   },
   "session": {
     "label": "Session : {{time}}",
@@ -53,5 +51,17 @@
     "profilesLabel": "Profils",
     "deleteConfirmTitle": "Supprimer ce profil ?",
     "deleteConfirmBody": "Le profil « {{name}} » sera définitivement supprimé."
+  },
+  "presence": {
+    "chooseType": "Choisissez un type de présence pour ce jour.",
+    "delete": "Supprimer",
+    "prevMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "types": {
+      "office": "Bureau",
+      "remote": "Télétravail",
+      "vacation": "Congés",
+      "holiday": "Jour férié"
+    }
   }
 }

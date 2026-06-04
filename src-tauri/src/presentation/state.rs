@@ -1,12 +1,15 @@
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
+use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
+use crate::application::use_cases::list_presences::ListPresencesUseCase;
 use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
 use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
+use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::update_profile::UpdateProfileUseCase;
 
 /// Application state injected via Tauri `.manage()` and read by the commands.
@@ -21,6 +24,9 @@ pub struct AppState {
     pub update_profile: UpdateProfileUseCase,
     pub delete_profile: DeleteProfileUseCase,
     pub set_active_profile: SetActiveProfileUseCase,
+    pub set_presence: SetPresenceUseCase,
+    pub list_presences: ListPresencesUseCase,
+    pub delete_presence: DeletePresenceUseCase,
     /// Keeps the keystore database alive for the lifetime of the app.
     #[allow(dead_code)]
     pub keystore_db: libsql::Database,

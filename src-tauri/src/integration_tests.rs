@@ -192,3 +192,173 @@ fn profile_crud_requires_unlocked_vault() {
         let _ = std::fs::remove_dir_all(dir);
     });
 }
+
+#[test]
+fn presence_set_list_delete_with_upsert_per_day() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("presence");
+        let state = build_state(config).await.expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        // Vault still locked before login: presence operations are refused.
+        assert!(matches!(
+            state.set_presence.execute("nope", 0, "office").await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const DAY_1: i64 = 1_717_200_000_000; // arbitrary UTC-midnight epoch ms
+        const DAY_2: i64 = DAY_1 + 86_400_000;
+
+        // Set a presence for DAY_1.
+        let p1 = state
+            .set_presence
+            .execute(&profile.id, DAY_1, "office")
+            .await
+            .expect("set office");
+        assert_eq!(p1.kind, "office");
+        assert_eq!(p1.day, DAY_1);
+
+        // Re-setting the same day upserts (no duplicate) and overwrites the type,
+        // while preserving the original id and created_at.
+        let p1b = state
+            .set_presence
+            .execute(&profile.id, DAY_1, "remote")
+            .await
+            .expect("set remote");
+        assert_eq!(p1b.id, p1.id);
+        assert_eq!(p1b.kind, "remote");
+        assert_eq!(p1b.created_at, p1.created_at);
+
+        let listed = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].kind, "remote");
+
+        // An unknown type is rejected by the domain.
+        assert!(matches!(
+            state
+                .set_presence
+                .execute(&profile.id, DAY_2, "carpool")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // A non-midnight day (not a multiple of 86_400_000 ms) is rejected.
+        assert!(matches!(
+            state
+                .set_presence
+                .execute(&profile.id, DAY_1 + 1, "office")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // A second day adds a second presence.
+        state
+            .set_presence
+            .execute(&profile.id, DAY_2, "vacation")
+            .await
+            .expect("set vacation");
+        let listed = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 2);
+
+        // Deleting by id removes a single presence.
+        state.delete_presence.execute(&p1.id).await.expect("delete");
+        let listed = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].day, DAY_2);
+
+        // Logout locks the vault; presence operations are refused again.
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state.list_presences.execute(&profile.id).await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn deleting_a_profile_cascades_to_its_presences() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("presence_cascade");
+        let state = build_state(config).await.expect("build_state");
+
+        state
+            .register_account
+            .execute("bob", "password123")
+            .await
+            .expect("register");
+        state
+            .login
+            .execute("bob", "password123")
+            .await
+            .expect("login");
+
+        let profile = state
+            .create_profile
+            .execute("Grace", "Hopper", "Navy", None)
+            .await
+            .expect("create profile");
+
+        const DAY: i64 = 1_717_200_000_000; // UTC-midnight epoch ms
+        state
+            .set_presence
+            .execute(&profile.id, DAY, "office")
+            .await
+            .expect("set");
+        assert_eq!(
+            state
+                .list_presences
+                .execute(&profile.id)
+                .await
+                .expect("list")
+                .len(),
+            1
+        );
+
+        // Deleting the profile must cascade-delete its presences. This only holds
+        // when `PRAGMA foreign_keys = ON` is set on the vault connection.
+        state
+            .delete_profile
+            .execute(&profile.id)
+            .await
+            .expect("delete profile");
+        assert!(state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .expect("list")
+            .is_empty());
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}

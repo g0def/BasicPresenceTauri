@@ -46,7 +46,7 @@ impl LibsqlVaultManager {
 impl VaultManager for LibsqlVaultManager {
     async fn open(&self, dek: &[u8]) -> Result<(), DomainError> {
         let db = open_encrypted_db(&self.path, dek).await?;
-        let conn = connect(&db)?;
+        let conn = connect(&db).await?;
         migrations::run(&conn, VAULT_MIGRATIONS).await?;
         let mut guard = self.state.lock().unwrap_or_else(|p| p.into_inner());
         *guard = Some(OpenVault { _db: db, conn });

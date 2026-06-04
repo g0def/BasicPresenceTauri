@@ -109,15 +109,27 @@ Le coffre `vault.db` (chiffré) ne contient encore qu'un placeholder ; il accuei
 
 > Le profil actif est persisté dans `vault_meta` (clé `active_profile_id`). Le premier profil créé devient l'actif ; supprimer l'actif le réassigne au premier restant.
 
+### Présences
+
+[presence.rs](../src-tauri/src/presentation/commands/presence.rs) — présences quotidiennes (stockées dans le **coffre chiffré**). Même garde d'accès que les profils : coffre **déverrouillé** requis (sinon `SESSION_EXPIRED`). Au plus une présence par `(profileId, day)` — `set_presence` fait un *upsert* sur le jour (conserve `id`/`createdAt`).
+
+| Commande | Entrée | Sortie |
+| --- | --- | --- |
+| `set_presence` | `profileId, day, type` | `PresenceDto { id, profileId, day, type, createdAt, updatedAt }` |
+| `list_presences` | `profileId` | `PresenceDto[]` |
+| `delete_presence` | `id` | `void` |
+
+> `day` = epoch ms à **minuit UTC** (validé côté domaine) ; `type` ∈ `office | remote | vacation | holiday`. Les présences référencent leur profil par une clé étrangère `ON DELETE CASCADE` (effective grâce à `PRAGMA foreign_keys = ON` posé sur la connexion vault) : supprimer un profil supprime ses présences.
+
 > Les commandes applicatives (`#[tauri::command]`) ne nécessitent **pas** d'entrée dans `capabilities/` (seules les permissions plugin/core en requièrent).
 
 ## Mapping Clean Architecture
 
 **Backend** ([src-tauri/src/](../src-tauri/src/)) :
 
-- `domain/` — entités (`User`, `Account`, `Session`, `Profile`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`), `DomainError`. Aucune dépendance externe.
-- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`) + DTOs.
-- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
+- `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`), `DomainError`. Aucune dépendance externe.
+- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`) + DTOs.
+- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 
 **Frontend** ([src/](../src/)) :
