@@ -28,6 +28,30 @@
     "en": "English"
   },
   "theme": {
-    "toggle": "Basculer le thème"
+    "toggle": "Basculer le thème",
+    "dark": "Mode sombre",
+    "light": "Mode clair"
+  },
+  "profile": {
+    "menu": "Menu du compte",
+    "emptyTitle": "Aucun profil",
+    "emptySubtitle": "Créez un profil pour commencer à gérer vos présences.",
+    "add": "Ajouter un profil",
+    "edit": "Modifier le profil",
+    "delete": "Supprimer le profil",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "addTitle": "Nouveau profil",
+    "editTitle": "Modifier le profil",
+    "formSubtitle": "Renseignez les informations du profil.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "enterprise": "Entreprise",
+    "poste": "Poste",
+    "optional": "(optionnel)",
+    "profilesLabel": "Profils",
+    "deleteConfirmTitle": "Supprimer ce profil ?",
+    "deleteConfirmBody": "Le profil « {{name}} » sera définitivement supprimé."
   }
 }

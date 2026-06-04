@@ -16,6 +16,12 @@ pub enum DomainError {
     #[error("an account already exists")]
     AccountAlreadyExists,
 
+    #[error("unauthorized: the vault is locked")]
+    Unauthorized,
+
+    #[error("profile not found")]
+    ProfileNotFound,
+
     #[error("validation error: {0}")]
     Validation(String),
 

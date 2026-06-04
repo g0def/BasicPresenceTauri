@@ -95,21 +95,36 @@ Le coffre `vault.db` (chiffré) ne contient encore qu'un placeholder ; il accuei
 | `check_session` | `token` | `{ valid, remainingMs }` |
 | `logout` | `token` | `void` |
 
+### Profils
+
+[profile.rs](../src-tauri/src/presentation/commands/profile.rs) — CRUD des profils de présence (stockés dans le **coffre chiffré**). Garde d'accès : aucun token transmis ; le coffre doit être **déverrouillé** (sinon erreur `SESSION_EXPIRED`). Un profil introuvable renvoie `NOT_FOUND`.
+
+| Commande | Entrée | Sortie |
+| --- | --- | --- |
+| `create_profile` | `firstName, lastName, enterprise, poste?` | `ProfileDto { id, firstName, lastName, enterprise, poste, createdAt, updatedAt }` |
+| `list_profiles` | – | `{ profiles: ProfileDto[], activeProfileId }` |
+| `update_profile` | `id, firstName, lastName, enterprise, poste?` | `ProfileDto` |
+| `delete_profile` | `id` | `void` |
+| `set_active_profile` | `id` | `void` |
+
+> Le profil actif est persisté dans `vault_meta` (clé `active_profile_id`). Le premier profil créé devient l'actif ; supprimer l'actif le réassigne au premier restant.
+
 > Les commandes applicatives (`#[tauri::command]`) ne nécessitent **pas** d'entrée dans `capabilities/` (seules les permissions plugin/core en requièrent).
 
 ## Mapping Clean Architecture
 
 **Backend** ([src-tauri/src/](../src-tauri/src/)) :
 
-- `domain/` — entités (`User`, `Account`, `Session`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`), `DomainError`. Aucune dépendance externe.
-- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`) + DTOs.
-- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
+- `domain/` — entités (`User`, `Account`, `Session`, `Profile`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`), `DomainError`. Aucune dépendance externe.
+- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`) + DTOs.
+- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 
 **Frontend** ([src/](../src/)) :
 
 - `core/` — [ipc.ts](../src/core/ipc.ts) (**seul** à importer `@tauri-apps/api`), `errors.ts` (`AppError`), `config.ts`.
 - `features/auth/` — `domain` (entités, `AuthRepository`, use cases), `data` (DTOs, mappers, `TauriAuthRepository`), `presentation` (`AuthProvider` = composition root front, `useAuth`, `useSessionTimer`, écrans Register/Login/Home, compte à rebours).
+- `features/profile/` — `domain` (`Profile`, `ProfileRepository`, use cases), `data` (DTOs, mapper, `TauriProfileRepository`), `presentation` (`ProfileProvider` = composition root front recevant `onSessionExpired`, `useProfile`, formulaire `Dialog`, et le **badge** = menu compte regroupant profils + langue + thème + déconnexion). Indépendante de `auth` : `logout` est injecté (`onSessionExpired` au provider, `onLogout` au badge) ; langue/thème viennent de `core`/`shared`.
 
 ## Garanties (mappées aux exigences)
 

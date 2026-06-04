@@ -4,6 +4,7 @@ export type AppErrorCode =
   | "ACCOUNT_EXISTS"
   | "VALIDATION"
   | "SESSION_EXPIRED"
+  | "NOT_FOUND"
   | "INTERNAL"
   | "UNKNOWN";
 
@@ -34,6 +35,7 @@ const KNOWN_CODES: readonly string[] = [
   "ACCOUNT_EXISTS",
   "VALIDATION",
   "SESSION_EXPIRED",
+  "NOT_FOUND",
   "INTERNAL",
 ];
 

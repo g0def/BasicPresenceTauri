@@ -11,4 +11,9 @@ export const COMMANDS = {
   login: "login",
   checkSession: "check_session",
   logout: "logout",
+  createProfile: "create_profile",
+  listProfiles: "list_profiles",
+  updateProfile: "update_profile",
+  deleteProfile: "delete_profile",
+  setActiveProfile: "set_active_profile",
 } as const;

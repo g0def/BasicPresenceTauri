@@ -35,6 +35,10 @@ impl From<DomainError> for AppError {
             DomainError::AccountAlreadyExists => {
                 AppError::new("ACCOUNT_EXISTS", "Un compte existe déjà sur cet appareil")
             }
+            DomainError::Unauthorized => {
+                AppError::new("SESSION_EXPIRED", "Session expirée. Reconnectez-vous.")
+            }
+            DomainError::ProfileNotFound => AppError::new("NOT_FOUND", "Profil introuvable"),
             DomainError::Validation(m) => AppError::new("VALIDATION", m),
             DomainError::Storage(_)
             | DomainError::Hashing(_)

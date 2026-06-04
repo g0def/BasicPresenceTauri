@@ -8,9 +8,9 @@ use crate::domain::error::DomainError;
 use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy};
 use crate::infrastructure::persistence::db::open_plain_db;
 
-fn temp_config() -> (AppConfig, PathBuf) {
+fn temp_config(name: &str) -> (AppConfig, PathBuf) {
     let mut dir = std::env::temp_dir();
-    dir.push(format!("basic-presence-it-{}", std::process::id()));
+    dir.push(format!("basic-presence-it-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let config = AppConfig {
@@ -34,7 +34,7 @@ fn temp_config() -> (AppConfig, PathBuf) {
 #[test]
 fn full_auth_flow_and_encryption() {
     tauri::async_runtime::block_on(async {
-        let (config, dir) = temp_config();
+        let (config, dir) = temp_config("auth");
         let max_attempts = config.auth.max_attempts;
         let vault_path = config.vault_path.clone();
         let state = build_state(config).await.expect("build_state");
@@ -95,6 +95,98 @@ fn full_auth_flow_and_encryption() {
         assert!(matches!(
             state.login.execute("alice", "password123").await,
             Err(DomainError::AccountLocked { .. })
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn profile_crud_requires_unlocked_vault() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("profile");
+        let state = build_state(config).await.expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        // Vault is still locked before login: profile operations are refused.
+        assert!(matches!(
+            state
+                .create_profile
+                .execute("Ada", "Lovelace", "Analytical Engine", None)
+                .await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+
+        // Create: the first profile becomes the active one.
+        let p1 = state
+            .create_profile
+            .execute(
+                "Ada",
+                "Lovelace",
+                "Analytical Engine",
+                Some("Mathematician"),
+            )
+            .await
+            .expect("create p1");
+        assert_eq!(p1.first_name, "Ada");
+        assert_eq!(p1.poste.as_deref(), Some("Mathematician"));
+
+        let listed = state.list_profiles.execute().await.expect("list");
+        assert_eq!(listed.profiles.len(), 1);
+        assert_eq!(listed.active_profile_id.as_deref(), Some(p1.id.as_str()));
+
+        // A blank optional field collapses to None; required fields are enforced.
+        let p2 = state
+            .create_profile
+            .execute("Alan", "Turing", "Bletchley", Some("  "))
+            .await
+            .expect("create p2");
+        assert_eq!(p2.poste, None);
+        assert!(matches!(
+            state.create_profile.execute("  ", "X", "Y", None).await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // Adding a second profile does not change the active one.
+        let listed = state.list_profiles.execute().await.expect("list");
+        assert_eq!(listed.profiles.len(), 2);
+        assert_eq!(listed.active_profile_id.as_deref(), Some(p1.id.as_str()));
+
+        // Switch active, then update.
+        state
+            .set_active_profile
+            .execute(&p2.id)
+            .await
+            .expect("set active");
+        let updated = state
+            .update_profile
+            .execute(&p2.id, "Alan", "Turing", "GCHQ", None)
+            .await
+            .expect("update");
+        assert_eq!(updated.enterprise, "GCHQ");
+
+        // Deleting the active profile falls back to the first remaining one.
+        state.delete_profile.execute(&p2.id).await.expect("delete");
+        let listed = state.list_profiles.execute().await.expect("list");
+        assert_eq!(listed.profiles.len(), 1);
+        assert_eq!(listed.active_profile_id.as_deref(), Some(p1.id.as_str()));
+
+        // Logout locks the vault; profile operations are refused again.
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state.list_profiles.execute().await,
+            Err(DomainError::Unauthorized)
         ));
 
         let _ = std::fs::remove_dir_all(dir);

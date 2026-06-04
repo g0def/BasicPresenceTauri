@@ -100,22 +100,23 @@ src-tauri/
     ├── lib.rs                   # POINT DE COMPOSITION : setup, DI (build_state), commandes
     ├── integration_tests.rs     # Test e2e backend (register→login→session + chiffrement)
     ├── domain/                  # ── Domain (pur, aucune dépendance externe)
-    │   ├── entities/            #    user, account, session
-    │   ├── repositories/        #    trait AccountRepository
+    │   ├── entities/            #    user, account, session, profile
+    │   ├── repositories/        #    traits AccountRepository, ProfileRepository
     │   ├── services/            #    ports : PasswordHasher, KeyService, TokenGenerator,
     │   │                        #            SessionStore, VaultManager, Clock
     │   └── error.rs             #    DomainError
     ├── application/             # ── Application (dépend du Domain)
-    │   ├── use_cases/           #    register_account, login, logout, check_session, account_exists
-    │   └── dto/                 #    UserDto, LoginResultDto, SessionStatusDto (serde camelCase)
+    │   ├── use_cases/           #    register_account, login, logout, check_session, account_exists,
+    │   │                        #    create_profile, list_profiles, update_profile, delete_profile, set_active_profile
+    │   └── dto/                 #    UserDto, LoginResultDto, SessionStatusDto, ProfileDto, ProfilesDto (serde camelCase)
     ├── infrastructure/          # ── Infrastructure (implémente les ports)
     │   ├── crypto/              #    Argon2PasswordHasher, Argon2KeyService, RandomTokenGenerator
-    │   ├── persistence/         #    db (libsql), migrations, account_repository, vault
+    │   ├── persistence/         #    db (libsql), migrations, account_repository, profile_repository, vault
     │   ├── session/             #    InMemorySessionStore
     │   ├── clock.rs             #    SystemClock
     │   └── config.rs            #    AppConfig (chemins, params Argon2, politique session/lockout)
     └── presentation/            # ── Presentation (frontière IPC)
-        ├── commands/            #    auth.rs (#[tauri::command] fines) + error.rs (AppError)
+        ├── commands/            #    auth.rs, profile.rs (#[tauri::command] fines) + error.rs (AppError)
         └── state.rs             #    AppState injecté via .manage()
 ```
 
@@ -143,11 +144,22 @@ src/
 │   ├── errors.ts                #    AppError + normalizeError
 │   └── config.ts                #    constantes + noms de commandes
 └── features/
-    └── auth/
-        ├── domain/              #    entities, repositories (interfaces), use-cases (purs)
-        ├── data/                #    dto, mappers, TauriAuthRepository (→ core/ipc)
-        └── presentation/        #    AuthProvider (composition root front), hooks, écrans
+    ├── auth/
+    │   ├── domain/              #    entities, repositories (interfaces), use-cases (purs)
+    │   ├── data/                #    dto, mappers, TauriAuthRepository (→ core/ipc)
+    │   └── presentation/        #    AuthProvider (composition root front), hooks, écrans
+    └── profile/                 #    Gestion des profils de présence (multi-profils)
+        ├── domain/              #    Profile, ProfileRepository, use-cases purs
+        ├── data/                #    dto, mapper, TauriProfileRepository (→ core/ipc)
+        └── presentation/        #    ProfileProvider, useProfile, formulaire (Dialog),
+                                 #    badge = menu compte (profils + langue + thème + déconnexion)
 ```
+
+> Le header authentifié ne garde que le timer de session ; le **badge de profil**
+> (tout à droite) ouvre le menu compte (changer/ajouter/éditer/supprimer un profil,
+> langue, thème, déconnexion). `App.tsx` injecte `onSessionExpired={logout}` au
+> `ProfileProvider` et `Home` injecte `onLogout` au badge — la feature `profile`
+> ne dépend pas de `auth` (langue/thème viennent de `core`/`shared`).
 
 ### Conventions frontend
 
@@ -194,10 +206,10 @@ src/
 
 ## 10. État du projet & feuille de route
 
-**Implémenté (socle v1)** : architecture propre Rust + React, persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Front minimal : Register → Login → Accueil (affiche le username).
+**Implémenté (socle v1)** : architecture propre Rust + React, persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Entité **Profile** (profils de présence) : CRUD complet dans le coffre chiffré, gestion **multi-profils** (création, sélection du profil actif, édition, suppression) ; après login, l'accueil propose la création si aucun profil, sinon un badge (photo + nom) en haut à droite.
 
 **Phase 2 (à venir)** :
 
 - **Synchronisation cloud Turso** (isolée dans `infrastructure/persistence/db.rs` ; arbitrer le compromis chiffrement-vs-sync de libSQL — voir [documentation/turso.md](documentation/turso.md)).
-- Entités **présence / mode de déplacement / CO₂** dans le coffre chiffré.
+- Entités **présence / mode de déplacement / CO₂** dans le coffre chiffré (rattachées à un profil).
 - `change_password`, intégrité-au-repos, idle-timeout, multi-comptes.

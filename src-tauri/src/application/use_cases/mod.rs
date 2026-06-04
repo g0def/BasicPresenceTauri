@@ -1,5 +1,10 @@
 pub mod account_exists;
 pub mod check_session;
+pub mod create_profile;
+pub mod delete_profile;
+pub mod list_profiles;
 pub mod login;
 pub mod logout;
 pub mod register_account;
+pub mod set_active_profile;
+pub mod update_profile;

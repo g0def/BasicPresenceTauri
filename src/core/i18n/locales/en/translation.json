@@ -28,6 +28,30 @@
     "en": "English"
   },
   "theme": {
-    "toggle": "Toggle theme"
+    "toggle": "Toggle theme",
+    "dark": "Dark mode",
+    "light": "Light mode"
+  },
+  "profile": {
+    "menu": "Account menu",
+    "emptyTitle": "No profile",
+    "emptySubtitle": "Create a profile to start managing your presence.",
+    "add": "Add a profile",
+    "edit": "Edit profile",
+    "delete": "Delete profile",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "addTitle": "New profile",
+    "editTitle": "Edit profile",
+    "formSubtitle": "Fill in the profile details.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "enterprise": "Company",
+    "poste": "Role",
+    "optional": "(optional)",
+    "profilesLabel": "Profiles",
+    "deleteConfirmTitle": "Delete this profile?",
+    "deleteConfirmBody": "The profile \"{{name}}\" will be permanently deleted."
   }
 }

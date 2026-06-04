@@ -13,10 +13,16 @@ pub const KEYSTORE_MIGRATIONS: &[Migration] = &[Migration {
     sql: include_str!("../../../migrations/keystore/0001_init.sql"),
 }];
 
-pub const VAULT_MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    sql: include_str!("../../../migrations/vault/0001_init.sql"),
-}];
+pub const VAULT_MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: include_str!("../../../migrations/vault/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        sql: include_str!("../../../migrations/vault/0002_add_profiles.sql"),
+    },
+];
 
 /// Idempotently apply migrations in version order, tracking applied versions in
 /// a `_migrations` table on the given connection.

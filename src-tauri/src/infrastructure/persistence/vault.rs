@@ -12,8 +12,7 @@ use crate::infrastructure::persistence::migrations::{self, VAULT_MIGRATIONS};
 struct OpenVault {
     // Keep the Database alive so the connection stays valid.
     _db: Database,
-    // Read via `connection()`; presence repositories will use it next iteration.
-    #[allow(dead_code)]
+    // Cloned out via `connection()` for the presence repositories.
     conn: Connection,
 }
 
@@ -32,9 +31,8 @@ impl LibsqlVaultManager {
         }
     }
 
-    /// Clone the live connection if the vault is currently unlocked.
-    /// Presence repositories will use this in later iterations.
-    #[allow(dead_code)]
+    /// Clone the live connection if the vault is currently unlocked
+    /// (used by the presence repositories).
     pub fn connection(&self) -> Option<Connection> {
         self.state
             .lock()
