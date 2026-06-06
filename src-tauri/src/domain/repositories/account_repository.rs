@@ -22,4 +22,14 @@ pub trait AccountRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     async fn reset_failed_attempts(&self, id: &str, updated_at: i64) -> Result<(), DomainError>;
+
+    /// Persist a (freshly generated) wrapped MAC key for an account that
+    /// predates the vault-integrity feature. Backfilled once, on login.
+    async fn set_mac_key(
+        &self,
+        id: &str,
+        wrapped_mac_key: &[u8],
+        mac_key_nonce: &[u8],
+        updated_at: i64,
+    ) -> Result<(), DomainError>;
 }

@@ -19,12 +19,24 @@ pub struct AuthPolicy {
     pub lockout_ms: i64,
 }
 
+/// What to do when the vault's at-rest integrity check fails on a *clean*
+/// previous shutdown (an unclean shutdown is always treated as expected).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntegrityPolicy {
+    /// Open anyway and re-baseline (default): a mismatch after a crash is
+    /// expected, and hard-failing would brick the app for legitimate users.
+    WarnAndAllow,
+    /// Refuse to open a tampered vault (for security-sensitive deployments).
+    HardFail,
+}
+
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub keystore_path: PathBuf,
     pub vault_path: PathBuf,
     pub argon2: Argon2Params,
     pub auth: AuthPolicy,
+    pub integrity: IntegrityPolicy,
 }
 
 impl AppConfig {
@@ -45,6 +57,7 @@ impl AppConfig {
                 max_attempts: 5,
                 lockout_ms: 5 * 60 * 1000, // 5 minutes
             },
+            integrity: IntegrityPolicy::WarnAndAllow,
         }
     }
 }

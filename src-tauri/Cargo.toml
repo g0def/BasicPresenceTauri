@@ -19,7 +19,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -33,6 +32,23 @@ password-hash = { version = "0.5", features = ["std"] }
 
 # Envelope encryption du DEK (AEAD authentifié, nonce 192 bits)
 chacha20poly1305 = "0.10"
+
+# Évidence d'altération du vault au repos (HMAC-SHA256 sur le fichier + comparaison
+# constant-time). libSQL 0.9 ne chiffre qu'en AES-256-CBC non authentifié.
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+
+# Scellement du keystore : clé de device stockée dans le trousseau OS.
+# `sync-secret-service` + `crypto-rust` => backend pur Rust (zbus), pas de
+# dépendance système à OpenSSL/libsecret au build (le Secret Service GNOME/KWallet
+# reste requis au runtime sous Linux).
+keyring = { version = "3", features = [
+    "apple-native",
+    "windows-native",
+    "sync-secret-service",
+    "crypto-rust",
+] }
 
 # Aléatoire cryptographique, effacement mémoire, ids, erreurs, encodage
 getrandom = "0.3"

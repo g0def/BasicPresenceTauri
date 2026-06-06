@@ -118,7 +118,10 @@ export function PresenceCalendar() {
             >
               <span className="font-medium">{d.getDate()}</span>
               {Icon && (
-                <Icon className="mt-auto size-5 self-end opacity-80" aria-hidden />
+                <Icon
+                  className="mt-auto size-5 self-end opacity-80"
+                  aria-hidden
+                />
               )}
             </button>
           );

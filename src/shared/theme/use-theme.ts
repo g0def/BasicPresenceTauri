@@ -15,7 +15,10 @@ function readStoredTheme(): Theme {
  * from the entry point.
  */
 export function applyStoredTheme(): void {
-  document.documentElement.classList.toggle("dark", readStoredTheme() === "dark");
+  document.documentElement.classList.toggle(
+    "dark",
+    readStoredTheme() === "dark",
+  );
 }
 
 /**
@@ -38,11 +41,12 @@ export function useTheme() {
   }, []);
 
   const toggleTheme = useCallback(
-    () => setThemeState((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    }),
+    () =>
+      setThemeState((prev) => {
+        const next: Theme = prev === "dark" ? "light" : "dark";
+        localStorage.setItem(STORAGE_KEY, next);
+        return next;
+      }),
     [],
   );
 

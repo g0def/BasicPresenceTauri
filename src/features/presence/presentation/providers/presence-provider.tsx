@@ -84,7 +84,10 @@ export function PresenceProvider({
       try {
         const saved = await setPresenceUseCase({ profileId, day, type });
         // Upsert by day: drop any previous record for that day, keep the rest.
-        setPresences((prev) => [...prev.filter((p) => p.day !== saved.day), saved]);
+        setPresences((prev) => [
+          ...prev.filter((p) => p.day !== saved.day),
+          saved,
+        ]);
         return true;
       } catch (e) {
         handleError(e);

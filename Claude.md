@@ -176,9 +176,10 @@ src/
 
 - **Mot de passe** : haché en **Argon2id** (jamais stocké en clair, jamais envoyé au front).
 - **Chiffrement au repos** : _envelope encryption_ à clé dérivée du mot de passe. Un DEK aléatoire chiffre le coffre `vault.db` ; le DEK est enveloppé (XChaCha20-Poly1305) par un KEK dérivé du mot de passe. Le coffre ne s'ouvre qu'après login.
-- **Deux bases** : `keystore.db` (clair : hash + DEK enveloppé) et `vault.db` (chiffré).
-- **Session** : 15 min **absolue**, en mémoire uniquement (jamais persistée) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** (verrouillage après échecs répétés).
+- **Deux bases, toutes deux chiffrées au repos** : `keystore.db` (hash + DEK/clé MAC enveloppés) **scellé par une clé de device du trousseau OS** (libsecret/Keychain/Credential Manager) → fichier volé inutilisable hors de l'appareil ; `vault.db` chiffré par le DEK, avec **évidence d'altération** (HMAC-SHA256 sidecar, libSQL CBC n'étant pas authentifié).
+- **Session** : 15 min **absolue** + **timeout d'inactivité**, en mémoire uniquement (jamais persistée) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** (verrouillage après échecs répétés).
 - **Aucun secret** (token Turso, clés) commité ni exposé au frontend — ils restent côté Rust.
+- ⚠️ **Contrainte runtime (Linux)** : un Secret Service (GNOME Keyring/KWallet) doit tourner pour ouvrir le keystore ; sinon le démarrage échoue explicitement.
 
 ---
 

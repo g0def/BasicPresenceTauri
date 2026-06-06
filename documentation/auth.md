@@ -30,6 +30,8 @@ Composants cryptographiques :
 - **DEK** (Data Encryption Key, 32 octets aléatoires) = la vraie clé du coffre `vault.db`.
 - **XChaCha20-Poly1305** (AEAD **authentifié**, nonce aléatoire 192 bits) = enveloppe (wrap) le DEK avec le KEK.
 - **libSQL AES-256-CBC** = chiffrement at-rest du coffre, clé = DEK (voir [turso.md](turso.md)).
+- **Clé de device** (32 octets aléatoires, **scellée dans le trousseau de l'OS** — libsecret / Keychain / Credential Manager via le crate `keyring`) = chiffre **aussi** `keystore.db` au repos (AES-256-CBC). Résolue au démarrage, indépendante du compte. [device_key.rs](../src-tauri/src/infrastructure/crypto/device_key.rs)
+- **Clé MAC** (32 octets aléatoires, **enveloppée par le même KEK** que le DEK) = évidence d'altération du coffre via HMAC-SHA256 du fichier (le CBC libSQL n'étant pas authentifié). [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs)
 
 ### Flux d'inscription (`register`)
 
@@ -39,8 +41,9 @@ Composants cryptographiques :
 2. `password_hash = Argon2id(password)` (sel propre, intégré au PHC).
 3. `DEK = aléatoire(32o)` ; `kek_salt = aléatoire` ; `KEK = Argon2id(password, kek_salt)`.
 4. `wrapped_dek, nonce = XChaCha20Poly1305(KEK).encrypt(DEK)`.
-5. Insérer dans `keystore.db` : `{id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, ...}`.
-6. Le mot de passe (et le DEK/KEK en mémoire) sont **effacés** (`Zeroizing`).
+5. `MAC key = aléatoire(32o)` ; `wrapped_mac_key, mac_key_nonce = XChaCha20Poly1305(KEK).encrypt(MAC key)`.
+6. Insérer dans `keystore.db` (lui-même **scellé** par la clé de device) : `{id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, wrapped_mac_key, mac_key_nonce, ...}`.
+7. Le mot de passe (et le DEK/KEK/MAC en mémoire) sont **effacés** (`Zeroizing`).
 
 ### Flux de connexion (`login`)
 
@@ -49,31 +52,35 @@ Composants cryptographiques :
 1. Charger le compte. _(Si username inconnu : faire un hash « à blanc » pour égaliser le timing, puis renvoyer `InvalidCredentials`.)_
 2. Si verrouillé (`locked_until` futur) → `AccountLocked`.
 3. Vérifier `password_hash`. Échec → incrémenter `failed_attempts`, verrouiller au seuil, renvoyer `InvalidCredentials`.
-4. Succès → `KEK = Argon2id(password, kek_salt)` → `DEK = unwrap(wrapped_dek, nonce, KEK)` → **ouvrir le coffre** chiffré avec le DEK.
-5. Réinitialiser les compteurs, créer une **session** (token + `expiresAt = now + 15 min`).
-6. Renvoyer `{ token, expiresAt, user }`.
+4. Succès → `KEK = Argon2id(password, kek_salt)` → `DEK = unwrap(wrapped_dek, nonce, KEK)`.
+5. Résoudre la **clé MAC** : `unwrap(wrapped_mac_key, …)` si présente, sinon en générer une et la persister (*backfill* unique pour les comptes créés avant la fonctionnalité).
+6. **Ouvrir le coffre** : vérifier d'abord l'intégrité at-rest (HMAC) avec la clé MAC, puis déchiffrer avec le DEK.
+7. Réinitialiser les compteurs, créer une **session** (token + `expiresAt = now + 15 min`).
+8. Renvoyer `{ token, expiresAt, user }`.
 
 ### Le « chicken-and-egg » résolu
 
-Le matériel d'auth (hash + DEK **enveloppé**) vit **hors** du coffre chiffré, dans `keystore.db` (non chiffré). On peut donc **vérifier le mot de passe et reconstruire la clé avant** d'ouvrir le coffre.
+Le matériel d'auth (hash + DEK **enveloppé**) vit **hors** du coffre chiffré, dans `keystore.db`. On peut donc **vérifier le mot de passe et reconstruire la clé avant** d'ouvrir le coffre. Le keystore est lui-même **scellé au repos** par la clé de device (issue du trousseau OS), résolue au démarrage — ce qui n'enlève rien au raisonnement : une fois le keystore ouvert, le matériel d'auth reste accessible avant le déverrouillage du coffre.
 
 ## Stockage : keystore vs vault
 
-Table `account` (keystore, non chiffré) — [0001_init.sql](../src-tauri/migrations/keystore/0001_init.sql) :
+Table `account` (keystore, **scellé** par la clé de device) — [0001_init.sql](../src-tauri/migrations/keystore/0001_init.sql) + [0002_add_mac_key.sql](../src-tauri/migrations/keystore/0002_add_mac_key.sql) :
 
 ```
 id, username, password_hash, wrapped_dek, kek_salt, dek_nonce,
-failed_attempts, locked_until, created_at, updated_at
+failed_attempts, locked_until, created_at, updated_at,
+wrapped_mac_key, mac_key_nonce
 ```
 
-Le coffre `vault.db` (chiffré) ne contient encore qu'un placeholder ; il accueillera les entités présence/déplacement/CO₂.
+Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d'altération) ne contient encore qu'un placeholder ; il accueillera les entités présence/déplacement/CO₂.
 
 ## Session
 
 - **Token** = 32 octets aléatoires (`getrandom`), encodés base64url. [token_generator.rs](../src-tauri/src/infrastructure/crypto/token_generator.rs)
 - **En mémoire uniquement** : côté Rust `InMemorySessionStore` (`Mutex<HashMap>`, [in_memory_session_store.rs](../src-tauri/src/infrastructure/session/in_memory_session_store.rs)) ; côté React un `useRef` dans [auth-provider.tsx](../src/features/auth/presentation/providers/auth-provider.tsx). **Jamais** dans `localStorage`. → app fermée = session perdue = re-login obligatoire.
 - **Expiration absolue 15 min** : basée sur `expiresAt` (epoch ms), donc insensible à la mise en veille / aux changements d'horloge. Timer front : [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts).
-- À l'**expiration ou au logout** : session révoquée + coffre **fermé** + DEK **oublié** (re-verrouillage). [check_session.rs](../src-tauri/src/application/use_cases/check_session.rs), [logout.rs](../src-tauri/src/application/use_cases/logout.rs).
+- **Timeout d'inactivité (5 min)** : en complément de l'expiration absolue, l'absence d'interaction (souris / clavier / scroll / retour au premier plan) déclenche une déconnexion. [use-idle-timeout.ts](../src/features/auth/presentation/hooks/use-idle-timeout.ts), seuil dans [config.ts](../src/core/config.ts) (`IDLE_TIMEOUT_MS`).
+- À l'**expiration ou au logout** : session révoquée + coffre **fermé** + DEK **oublié** (re-verrouillage), et la **base d'intégrité (HMAC) du coffre est rafraîchie**. [check_session.rs](../src-tauri/src/application/use_cases/check_session.rs), [logout.rs](../src-tauri/src/application/use_cases/logout.rs). Une fermeture propre de la fenêtre déclenche aussi ce verrouillage (hook `on_window_event` dans [lib.rs](../src-tauri/src/lib.rs)).
 
 ## Anti-bruteforce
 
@@ -141,21 +148,30 @@ Le coffre `vault.db` (chiffré) ne contient encore qu'un placeholder ; il accuei
 ## Garanties (mappées aux exigences)
 
 - Mot de passe **jamais** stocké en clair (Argon2id PHC).
-- `password_hash` / `DEK` / `KEK` / `token` **jamais** envoyés au frontend.
+- `password_hash` / `DEK` / `KEK` / clé MAC / `token` **jamais** envoyés au frontend.
 - Données au repos chiffrées, clé **dérivée du mot de passe** (coffre illisible sans login).
+- `keystore.db` **scellé** par la clé de device (trousseau OS) → fichier volé inutilisable hors de l'appareil.
+- Évidence d'altération du coffre (HMAC-SHA256 sidecar, vérifié à l'ouverture).
 - Mémoire sensible effacée (`Zeroizing` / `zeroize`).
-- Session 15 min absolue + re-login à chaque démarrage.
+- Session 15 min absolue + timeout d'inactivité + re-login à chaque démarrage.
+
+## Durcissements implémentés
+
+- **Scellement du `keystore.db` par le trousseau OS** *(résout le brute-force hors-ligne)*. Le keystore est désormais chiffré au repos (AES-256-CBC) avec une **clé de device** stockée dans le trousseau de l'OS (libsecret / Keychain / Credential Manager). Un attaquant qui copie le fichier ne peut plus tester des mots de passe hors-ligne sans **aussi** extraire la clé du trousseau. Bootstrap + migration d'un keystore historique en clair : [keystore_bootstrap.rs](../src-tauri/src/infrastructure/persistence/keystore_bootstrap.rs) (marqueur `keystore.db.sealed`).
+  - ⚠️ **Contrainte runtime (Linux)** : un Secret Service actif (GNOME Keyring / KWallet) est requis ; en headless/CI le démarrage échoue explicitement (pas de repli silencieux en clair).
+  - ⚠️ **Risque inhérent** : si l'entrée du trousseau est supprimée (reset OS, réinstallation), `keystore.db` devient illisible → coffre perdu. Surfacé via `KeystoreUnrecoverable` (pas d'effacement automatique).
+- **Évidence d'altération du coffre (HMAC-SHA256)** *(atténue le CBC non authentifié)*. À la fermeture propre, un HMAC du fichier `vault.db` (clé MAC enveloppée par le KEK) est écrit dans `vault.db.hmac` ; il est vérifié à l'ouverture. Politique `IntegrityPolicy` ([config.rs](../src-tauri/src/infrastructure/config.rs)) : `WarnAndAllow` (défaut) ou `HardFail`. Un marqueur `vault.db.dirty` distingue un crash (rebaseline silencieux) d'une altération après arrêt propre. [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs).
+  - ⚠️ C'est de la **détection**, pas de la prévention, et uniquement entre sessions propres. libSQL 0.9 n'expose que `Cipher::Aes256Cbc` (aucun AEAD at-rest) — un chiffrement authentifié natif reste à surveiller côté lib.
+- **Timeout d'inactivité** en complément de l'expiration absolue.
 
 ## Limites connues & Phase 2
 
-- **AES-256-CBC = confidentialité forte mais NON authentifiée** (pas de HMAC par page comme le SQLCipher complet) → pas de détection d'altération du fichier. L'intégrité au repos est un durcissement Phase 2. Le matériel de clé, lui, reste authentifié (XChaCha20-Poly1305). _Note : libSQL 0.9 n'expose que `Cipher::Aes256Cbc` — aucun cipher AEAD n'est disponible côté at-rest, c'est une contrainte de la lib, pas un choix._
-- **Brute-force hors-ligne du `keystore.db`** : le keystore est en clair et contient `wrapped_dek`, `kek_salt`, `dek_nonce` et `password_hash`. Un attaquant ayant un accès **lecture au fichier** peut le copier et tester des mots de passe **hors-ligne**, contournant le verrouillage 5-tentatives (qui ne protège que l'application en cours d'exécution). C'est **inhérent** au chiffrement local dérivé d'un mot de passe ; la seule barrière est le coût Argon2id (profil OWASP 46 MiB). Durcissement Phase 2 possible : sceller un secret supplémentaire dans le trousseau de l'OS (Keychain / DPAPI / libsecret) pour rendre le keystore inutilisable hors de l'appareil.
-- `change_password` (peu coûteux : ré-envelopper le DEK, sans re-chiffrer tout le coffre).
-- Idle-timeout en complément de l'expiration absolue.
+- `change_password` (peu coûteux : ré-envelopper le DEK + la clé MAC, sans re-chiffrer tout le coffre).
+- Surfacer dans l'UI l'avertissement d'altération en mode `WarnAndAllow` (aujourd'hui silencieux ; `HardFail` refuse l'ouverture).
 - Multi-comptes par appareil (le v1 est mono-utilisateur, cohérent avec la clé dérivée du mot de passe).
 
 ## Vérification
 
-- `cargo test` — tests crypto (hash/verify, wrap/unwrap) + test d'intégration `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement + lockout). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
+- `cargo test` — tests crypto (hash/verify, wrap/unwrap) + tests d'intégration : `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement coffre **et** keystore + lockout), `legacy_plaintext_keystore_is_migrated_and_sealed` (migration + scellement), `tampering_with_the_vault_is_detected_under_hard_fail` (évidence d'altération). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
 - `pnpm test` — mapper, repository (via `mockIPC`), timer de session, flux login → Home.
 - Manuel : `pnpm tauri dev` → **Créer un compte** → **Connexion** → **Home** (« Bonjour {username} » + compte à rebours).

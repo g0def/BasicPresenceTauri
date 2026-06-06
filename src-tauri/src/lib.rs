@@ -39,7 +39,8 @@ use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
 use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
-use crate::infrastructure::persistence::db::{connect, open_plain_db};
+use crate::infrastructure::persistence::db::connect;
+use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
 use crate::infrastructure::persistence::profile_repository::LibsqlProfileRepository;
@@ -51,7 +52,16 @@ use crate::presentation::state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .on_window_event(|window, event| {
+            // On a clean window close, lock the vault so its integrity baseline
+            // is refreshed (otherwise the next launch sees an "unclean" state).
+            if matches!(
+                event,
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+            ) {
+                window.state::<AppState>().vault.close();
+            }
+        })
         .setup(|app| {
             // Resolve (and create) the per-app data directory for the DB files.
             let data_dir = app
@@ -61,8 +71,12 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)
                 .map_err(|e| format!("cannot create app data dir: {e}"))?;
 
+            // Per-device key that seals the keystore at rest (from the OS keychain).
+            let device_key = crate::infrastructure::crypto::device_key::resolve_device_key()
+                .map_err(|e| format!("cannot access OS secure storage: {e:?}"))?;
+
             let config = AppConfig::new(&data_dir);
-            let state = tauri::async_runtime::block_on(build_state(config))
+            let state = tauri::async_runtime::block_on(build_state(config, device_key.as_slice()))
                 .map_err(|e| format!("failed to initialize backend: {e:?}"))?;
             app.manage(state);
             Ok(())
@@ -88,9 +102,12 @@ pub fn run() {
 
 /// Composition root: build the infrastructure implementations, inject them into
 /// the use cases, and assemble the managed `AppState`.
-async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
-    // Keystore (plaintext): auth credentials + wrapped key material.
-    let keystore_db = open_plain_db(&config.keystore_path).await?;
+async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, DomainError> {
+    // Keystore: auth credentials + wrapped key material. Sealed at rest behind
+    // the per-device key (creates a fresh encrypted store, or migrates a legacy
+    // plaintext one). Every field inside is already cryptographically protected;
+    // this layer additionally defeats offline brute-force of a stolen file.
+    let keystore_db = open_or_migrate_keystore(&config.keystore_path, device_key).await?;
     let keystore_conn = connect(&keystore_db).await?;
     migrations::run(&keystore_conn, KEYSTORE_MIGRATIONS).await?;
 
@@ -111,7 +128,10 @@ async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
     let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
     // Keep a concrete handle so the profile repository can read the live vault
     // connection, while the auth use cases depend on the `VaultManager` port.
-    let vault_impl = Arc::new(LibsqlVaultManager::new(config.vault_path.clone()));
+    let vault_impl = Arc::new(LibsqlVaultManager::new(
+        config.vault_path.clone(),
+        config.integrity,
+    ));
     let vault: Arc<dyn VaultManager> = vault_impl.clone();
     let profiles: Arc<dyn ProfileRepository> =
         Arc::new(LibsqlProfileRepository::new(vault_impl.clone()));
@@ -147,6 +167,7 @@ async fn build_state(config: AppConfig) -> Result<AppState, DomainError> {
         set_presence: SetPresenceUseCase::new(presences.clone(), clock.clone()),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
+        vault: vault.clone(),
         keystore_db,
     })
 }

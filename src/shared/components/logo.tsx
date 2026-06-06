@@ -16,8 +16,7 @@ export function Logo({ className }: LogoProps) {
         className,
       )}
     >
-      Basic Presence{" "}
-      <span aria-hidden="true">🌿</span>
+      Basic Presence <span aria-hidden="true">🌿</span>
     </span>
   );
 }

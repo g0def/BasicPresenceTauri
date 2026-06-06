@@ -4,6 +4,12 @@ export const SESSION_TICK_MS = 1_000;
 /** Below this remaining time, the countdown switches to its warning style. */
 export const COUNTDOWN_WARNING_MS = 60_000;
 
+/**
+ * Inactivity window: an authenticated session with no user interaction for this
+ * long is logged out, independently of the backend's absolute 15-min TTL.
+ */
+export const IDLE_TIMEOUT_MS = 5 * 60_000;
+
 /** Backend command names (snake_case, matching the Rust `#[tauri::command]`s). */
 export const COMMANDS = {
   accountExists: "account_exists",

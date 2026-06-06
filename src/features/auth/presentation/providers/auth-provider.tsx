@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
+import { IDLE_TIMEOUT_MS } from "@/core/config";
 import { isAppError } from "@/core/errors";
 import type { Credentials } from "@/features/auth/domain/entities/auth-session";
 import type { User } from "@/features/auth/domain/entities/user";
@@ -14,6 +15,7 @@ import {
   type AuthContextValue,
   type AuthStatus,
 } from "@/features/auth/presentation/context/auth-context";
+import { useIdleTimeout } from "@/features/auth/presentation/hooks/use-idle-timeout";
 import { useSessionTimer } from "@/features/auth/presentation/hooks/use-session-timer";
 
 // Composition root for the auth feature: wire the repository to the use cases.
@@ -62,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const remainingMs = useSessionTimer(expiresAt, clearSession);
+
+  // Inactivity logout (only while authenticated); shortens the session when the
+  // app is left unattended, on top of the backend's absolute TTL.
+  useIdleTimeout(IDLE_TIMEOUT_MS, clearSession, status === "authenticated");
 
   const login = useCallback(async (credentials: Credentials) => {
     setIsSubmitting(true);

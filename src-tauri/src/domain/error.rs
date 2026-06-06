@@ -36,4 +36,13 @@ pub enum DomainError {
 
     #[error("token error: {0}")]
     Token(String),
+
+    #[error("keychain error: {0}")]
+    Keychain(String),
+
+    #[error("keystore unrecoverable: the device key is missing or changed")]
+    KeystoreUnrecoverable,
+
+    #[error("vault integrity check failed: the encrypted store was modified")]
+    VaultTampered,
 }

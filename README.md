@@ -67,7 +67,7 @@ Cela démarre Vite **et** ouvre la fenêtre Tauri avec hot-reload.
 **Au premier lancement** : l'écran **« Créer un compte »** s'affiche (appareil mono-utilisateur).
 Une fois le compte créé → écran **Connexion** → **Accueil** (« Bonjour {username} » + compte à rebours de session). La session dure **15 min** et le mot de passe est redemandé à chaque démarrage.
 
-> Les bases de données (`keystore.db` clair + `vault.db` chiffré) sont créées dans le dossier _app-data_ de l'OS (ex. `~/.local/share/com.godef.basic-presence/` sous Linux).
+> Les bases de données (`keystore.db` et `vault.db`, **toutes deux chiffrées au repos**) sont créées dans le dossier _app-data_ de l'OS (ex. `~/.local/share/com.godef.basic-presence/` sous Linux). Le `keystore.db` est scellé par une clé stockée dans le **trousseau de l'OS** : sous Linux, un Secret Service (GNOME Keyring / KWallet) doit être actif, sinon le démarrage échoue.
 
 ### Dépannage (Linux — affichage WebKitGTK)
 

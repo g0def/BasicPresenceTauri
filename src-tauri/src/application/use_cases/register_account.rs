@@ -60,6 +60,10 @@ impl RegisterAccountUseCase {
         let kek = self.keys.derive_kek(pw.as_slice(), &kek_salt)?;
         let wrapped = self.keys.wrap_dek(dek.as_slice(), kek.as_slice())?;
 
+        // Generate the vault MAC key (tamper-evidence) and wrap it with the same KEK.
+        let mac_key = self.keys.generate_dek()?;
+        let wrapped_mac = self.keys.wrap_dek(mac_key.as_slice(), kek.as_slice())?;
+
         let now = self.clock.now_ms();
         let account = Account {
             id: Uuid::now_v7().to_string(),
@@ -69,6 +73,8 @@ impl RegisterAccountUseCase {
                 wrapped_dek: wrapped.ciphertext,
                 kek_salt,
                 dek_nonce: wrapped.nonce,
+                wrapped_mac_key: Some(wrapped_mac.ciphertext),
+                mac_key_nonce: Some(wrapped_mac.nonce),
             },
             failed_attempts: 0,
             locked_until: None,

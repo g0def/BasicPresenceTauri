@@ -7,7 +7,7 @@ use crate::domain::repositories::account_repository::AccountRepository;
 use crate::infrastructure::persistence::db::map_storage;
 
 const SELECT_COLUMNS: &str = "id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
-     failed_attempts, locked_until, created_at, updated_at";
+     failed_attempts, locked_until, created_at, updated_at, wrapped_mac_key, mac_key_nonce";
 
 /// libSQL-backed account repository (over the keystore connection).
 pub struct LibsqlAccountRepository {
@@ -29,6 +29,8 @@ fn row_to_account(row: &Row) -> Result<Account, DomainError> {
             wrapped_dek: row.get(3).map_err(map_storage)?,
             kek_salt: row.get(4).map_err(map_storage)?,
             dek_nonce: row.get(5).map_err(map_storage)?,
+            wrapped_mac_key: row.get(10).map_err(map_storage)?,
+            mac_key_nonce: row.get(11).map_err(map_storage)?,
         },
         failed_attempts: row.get(6).map_err(map_storage)?,
         locked_until: row.get(7).map_err(map_storage)?,
@@ -72,8 +74,9 @@ impl AccountRepository for LibsqlAccountRepository {
             .execute(
                 "INSERT INTO account \
                  (id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
-                  failed_attempts, locked_until, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                  failed_attempts, locked_until, created_at, updated_at, \
+                  wrapped_mac_key, mac_key_nonce) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                 params![
                     account.id.clone(),
                     account.username.clone(),
@@ -85,6 +88,8 @@ impl AccountRepository for LibsqlAccountRepository {
                     account.locked_until,
                     account.created_at,
                     account.updated_at,
+                    account.key_material.wrapped_mac_key.clone(),
+                    account.key_material.mac_key_nonce.clone(),
                 ],
             )
             .await
@@ -116,6 +121,29 @@ impl AccountRepository for LibsqlAccountRepository {
                 "UPDATE account SET failed_attempts = 0, locked_until = NULL, updated_at = ?1 \
                  WHERE id = ?2",
                 params![updated_at, id],
+            )
+            .await
+            .map_err(map_storage)?;
+        Ok(())
+    }
+
+    async fn set_mac_key(
+        &self,
+        id: &str,
+        wrapped_mac_key: &[u8],
+        mac_key_nonce: &[u8],
+        updated_at: i64,
+    ) -> Result<(), DomainError> {
+        self.conn
+            .execute(
+                "UPDATE account SET wrapped_mac_key = ?1, mac_key_nonce = ?2, updated_at = ?3 \
+                 WHERE id = ?4",
+                params![
+                    wrapped_mac_key.to_vec(),
+                    mac_key_nonce.to_vec(),
+                    updated_at,
+                    id
+                ],
             )
             .await
             .map_err(map_storage)?;

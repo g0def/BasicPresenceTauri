@@ -27,6 +27,45 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   };
 }
 
+// jsdom's default (opaque) origin does not expose a usable `localStorage`, so
+// any code reading/writing it throws. Provide an in-memory polyfill.
+let hasLocalStorage = false;
+try {
+  hasLocalStorage =
+    typeof globalThis.localStorage !== "undefined" &&
+    globalThis.localStorage !== null;
+} catch {
+  hasLocalStorage = false;
+}
+if (!hasLocalStorage) {
+  class MemoryStorage implements Storage {
+    private store = new Map<string, string>();
+    get length(): number {
+      return this.store.size;
+    }
+    clear(): void {
+      this.store.clear();
+    }
+    getItem(key: string): string | null {
+      return this.store.has(key) ? this.store.get(key)! : null;
+    }
+    setItem(key: string, value: string): void {
+      this.store.set(key, String(value));
+    }
+    removeItem(key: string): void {
+      this.store.delete(key);
+    }
+    key(index: number): string | null {
+      return Array.from(this.store.keys())[index] ?? null;
+    }
+  }
+  Object.defineProperty(globalThis, "localStorage", {
+    value: new MemoryStorage(),
+    configurable: true,
+    writable: true,
+  });
+}
+
 // Reset the DOM and Tauri mocks between tests so state never leaks.
 afterEach(() => {
   cleanup();

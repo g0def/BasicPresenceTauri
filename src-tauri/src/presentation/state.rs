@@ -11,6 +11,8 @@ use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::update_profile::UpdateProfileUseCase;
+use crate::domain::services::vault::VaultManager;
+use std::sync::Arc;
 
 /// Application state injected via Tauri `.manage()` and read by the commands.
 pub struct AppState {
@@ -27,6 +29,9 @@ pub struct AppState {
     pub set_presence: SetPresenceUseCase,
     pub list_presences: ListPresencesUseCase,
     pub delete_presence: DeletePresenceUseCase,
+    /// Vault handle, exposed so a window-close hook can lock it and refresh the
+    /// integrity baseline on a clean app exit.
+    pub vault: Arc<dyn VaultManager>,
     /// Keeps the keystore database alive for the lifetime of the app.
     #[allow(dead_code)]
     pub keystore_db: libsql::Database,

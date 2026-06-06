@@ -99,7 +99,36 @@ impl LoginUseCase {
             nonce: account.key_material.dek_nonce.clone(),
         };
         let dek = self.keys.unwrap_dek(&wrapped, kek.as_slice())?;
-        self.vault.open(dek.as_slice()).await?;
+
+        // Resolve the vault MAC key (tamper-evidence), backfilling it once for
+        // accounts created before the feature shipped.
+        let mac_key = match (
+            &account.key_material.wrapped_mac_key,
+            &account.key_material.mac_key_nonce,
+        ) {
+            (Some(ciphertext), Some(nonce)) => {
+                let wrapped_mac = WrappedKey {
+                    ciphertext: ciphertext.clone(),
+                    nonce: nonce.clone(),
+                };
+                self.keys.unwrap_dek(&wrapped_mac, kek.as_slice())?
+            }
+            _ => {
+                let new_mac = self.keys.generate_dek()?;
+                let wrapped_mac = self.keys.wrap_dek(new_mac.as_slice(), kek.as_slice())?;
+                self.accounts
+                    .set_mac_key(
+                        &account.id,
+                        &wrapped_mac.ciphertext,
+                        &wrapped_mac.nonce,
+                        now,
+                    )
+                    .await?;
+                new_mac
+            }
+        };
+
+        self.vault.open(dek.as_slice(), mac_key.as_slice()).await?;
 
         // Clear lockout counters and open the session.
         self.accounts

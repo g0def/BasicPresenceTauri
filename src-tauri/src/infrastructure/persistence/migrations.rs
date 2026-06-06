@@ -8,10 +8,16 @@ pub struct Migration {
     pub sql: &'static str,
 }
 
-pub const KEYSTORE_MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    sql: include_str!("../../../migrations/keystore/0001_init.sql"),
-}];
+pub const KEYSTORE_MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: include_str!("../../../migrations/keystore/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        sql: include_str!("../../../migrations/keystore/0002_add_mac_key.sql"),
+    },
+];
 
 pub const VAULT_MIGRATIONS: &[Migration] = &[
     Migration {

@@ -40,10 +40,20 @@ impl From<DomainError> for AppError {
             }
             DomainError::ProfileNotFound => AppError::new("NOT_FOUND", "Profil introuvable"),
             DomainError::Validation(m) => AppError::new("VALIDATION", m),
+            DomainError::KeystoreUnrecoverable => AppError::new(
+                "KEYSTORE_UNRECOVERABLE",
+                "La clé sécurisée de cet appareil est manquante ou a changé : \
+                 le stockage local chiffré ne peut pas être ouvert.",
+            ),
+            DomainError::VaultTampered => AppError::new(
+                "VAULT_TAMPERED",
+                "L'intégrité du stockage chiffré a échoué : le fichier a été modifié.",
+            ),
             DomainError::Storage(_)
             | DomainError::Hashing(_)
             | DomainError::Crypto(_)
-            | DomainError::Token(_) => AppError::new("INTERNAL", "Erreur interne"),
+            | DomainError::Token(_)
+            | DomainError::Keychain(_) => AppError::new("INTERNAL", "Erreur interne"),
         }
     }
 }

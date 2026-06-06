@@ -13,6 +13,11 @@ pub struct KeyMaterial {
     pub kek_salt: Vec<u8>,
     /// AEAD nonce used when wrapping the DEK (24 bytes, XChaCha20-Poly1305).
     pub dek_nonce: Vec<u8>,
+    /// MAC key (for vault tamper-evidence) wrapped with the same KEK. `None`
+    /// for accounts created before the feature; backfilled on next login.
+    pub wrapped_mac_key: Option<Vec<u8>>,
+    /// AEAD nonce used when wrapping the MAC key.
+    pub mac_key_nonce: Option<Vec<u8>>,
 }
 
 /// The single device-owner account: auth credentials + key material + lockout state.

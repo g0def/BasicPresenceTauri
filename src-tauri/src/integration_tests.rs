@@ -5,8 +5,12 @@ use std::path::PathBuf;
 
 use crate::build_state;
 use crate::domain::error::DomainError;
-use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy};
+use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy, IntegrityPolicy};
 use crate::infrastructure::persistence::db::open_plain_db;
+
+/// Fixed device key for tests: stands in for the OS-keychain-backed key so the
+/// suite never touches a real Secret Service (keeps it headless/CI-safe).
+const TEST_DEVICE_KEY: [u8; 32] = [7u8; 32];
 
 fn temp_config(name: &str) -> (AppConfig, PathBuf) {
     let mut dir = std::env::temp_dir();
@@ -27,6 +31,7 @@ fn temp_config(name: &str) -> (AppConfig, PathBuf) {
             max_attempts: 3,
             lockout_ms: 60_000,
         },
+        integrity: IntegrityPolicy::WarnAndAllow,
     };
     (config, dir)
 }
@@ -37,7 +42,10 @@ fn full_auth_flow_and_encryption() {
         let (config, dir) = temp_config("auth");
         let max_attempts = config.auth.max_attempts;
         let vault_path = config.vault_path.clone();
-        let state = build_state(config).await.expect("build_state");
+        let keystore_path = config.keystore_path.clone();
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
 
         // No account on first run.
         assert!(!state.account_exists.execute().await.unwrap());
@@ -87,6 +95,19 @@ fn full_auth_flow_and_encryption() {
         };
         assert!(!readable, "vault must be unreadable without the key");
 
+        // The keystore must ALSO be sealed at rest: opening it in clear cannot
+        // read its schema (defeats offline brute-force of a stolen file).
+        let plain_ks = open_plain_db(&keystore_path).await.unwrap();
+        let ks_conn = plain_ks.connect().unwrap();
+        let ks_readable = match ks_conn.query("SELECT name FROM sqlite_master", ()).await {
+            Ok(mut rows) => rows.next().await.is_ok(),
+            Err(_) => false,
+        };
+        assert!(
+            !ks_readable,
+            "keystore must be unreadable without the device key"
+        );
+
         // Brute-force lockout: after `max_attempts` failures, even the correct
         // password is rejected with a lockout.
         for _ in 0..max_attempts {
@@ -105,7 +126,9 @@ fn full_auth_flow_and_encryption() {
 fn profile_crud_requires_unlocked_vault() {
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("profile");
-        let state = build_state(config).await.expect("build_state");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
 
         state
             .register_account
@@ -197,7 +220,9 @@ fn profile_crud_requires_unlocked_vault() {
 fn presence_set_list_delete_with_upsert_per_day() {
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("presence");
-        let state = build_state(config).await.expect("build_state");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
 
         state
             .register_account
@@ -310,7 +335,9 @@ fn presence_set_list_delete_with_upsert_per_day() {
 fn deleting_a_profile_cascades_to_its_presences() {
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("presence_cascade");
-        let state = build_state(config).await.expect("build_state");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
 
         state
             .register_account
@@ -358,6 +385,134 @@ fn deleting_a_profile_cascades_to_its_presences() {
             .await
             .expect("list")
             .is_empty());
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn legacy_plaintext_keystore_is_migrated_and_sealed() {
+    use crate::infrastructure::persistence::db::connect;
+    use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
+    use crate::infrastructure::persistence::migrations::{run, KEYSTORE_MIGRATIONS};
+
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("legacy_migration");
+        let keystore_path = config.keystore_path.clone();
+
+        // Fabricate a legacy plaintext keystore with one account row and NO
+        // sealed marker (the pre-hardening on-disk shape).
+        {
+            let db = open_plain_db(&keystore_path).await.unwrap();
+            let conn = connect(&db).await.unwrap();
+            run(&conn, KEYSTORE_MIGRATIONS).await.unwrap();
+            conn.execute(
+                "INSERT INTO account \
+                 (id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
+                  failed_attempts, locked_until, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                libsql::params![
+                    "id-1",
+                    "legacy-user",
+                    "$argon2id$dummy",
+                    vec![1u8; 48],
+                    vec![2u8; 16],
+                    vec![3u8; 24],
+                    0_i64,
+                    None::<i64>,
+                    1_700_000_000_000_i64,
+                    1_700_000_000_000_i64,
+                ],
+            )
+            .await
+            .unwrap();
+        }
+
+        // Sanity: the fixture is readable in clear before migration.
+        let plain = open_plain_db(&keystore_path).await.unwrap();
+        let pconn = plain.connect().unwrap();
+        assert!(pconn
+            .query("SELECT count(*) FROM account", ())
+            .await
+            .is_ok());
+        drop(pconn);
+        drop(plain);
+
+        // Migrate: open_or_migrate_keystore detects the plaintext store, copies
+        // the row into an encrypted one, swaps the file, and writes the marker.
+        let sealed = open_or_migrate_keystore(&keystore_path, &TEST_DEVICE_KEY)
+            .await
+            .expect("migration");
+        let sconn = connect(&sealed).await.unwrap();
+        let mut rows = sconn
+            .query("SELECT username FROM account", ())
+            .await
+            .expect("read migrated account");
+        let row = rows.next().await.unwrap().expect("one account row");
+        let username: String = row.get(0).unwrap();
+        assert_eq!(username, "legacy-user", "account row survived migration");
+        drop(rows);
+        drop(sconn);
+        drop(sealed);
+
+        // The keystore is now sealed: unreadable in clear, and the marker exists.
+        let plain2 = open_plain_db(&keystore_path).await.unwrap();
+        let p2conn = plain2.connect().unwrap();
+        let readable = match p2conn.query("SELECT count(*) FROM account", ()).await {
+            Ok(mut r) => r.next().await.is_ok(),
+            Err(_) => false,
+        };
+        assert!(!readable, "migrated keystore must be encrypted at rest");
+
+        let mut marker = keystore_path.as_os_str().to_owned();
+        marker.push(".sealed");
+        assert!(std::path::PathBuf::from(marker).exists(), "marker written");
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn tampering_with_the_vault_is_detected_under_hard_fail() {
+    tauri::async_runtime::block_on(async {
+        let (mut config, dir) = temp_config("tamper");
+        config.integrity = IntegrityPolicy::HardFail;
+        let vault_path = config.vault_path.clone();
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        // Write some data, then close cleanly: this writes the integrity baseline
+        // and clears the dirty marker.
+        state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+        state.logout.execute(&session.token).unwrap();
+
+        // Tamper with the at-rest ciphertext.
+        let mut bytes = std::fs::read(&vault_path).unwrap();
+        let mid = bytes.len() / 2;
+        bytes[mid] ^= 0xFF;
+        std::fs::write(&vault_path, &bytes).unwrap();
+
+        // Re-login must be refused: a mismatch after a clean shutdown is treated
+        // as tampering under HardFail.
+        assert!(matches!(
+            state.login.execute("alice", "password123").await,
+            Err(DomainError::VaultTampered)
+        ));
 
         let _ = std::fs::remove_dir_all(dir);
     });
