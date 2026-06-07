@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 import { isAppError } from "@/core/errors";
 import { TauriPresenceRepository } from "@/features/presence/data/repositories/tauri-presence.repository";
 import type {
+  ImportPresenceEntry,
+  ImportSummary,
   Presence,
   PresenceType,
 } from "@/features/presence/domain/entities/presence";
 import { makeDeletePresenceUseCase } from "@/features/presence/domain/use-cases/delete-presence";
+import { makeImportPresencesUseCase } from "@/features/presence/domain/use-cases/import-presences";
 import { makeListPresencesUseCase } from "@/features/presence/domain/use-cases/list-presences";
 import { makeSetPresenceUseCase } from "@/features/presence/domain/use-cases/set-presence";
 import {
@@ -21,6 +24,7 @@ const repo = new TauriPresenceRepository();
 const listPresencesUseCase = makeListPresencesUseCase(repo);
 const setPresenceUseCase = makeSetPresenceUseCase(repo);
 const deletePresenceUseCase = makeDeletePresenceUseCase(repo);
+const importPresencesUseCase = makeImportPresencesUseCase(repo);
 
 interface PresenceProviderProps {
   children: ReactNode;
@@ -117,6 +121,49 @@ export function PresenceProvider({
     [handleError],
   );
 
+  // Re-pull the whole list from the backend. Used after a bulk import, where a
+  // single re-list is simpler (and safer) than reconciling many rows by hand.
+  const reload = useCallback(async (): Promise<void> => {
+    if (!profileId) {
+      setPresences([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      setPresences(await listPresencesUseCase(profileId));
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [profileId, handleError]);
+
+  const importPresences = useCallback(
+    async (
+      entries: ImportPresenceEntry[],
+      replaceExisting: boolean,
+    ): Promise<ImportSummary | null> => {
+      if (!profileId) return null;
+      setIsSubmitting(true);
+      setError(null);
+      try {
+        const summary = await importPresencesUseCase({
+          profileId,
+          entries,
+          replaceExisting,
+        });
+        await reload();
+        return summary;
+      } catch (e) {
+        handleError(e);
+        return null;
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [profileId, reload, handleError],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   const presencesByDay = useMemo(() => {
@@ -133,6 +180,7 @@ export function PresenceProvider({
       error,
       setPresence,
       deletePresence,
+      importPresences,
       clearError,
     }),
     [
@@ -142,6 +190,7 @@ export function PresenceProvider({
       error,
       setPresence,
       deletePresence,
+      importPresences,
       clearError,
     ],
   );

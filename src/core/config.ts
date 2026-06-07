@@ -25,4 +25,5 @@ export const COMMANDS = {
   setPresence: "set_presence",
   listPresences: "list_presences",
   deletePresence: "delete_presence",
+  importPresences: "import_presences",
 } as const;

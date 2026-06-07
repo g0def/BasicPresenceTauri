@@ -8,6 +8,7 @@ import {
   Plus,
   Sun,
   Trash2,
+  Upload,
 } from "lucide-react";
 
 import profilePic from "@/assets/picture/minimal-profile-accout.png";
@@ -31,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supportedLngs } from "@/core/i18n/resources";
+import { ImportDialog } from "@/features/presence/presentation/components/import-dialog";
 import type { Profile } from "@/features/profile/domain/entities/profile";
 import { ProfileFormDialog } from "@/features/profile/presentation/components/profile-form-dialog";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
@@ -58,6 +60,7 @@ export function ProfileBadge({ onLogout }: ProfileBadgeProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -114,6 +117,10 @@ export function ProfileBadge({ onLogout }: ProfileBadgeProps) {
                 <Pencil />
                 {t("profile.edit")}
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                <Upload />
+                {t("import.menuItem")}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => setConfirmOpen(true)}
@@ -162,6 +169,8 @@ export function ProfileBadge({ onLogout }: ProfileBadgeProps) {
         onOpenChange={setFormOpen}
         profile={editing}
       />
+
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       {activeProfile && (
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

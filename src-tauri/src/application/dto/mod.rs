@@ -1,3 +1,4 @@
+pub mod import_presence_dto;
 pub mod login_result_dto;
 pub mod presence_dto;
 pub mod profile_dto;

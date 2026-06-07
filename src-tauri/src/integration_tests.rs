@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use crate::application::dto::import_presence_dto::ImportPresenceEntryDto;
 use crate::build_state;
 use crate::domain::error::DomainError;
 use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy, IntegrityPolicy};
@@ -324,6 +325,167 @@ fn presence_set_list_delete_with_upsert_per_day() {
         state.logout.execute(&session.token).unwrap();
         assert!(matches!(
             state.list_presences.execute(&profile.id).await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn presence_import_skip_and_replace() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("presence_import");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const DAY_1: i64 = 1_717_200_000_000; // UTC-midnight epoch ms
+        const DAY_2: i64 = DAY_1 + 86_400_000;
+        const DAY_3: i64 = DAY_1 + 2 * 86_400_000;
+        const TS: i64 = 1_700_000_000_000;
+
+        // Build an entry exactly as the command would receive it from the front.
+        let entry = |day: i64, kind: &str, created: Option<i64>| ImportPresenceEntryDto {
+            day,
+            kind: kind.to_string(),
+            created_at: created,
+            updated_at: None,
+        };
+
+        // Initial import into an empty profile: everything inserted, and the
+        // file's created_at is honored (with a fallback when absent).
+        let s = state
+            .import_presences
+            .execute(
+                &profile.id,
+                vec![
+                    entry(DAY_1, "office", Some(TS)),
+                    entry(DAY_2, "remote", None),
+                ],
+                false,
+            )
+            .await
+            .expect("import");
+        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (2, 0, 0, 2));
+        let day1 = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.day == DAY_1)
+            .unwrap();
+        assert_eq!(day1.kind, "office");
+        assert_eq!(day1.created_at, TS, "created_at preserved from the file");
+
+        // Re-import overlapping DAY_1 (different type) + new DAY_3 with the skip
+        // strategy: DAY_1 is left untouched, DAY_3 is inserted.
+        let s = state
+            .import_presences
+            .execute(
+                &profile.id,
+                vec![
+                    entry(DAY_1, "vacation", Some(TS + 1)),
+                    entry(DAY_3, "holiday", None),
+                ],
+                false,
+            )
+            .await
+            .expect("import skip");
+        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (1, 1, 0, 2));
+        let day1 = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.day == DAY_1)
+            .unwrap();
+        assert_eq!(day1.kind, "office", "skip kept the original type");
+        assert_eq!(day1.created_at, TS, "skip kept the original created_at");
+
+        // Re-import DAY_1 with the replace strategy: the type is overwritten but
+        // the original created_at is preserved.
+        let s = state
+            .import_presences
+            .execute(
+                &profile.id,
+                vec![entry(DAY_1, "vacation", Some(TS + 99))],
+                true,
+            )
+            .await
+            .expect("import replace");
+        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (0, 0, 1, 1));
+        let day1 = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.day == DAY_1)
+            .unwrap();
+        assert_eq!(day1.kind, "vacation", "replace overwrote the type");
+        assert_eq!(
+            day1.created_at, TS,
+            "replace preserved the original created_at"
+        );
+
+        // A duplicate day within a single import keeps the counts consistent.
+        const DAY_DUP: i64 = DAY_1 + 10 * 86_400_000;
+        let s = state
+            .import_presences
+            .execute(
+                &profile.id,
+                vec![
+                    entry(DAY_DUP, "office", None),
+                    entry(DAY_DUP, "remote", None),
+                ],
+                true,
+            )
+            .await
+            .expect("import dup");
+        assert_eq!(s.imported + s.replaced + s.skipped, s.total);
+
+        // Unknown type and non-midnight day are rejected by validation.
+        assert!(matches!(
+            state
+                .import_presences
+                .execute(&profile.id, vec![entry(DAY_2, "carpool", None)], false)
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        assert!(matches!(
+            state
+                .import_presences
+                .execute(&profile.id, vec![entry(DAY_1 + 1, "office", None)], false)
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // Logout locks the vault; import is refused.
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state
+                .import_presences
+                .execute(&profile.id, vec![entry(DAY_1, "office", None)], false)
+                .await,
             Err(DomainError::Unauthorized)
         ));
 

@@ -3,6 +3,8 @@ import { invoke } from "@/core/ipc";
 import type { PresenceDto } from "@/features/presence/data/dto/presence.dto";
 import { toPresence } from "@/features/presence/data/mappers/presence.mapper";
 import type {
+  ImportPresencesInput,
+  ImportSummary,
   Presence,
   SetPresenceInput,
 } from "@/features/presence/domain/entities/presence";
@@ -28,5 +30,16 @@ export class TauriPresenceRepository implements PresenceRepository {
 
   async remove(id: string): Promise<void> {
     await invoke<void>(COMMANDS.deletePresence, { id });
+  }
+
+  async importMany(input: ImportPresencesInput): Promise<ImportSummary> {
+    // The wire shape matches `ImportSummary`/`ImportPresenceEntry` 1:1 (camelCase),
+    // so no DTO/mapper is needed. `undefined` timestamps are dropped by JSON
+    // serialization and become `None` on the backend.
+    return invoke<ImportSummary>(COMMANDS.importPresences, {
+      profileId: input.profileId,
+      entries: input.entries,
+      replaceExisting: input.replaceExisting,
+    });
   }
 }

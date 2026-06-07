@@ -3,6 +3,7 @@ pub mod check_session;
 pub mod create_profile;
 pub mod delete_presence;
 pub mod delete_profile;
+pub mod import_presences;
 pub mod list_presences;
 pub mod list_profiles;
 pub mod login;

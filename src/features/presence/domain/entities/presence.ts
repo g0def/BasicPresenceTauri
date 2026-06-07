@@ -24,3 +24,31 @@ export interface SetPresenceInput {
   day: number;
   type: PresenceType;
 }
+
+/**
+ * A single presence row to import. `id` is backend-managed; the timestamps are
+ * carried over from the old export when present (the backend falls back to
+ * "now" otherwise).
+ */
+export interface ImportPresenceEntry {
+  day: number;
+  type: PresenceType;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/** Outcome of an import run (`imported + replaced + skipped === total`). */
+export interface ImportSummary {
+  imported: number;
+  skipped: number;
+  replaced: number;
+  total: number;
+}
+
+/** Arguments for a bulk import into a profile. */
+export interface ImportPresencesInput {
+  profileId: string;
+  entries: ImportPresenceEntry[];
+  /** `false` keeps existing days, `true` overwrites them. */
+  replaceExisting: boolean;
+}

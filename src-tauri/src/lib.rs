@@ -15,6 +15,7 @@ use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
+use crate::application::use_cases::import_presences::ImportPresencesUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
 use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
@@ -94,7 +95,8 @@ pub fn run() {
             profile::set_active_profile,
             presence::set_presence,
             presence::list_presences,
-            presence::delete_presence
+            presence::delete_presence,
+            presence::import_presences
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -167,6 +169,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         set_presence: SetPresenceUseCase::new(presences.clone(), clock.clone()),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
+        import_presences: ImportPresencesUseCase::new(presences.clone(), clock.clone()),
         vault: vault.clone(),
         keystore_db,
     })

@@ -3,6 +3,7 @@ use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
+use crate::application::use_cases::import_presences::ImportPresencesUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
 use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
@@ -29,6 +30,7 @@ pub struct AppState {
     pub set_presence: SetPresenceUseCase,
     pub list_presences: ListPresencesUseCase,
     pub delete_presence: DeletePresenceUseCase,
+    pub import_presences: ImportPresencesUseCase,
     /// Vault handle, exposed so a window-close hook can lock it and refresh the
     /// integrity baseline on a clean app exit.
     pub vault: Arc<dyn VaultManager>,

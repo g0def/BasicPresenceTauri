@@ -63,5 +63,38 @@
       "vacation": "Vacation",
       "holiday": "Holiday"
     }
+  },
+  "import": {
+    "menuItem": "Import data",
+    "title": "Import presence",
+    "description": "Select a JSON file exported from the previous app.",
+    "chooseFile": "Choose a file…",
+    "importing": "Importing…",
+    "cancel": "Cancel",
+    "done": "Done",
+    "review": {
+      "valid": "{{count}} valid entries ready to import.",
+      "conflicts": "{{count}} day(s) already have a presence.",
+      "nothingValid": "No valid entry to import."
+    },
+    "importValid": "Import {{count}}",
+    "skip": "Skip existing",
+    "replace": "Replace existing",
+    "result": "Imported {{imported}}, replaced {{replaced}}, skipped {{skipped}} of {{total}}.",
+    "resultInvalid": "{{count}} row(s) skipped as unreadable.",
+    "invalid": {
+      "heading": "Rows not imported:",
+      "more": "…and {{count}} more.",
+      "row": "Row {{row}}",
+      "missingDate": "missing date",
+      "badDate": "unreadable date \"{{value}}\"",
+      "missingMode": "missing mode",
+      "unknownMode": "unknown mode \"{{value}}\""
+    },
+    "errors": {
+      "malformed": "The file is not valid JSON.",
+      "notArray": "The file must contain a JSON array.",
+      "empty": "The file contains no entries."
+    }
   }
 }

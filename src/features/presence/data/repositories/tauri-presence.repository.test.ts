@@ -37,6 +37,41 @@ describe("TauriPresenceRepository", () => {
     expect(saved.type).toBe("office");
   });
 
+  it("imports presences with camelCase args and returns the summary", async () => {
+    const summary = { imported: 2, skipped: 0, replaced: 1, total: 3 };
+    mockIPC((cmd, args) => {
+      if (cmd === "import_presences") {
+        expect(args).toEqual({
+          profileId: "p1",
+          entries: [
+            { day: 1_717_200_000_000, type: "office" },
+            {
+              day: 1_717_286_400_000,
+              type: "remote",
+              createdAt: 5,
+              updatedAt: 6,
+            },
+          ],
+          replaceExisting: true,
+        });
+        return summary;
+      }
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    const repo = new TauriPresenceRepository();
+    const result = await repo.importMany({
+      profileId: "p1",
+      entries: [
+        { day: 1_717_200_000_000, type: "office" },
+        { day: 1_717_286_400_000, type: "remote", createdAt: 5, updatedAt: 6 },
+      ],
+      replaceExisting: true,
+    });
+
+    expect(result).toEqual(summary);
+  });
+
   it("maps the presence list for a profile", async () => {
     mockIPC((cmd, args) => {
       if (cmd === "list_presences") {

@@ -63,5 +63,38 @@
       "vacation": "Congés",
       "holiday": "Jour férié"
     }
+  },
+  "import": {
+    "menuItem": "Importer des données",
+    "title": "Importer des présences",
+    "description": "Sélectionnez un fichier JSON exporté depuis l'ancienne application.",
+    "chooseFile": "Choisir un fichier…",
+    "importing": "Importation…",
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "review": {
+      "valid": "{{count}} entrée(s) valide(s) prête(s) à importer.",
+      "conflicts": "{{count}} jour(s) possèdent déjà une présence.",
+      "nothingValid": "Aucune entrée valide à importer."
+    },
+    "importValid": "Importer {{count}}",
+    "skip": "Ignorer les existants",
+    "replace": "Remplacer les existants",
+    "result": "Importés : {{imported}}, remplacés : {{replaced}}, ignorés : {{skipped}} sur {{total}}.",
+    "resultInvalid": "{{count}} ligne(s) ignorée(s) car illisibles.",
+    "invalid": {
+      "heading": "Lignes non importées :",
+      "more": "…et {{count}} de plus.",
+      "row": "Ligne {{row}}",
+      "missingDate": "date manquante",
+      "badDate": "date illisible « {{value}} »",
+      "missingMode": "mode manquant",
+      "unknownMode": "mode inconnu « {{value}} »"
+    },
+    "errors": {
+      "malformed": "Le fichier n'est pas un JSON valide.",
+      "notArray": "Le fichier doit contenir un tableau JSON.",
+      "empty": "Le fichier ne contient aucune entrée."
+    }
   }
 }

@@ -22,6 +22,7 @@ describe("PresenceCalendar", () => {
         return Promise.resolve(true);
       },
       deletePresence: () => Promise.resolve(true),
+      importPresences: () => Promise.resolve(null),
       clearError: () => {},
     };
 

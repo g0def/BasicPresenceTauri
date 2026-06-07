@@ -1,6 +1,8 @@
 import { createContext } from "react";
 
 import type {
+  ImportPresenceEntry,
+  ImportSummary,
   Presence,
   PresenceType,
 } from "@/features/presence/domain/entities/presence";
@@ -10,13 +12,22 @@ export interface PresenceContextValue {
   presencesByDay: Map<number, Presence>;
   /** True while the presence list is (re)loading. */
   isLoading: boolean;
-  /** True while a set/delete is in flight. */
+  /** True while a set/delete/import is in flight. */
   isSubmitting: boolean;
   error: string | null;
   /** Create or update the presence type for a day. Returns `true` on success. */
   setPresence: (day: number, type: PresenceType) => Promise<boolean>;
   /** Delete a presence by id. Returns `true` on success. */
   deletePresence: (id: string) => Promise<boolean>;
+  /**
+   * Bulk-import presences for the active profile, then refresh the list.
+   * Returns the summary, or `null` if there's no active profile or the command
+   * failed (in which case `error` is set).
+   */
+  importPresences: (
+    entries: ImportPresenceEntry[],
+    replaceExisting: boolean,
+  ) => Promise<ImportSummary | null>;
   clearError: () => void;
 }
 
