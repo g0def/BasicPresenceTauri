@@ -65,6 +65,9 @@ impl ImportPresencesUseCase {
                 profile_id: profile_id.to_string(),
                 day: e.day,
                 kind,
+                // Imported days carry no commute footprint until re-encoded.
+                co2_kg: None,
+                is_estimated: false,
                 created_at,
                 updated_at,
             });

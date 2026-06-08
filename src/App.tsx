@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Home } from "@/features/auth/presentation/components/home";
 import { LoginPage } from "@/features/auth/presentation/components/login-page";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
+import { CommuteProvider } from "@/features/commute/presentation/providers/commute-provider";
 import { PresenceProvider } from "@/features/presence/presentation/providers/presence-provider";
 import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
 
@@ -18,7 +19,9 @@ export default function App() {
     return (
       <ProfileProvider onSessionExpired={logout}>
         <PresenceProvider onSessionExpired={logout}>
-          <Home />
+          <CommuteProvider onSessionExpired={logout}>
+            <Home />
+          </CommuteProvider>
         </PresenceProvider>
       </ProfileProvider>
     );

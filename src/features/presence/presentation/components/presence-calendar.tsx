@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { formatCo2 } from "@/features/commute/presentation/commute-format";
 import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
 import { dayKey } from "@/features/presence/presentation/day-key";
 import { PresenceDayDialog } from "@/features/presence/presentation/components/presence-day-dialog";
@@ -117,6 +118,12 @@ export function PresenceCalendar() {
               )}
             >
               <span className="font-medium">{d.getDate()}</span>
+              {presence && presence.co2Kg != null && presence.co2Kg > 0 && (
+                <span className="m-auto text-xs font-semibold tabular-nums">
+                  {formatCo2(presence.co2Kg, i18n.resolvedLanguage ?? "fr")}
+                  {presence.isEstimated ? " ~" : ""}
+                </span>
+              )}
               {Icon && (
                 <Icon
                   className="mt-auto size-5 self-end opacity-80"

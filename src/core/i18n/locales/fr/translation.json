@@ -99,5 +99,84 @@
       "notArray": "Le fichier doit contenir un tableau JSON.",
       "empty": "Le fichier ne contient aucune entrée."
     }
+  },
+  "commute": {
+    "menuItem": "Modes de déplacement",
+    "manager": {
+      "title": "Modes de déplacement",
+      "subtitle": "Enregistrez vos trajets réutilisables (ex. 30 km train + 5 km vélo).",
+      "empty": "Aucun mode enregistré pour l'instant.",
+      "add": "Ajouter",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "roundTripBadge": "aller-retour",
+      "deleteConfirmTitle": "Supprimer ce mode de déplacement ?"
+    },
+    "form": {
+      "addTitle": "Nouveau mode de déplacement",
+      "editTitle": "Modifier le mode de déplacement",
+      "subtitle": "Donnez un nom et ajoutez les segments du trajet (distance aller simple).",
+      "name": "Nom",
+      "roundTrip": "Aller-retour",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "cancel": "Annuler"
+    },
+    "segment": {
+      "type": "Transport",
+      "typePlaceholder": "Choisir un transport",
+      "distance": "Distance (km)",
+      "occupants": "Occupants",
+      "add": "Ajouter un segment",
+      "remove": "Supprimer le segment"
+    },
+    "categories": {
+      "car": "Voiture",
+      "active": "Vélo & marche",
+      "public_transport": "Transport en commun",
+      "rail": "Train",
+      "air": "Avion",
+      "other": "Autre"
+    },
+    "modes": {
+      "car_petrol": "Voiture — essence",
+      "car_diesel": "Voiture — diesel",
+      "car_average": "Voiture — motorisation moyenne",
+      "car_phev": "Voiture — hybride rechargeable",
+      "car_ev": "Voiture — électrique",
+      "taxi": "Taxi / VTC",
+      "walk": "À pied",
+      "bike": "Vélo musculaire",
+      "ebike": "Vélo électrique",
+      "escooter": "Trottinette électrique",
+      "scooter_elec": "Scooter électrique",
+      "public_transport": "Transport en commun",
+      "bus": "Bus urbain",
+      "coach": "Autocar longue distance",
+      "metro_tram": "Métro / tram",
+      "train_sncb": "Train Intercity (SNCB)",
+      "train_ter": "Train régional (TER)",
+      "train_hs_fr": "TGV",
+      "train_eurostar": "Eurostar",
+      "train_thalys": "Thalys",
+      "plane_domestic": "Avion — intérieur",
+      "plane_short": "Avion — court-courrier",
+      "plane_medium": "Avion — moyen-courrier",
+      "plane_long": "Avion — long-courrier"
+    },
+    "step": {
+      "title": "Choisissez un mode de déplacement.",
+      "none": "Aucun déplacement",
+      "custom": "Personnalisé",
+      "back": "Retour",
+      "confirm": "Confirmer"
+    },
+    "back": "Retour au calendrier",
+    "validation": {
+      "nameRequired": "Le nom est requis.",
+      "minSegment": "Ajoutez au moins un segment.",
+      "modeRequired": "Choisissez un transport pour chaque segment.",
+      "distancePositive": "La distance doit être supérieure à 0."
+    }
   }
 }

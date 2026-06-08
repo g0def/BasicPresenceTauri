@@ -6,6 +6,7 @@ import {
   Moon,
   Pencil,
   Plus,
+  Route,
   Sun,
   Trash2,
   Upload,
@@ -46,13 +47,15 @@ interface ProfileBadgeProps {
   /** Auth concern, injected by the composition root (App/Home) to keep the
    * profile feature decoupled from the auth feature. */
   onLogout: () => void;
+  /** Open the "Modes de déplacement" view (owned by Home). */
+  onOpenCommutes: () => void;
 }
 
 /**
  * Header account menu: active-profile photo + name on the right, with a menu to
  * switch/add/edit/delete profiles and to manage language, theme and logout.
  */
-export function ProfileBadge({ onLogout }: ProfileBadgeProps) {
+export function ProfileBadge({ onLogout, onOpenCommutes }: ProfileBadgeProps) {
   const { t, i18n } = useTranslation();
   const { profiles, activeProfile, setActiveProfile, deleteProfile } =
     useProfile();
@@ -116,6 +119,10 @@ export function ProfileBadge({ onLogout }: ProfileBadgeProps) {
               <DropdownMenuItem onSelect={openEdit}>
                 <Pencil />
                 {t("profile.edit")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onOpenCommutes()}>
+                <Route />
+                {t("commute.menuItem")}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => setImportOpen(true)}>
                 <Upload />

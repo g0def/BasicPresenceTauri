@@ -1,0 +1,34 @@
+use serde::{Deserialize, Serialize};
+
+/// Org-level CO2 configuration. Persisted as a JSON blob in `vault_meta`
+/// (key `co2_config`); falls back to these defaults when absent. There is no
+/// settings UI yet — the values are overridable directly in the vault.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Co2Settings {
+    /// Charging country selecting the electric-grid preset (e.g. `"BE"`).
+    pub grid_country: String,
+    /// Default car occupancy when a trip omits it.
+    pub default_car_occupancy: i64,
+    /// Aviation: include the radiative-forcing effect (contrails).
+    pub include_radiative_forcing: bool,
+    /// Phase 2: add building energy for office/remote days.
+    pub count_building_energy: bool,
+    /// For annual projections (not used in Phase 1 calculations).
+    pub working_days_per_year: i64,
+    /// Which referential year to resolve factors against.
+    pub factor_year: i32,
+}
+
+impl Default for Co2Settings {
+    fn default() -> Self {
+        Self {
+            grid_country: "BE".to_string(),
+            default_car_occupancy: 1,
+            include_radiative_forcing: true,
+            count_building_energy: false,
+            working_days_per_year: 220,
+            factor_year: 2025,
+        }
+    }
+}

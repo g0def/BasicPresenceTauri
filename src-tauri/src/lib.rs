@@ -12,10 +12,15 @@ use tauri::Manager;
 
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
+use crate::application::use_cases::create_commute::CreateCommuteUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
+use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
+use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::import_presences::ImportPresencesUseCase;
+use crate::application::use_cases::list_commutes::ListCommutesUseCase;
+use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
 use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
@@ -23,9 +28,13 @@ use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
+use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
 use crate::application::use_cases::update_profile::UpdateProfileUseCase;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::account_repository::AccountRepository;
+use crate::domain::repositories::co2_settings_repository::Co2SettingsRepository;
+use crate::domain::repositories::commute_repository::CommuteRepository;
+use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::services::clock::Clock;
@@ -40,14 +49,17 @@ use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
 use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
+use crate::infrastructure::persistence::co2_settings_repository::LibsqlCo2SettingsRepository;
+use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
 use crate::infrastructure::persistence::db::connect;
+use crate::infrastructure::persistence::emission_factor_repository::LibsqlEmissionFactorRepository;
 use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
 use crate::infrastructure::persistence::profile_repository::LibsqlProfileRepository;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
-use crate::presentation::commands::{auth, presence, profile};
+use crate::presentation::commands::{auth, commute, presence, profile};
 use crate::presentation::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -96,7 +108,13 @@ pub fn run() {
             presence::set_presence,
             presence::list_presences,
             presence::delete_presence,
-            presence::import_presences
+            presence::import_presences,
+            commute::list_emission_factors,
+            commute::create_commute,
+            commute::list_commutes,
+            commute::update_commute,
+            commute::delete_commute,
+            commute::get_presence_trips
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -139,6 +157,12 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlProfileRepository::new(vault_impl.clone()));
     let presences: Arc<dyn PresenceRepository> =
         Arc::new(LibsqlPresenceRepository::new(vault_impl.clone()));
+    let factors: Arc<dyn EmissionFactorRepository> =
+        Arc::new(LibsqlEmissionFactorRepository::new(vault_impl.clone()));
+    let commutes: Arc<dyn CommuteRepository> =
+        Arc::new(LibsqlCommuteRepository::new(vault_impl.clone()));
+    let co2_settings: Arc<dyn Co2SettingsRepository> =
+        Arc::new(LibsqlCo2SettingsRepository::new(vault_impl.clone()));
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
 
     Ok(AppState {
@@ -166,10 +190,28 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         update_profile: UpdateProfileUseCase::new(profiles.clone(), clock.clone()),
         delete_profile: DeleteProfileUseCase::new(profiles.clone()),
         set_active_profile: SetActiveProfileUseCase::new(profiles.clone()),
-        set_presence: SetPresenceUseCase::new(presences.clone(), clock.clone()),
+        set_presence: SetPresenceUseCase::new(
+            presences.clone(),
+            factors.clone(),
+            co2_settings.clone(),
+            clock.clone(),
+        ),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
         import_presences: ImportPresencesUseCase::new(presences.clone(), clock.clone()),
+        list_emission_factors: ListEmissionFactorsUseCase::new(
+            factors.clone(),
+            co2_settings.clone(),
+        ),
+        create_commute: CreateCommuteUseCase::new(commutes.clone(), clock.clone()),
+        list_commutes: ListCommutesUseCase::new(
+            commutes.clone(),
+            factors.clone(),
+            co2_settings.clone(),
+        ),
+        update_commute: UpdateCommuteUseCase::new(commutes.clone(), clock.clone()),
+        delete_commute: DeleteCommuteUseCase::new(commutes.clone()),
+        get_presence_trips: GetPresenceTripsUseCase::new(presences.clone()),
         vault: vault.clone(),
         keystore_db,
     })

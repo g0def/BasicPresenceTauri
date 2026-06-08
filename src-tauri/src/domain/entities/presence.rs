@@ -43,6 +43,11 @@ pub struct Presence {
     /// Epoch ms at UTC midnight of the day concerned.
     pub day: i64,
     pub kind: PresenceType,
+    /// Denormalized commute footprint for the day (kgCO2e). `None` when the day
+    /// carries no trip (e.g. vacation/holiday, or a pre-CO2 imported row).
+    pub co2_kg: Option<f64>,
+    /// `true` if any of the day's trips fell back to an estimated factor (R6).
+    pub is_estimated: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }

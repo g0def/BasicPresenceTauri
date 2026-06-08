@@ -4,6 +4,7 @@ import type {
   ImportPresenceEntry,
   ImportSummary,
   Presence,
+  PresenceTrip,
   PresenceType,
 } from "@/features/presence/domain/entities/presence";
 
@@ -15,10 +16,17 @@ export interface PresenceContextValue {
   /** True while a set/delete/import is in flight. */
   isSubmitting: boolean;
   error: string | null;
-  /** Create or update the presence type for a day. Returns `true` on success. */
-  setPresence: (day: number, type: PresenceType) => Promise<boolean>;
+  /** Create or update the presence for a day, optionally with commute trips
+   * (office/remote). Returns `true` on success. */
+  setPresence: (
+    day: number,
+    type: PresenceType,
+    trips?: PresenceTrip[],
+  ) => Promise<boolean>;
   /** Delete a presence by id. Returns `true` on success. */
   deletePresence: (id: string) => Promise<boolean>;
+  /** Fetch the commute trips recorded for a presence day (for re-editing). */
+  getPresenceTrips: (presenceId: string) => Promise<PresenceTrip[]>;
   /**
    * Bulk-import presences for the active profile, then refresh the list.
    * Returns the summary, or `null` if there's no active profile or the command

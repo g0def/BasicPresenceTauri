@@ -3,7 +3,9 @@
 
 use std::path::PathBuf;
 
+use crate::application::dto::commute_dto::CommuteSegmentInputDto;
 use crate::application::dto::import_presence_dto::ImportPresenceEntryDto;
+use crate::application::dto::trip_dto::TripInputDto;
 use crate::build_state;
 use crate::domain::error::DomainError;
 use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy, IntegrityPolicy};
@@ -233,7 +235,10 @@ fn presence_set_list_delete_with_upsert_per_day() {
 
         // Vault still locked before login: presence operations are refused.
         assert!(matches!(
-            state.set_presence.execute("nope", 0, "office").await,
+            state
+                .set_presence
+                .execute("nope", 0, "office", vec![])
+                .await,
             Err(DomainError::Unauthorized)
         ));
 
@@ -255,7 +260,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         // Set a presence for DAY_1.
         let p1 = state
             .set_presence
-            .execute(&profile.id, DAY_1, "office")
+            .execute(&profile.id, DAY_1, "office", vec![])
             .await
             .expect("set office");
         assert_eq!(p1.kind, "office");
@@ -265,7 +270,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         // while preserving the original id and created_at.
         let p1b = state
             .set_presence
-            .execute(&profile.id, DAY_1, "remote")
+            .execute(&profile.id, DAY_1, "remote", vec![])
             .await
             .expect("set remote");
         assert_eq!(p1b.id, p1.id);
@@ -284,7 +289,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         assert!(matches!(
             state
                 .set_presence
-                .execute(&profile.id, DAY_2, "carpool")
+                .execute(&profile.id, DAY_2, "carpool", vec![])
                 .await,
             Err(DomainError::Validation(_))
         ));
@@ -293,7 +298,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         assert!(matches!(
             state
                 .set_presence
-                .execute(&profile.id, DAY_1 + 1, "office")
+                .execute(&profile.id, DAY_1 + 1, "office", vec![])
                 .await,
             Err(DomainError::Validation(_))
         ));
@@ -301,7 +306,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         // A second day adds a second presence.
         state
             .set_presence
-            .execute(&profile.id, DAY_2, "vacation")
+            .execute(&profile.id, DAY_2, "vacation", vec![])
             .await
             .expect("set vacation");
         let listed = state
@@ -521,7 +526,7 @@ fn deleting_a_profile_cascades_to_its_presences() {
         const DAY: i64 = 1_717_200_000_000; // UTC-midnight epoch ms
         state
             .set_presence
-            .execute(&profile.id, DAY, "office")
+            .execute(&profile.id, DAY, "office", vec![])
             .await
             .expect("set");
         assert_eq!(
@@ -676,6 +681,239 @@ fn tampering_with_the_vault_is_detected_under_hard_fail() {
             Err(DomainError::VaultTampered)
         ));
 
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn presence_co2_is_computed_snapshotted_and_tied_to_presence() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("co2_presence");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("profile");
+
+        const DAY_1: i64 = 1_717_200_000_000;
+        const DAY_2: i64 = DAY_1 + 86_400_000;
+
+        let trip = |mode: &str, km: f64| TripInputDto {
+            mode_id: mode.to_string(),
+            distance_km: km,
+            round_trip: true,
+            occupants: None,
+        };
+
+        // Office day, 15 km round-trip petrol commute → 15*2*0.2388 = 7.164.
+        let p = state
+            .set_presence
+            .execute(&profile.id, DAY_1, "office", vec![trip("car_petrol", 15.0)])
+            .await
+            .expect("set office");
+        let co2 = p.co2_kg.expect("co2 present");
+        assert!((co2 - 7.164).abs() < 1e-3, "got {co2}");
+        assert!(!p.is_estimated);
+
+        // The trip snapshot is persisted with the per-segment footprint.
+        let trips = state
+            .get_presence_trips
+            .execute(&p.id)
+            .await
+            .expect("trips");
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].mode_id, "car_petrol");
+        assert!((trips[0].co2_kg - 7.164).abs() < 1e-3);
+
+        // list_presences returns the day total.
+        let d1 = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.day == DAY_1)
+            .unwrap();
+        assert!((d1.co2_kg.unwrap() - 7.164).abs() < 1e-3);
+
+        // Re-encoding the office day REPLACES the snapshot (same presence row).
+        let p2 = state
+            .set_presence
+            .execute(
+                &profile.id,
+                DAY_1,
+                "office",
+                vec![trip("train_hs_fr", 100.0)],
+            )
+            .await
+            .expect("re-set office");
+        assert_eq!(p2.id, p.id);
+        let trips2 = state.get_presence_trips.execute(&p.id).await.unwrap();
+        assert_eq!(trips2.len(), 1);
+        assert_eq!(trips2[0].mode_id, "train_hs_fr");
+
+        // Switching to a non-commute type clears trips and the footprint.
+        let p3 = state
+            .set_presence
+            .execute(&profile.id, DAY_1, "vacation", vec![])
+            .await
+            .expect("vacation");
+        assert!(p3.co2_kg.is_none());
+        assert!(state
+            .get_presence_trips
+            .execute(&p.id)
+            .await
+            .unwrap()
+            .is_empty());
+
+        // Remote days also accept an optional trip (scope: office + remote).
+        let r = state
+            .set_presence
+            .execute(&profile.id, DAY_2, "remote", vec![trip("ebike", 8.0)])
+            .await
+            .expect("remote");
+        assert!((r.co2_kg.unwrap() - 0.1752).abs() < 1e-3);
+
+        state.logout.execute(&session.token).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn commute_crud_and_emission_factors() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("commute_crud");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        // CO2 operations require an unlocked vault.
+        assert!(matches!(
+            state.list_emission_factors.execute().await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("profile");
+
+        // The 2025 referential is seeded; building factors are hidden from the
+        // picker, and car_ev carries its 4 grid variants.
+        let factors = state
+            .list_emission_factors
+            .execute()
+            .await
+            .expect("factors");
+        assert!(factors.len() >= 24, "got {}", factors.len());
+        assert!(factors.iter().all(|f| f.category != "building"));
+        let ev = factors
+            .iter()
+            .find(|f| f.mode_id == "car_ev")
+            .expect("car_ev");
+        assert_eq!(ev.grid_variants.len(), 4);
+
+        // Create "30 km train + 5 km vélo".
+        let segs = vec![
+            CommuteSegmentInputDto {
+                mode_id: "train_sncb".into(),
+                distance_km: 30.0,
+                occupants: None,
+            },
+            CommuteSegmentInputDto {
+                mode_id: "bike".into(),
+                distance_km: 5.0,
+                occupants: None,
+            },
+        ];
+        let c = state
+            .create_commute
+            .execute(&profile.id, "Train + vélo", true, segs)
+            .await
+            .expect("create commute");
+        assert_eq!(c.segments.len(), 2);
+
+        // list_commutes annotates an indicative CO2: 30*2*0.021 + 0 = 1.26.
+        let list = state
+            .list_commutes
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(list.len(), 1);
+        assert!((list[0].co2_kg.unwrap() - 1.26).abs() < 1e-3);
+
+        // Update: rename + replace segments (carpool, 2 occupants).
+        let segs2 = vec![CommuteSegmentInputDto {
+            mode_id: "car_petrol".into(),
+            distance_km: 10.0,
+            occupants: Some(2),
+        }];
+        let updated = state
+            .update_commute
+            .execute(&c.id, "Voiture", false, segs2)
+            .await
+            .expect("update");
+        assert_eq!(updated.name, "Voiture");
+        assert_eq!(updated.segments.len(), 1);
+        assert_eq!(updated.segments[0].occupants, 2);
+
+        // Delete removes it (and its segments cascade).
+        state.delete_commute.execute(&c.id).await.expect("delete");
+        assert!(state
+            .list_commutes
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .is_empty());
+
+        // Deleting the profile cascades to its commutes.
+        let segs3 = vec![CommuteSegmentInputDto {
+            mode_id: "walk".into(),
+            distance_km: 1.0,
+            occupants: None,
+        }];
+        state
+            .create_commute
+            .execute(&profile.id, "Marche", true, segs3)
+            .await
+            .expect("create2");
+        state
+            .delete_profile
+            .execute(&profile.id)
+            .await
+            .expect("delete profile");
+        assert!(state
+            .list_commutes
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .is_empty());
+
+        state.logout.execute(&session.token).unwrap();
         let _ = std::fs::remove_dir_all(dir);
     });
 }

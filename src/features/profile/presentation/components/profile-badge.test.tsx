@@ -32,6 +32,10 @@ describe("profile home", () => {
           return { profiles: [ADA], activeProfileId: ADA.id };
         case "list_presences":
           return [];
+        case "list_emission_factors":
+          return [];
+        case "list_commutes":
+          return [];
         default:
           throw new Error(`unexpected command: ${cmd}`);
       }

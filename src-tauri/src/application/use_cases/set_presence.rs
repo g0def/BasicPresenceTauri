@@ -1,27 +1,48 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use uuid::Uuid;
 
 use crate::application::dto::presence_dto::PresenceDto;
+use crate::application::dto::trip_dto::TripInputDto;
+use crate::domain::entities::emission_factor::EmissionFactor;
 use crate::domain::entities::presence::{Presence, PresenceType};
+use crate::domain::entities::trip::{Trip, TripInput};
 use crate::domain::error::DomainError;
+use crate::domain::repositories::co2_settings_repository::Co2SettingsRepository;
+use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::services::clock::Clock;
+use crate::domain::services::co2_calculator::Co2Calculator;
 
 /// Milliseconds in a UTC day. A valid `day` is a non-negative multiple of it
 /// (epoch ms at UTC midnight), matching the key the frontend sends.
 const MS_PER_DAY: i64 = 86_400_000;
 
-/// Set (create or update) the presence type for a given day of a profile.
-/// Re-setting the same day overwrites the type rather than duplicating the row.
+/// Set (create or update) the presence type for a given day of a profile, and
+/// compute + snapshot the day's commute footprint. Re-setting the same day
+/// overwrites the type/trips rather than duplicating the row. CO2 is tied to
+/// presence: only office/remote days carry trips; other types clear them.
 pub struct SetPresenceUseCase {
     presences: Arc<dyn PresenceRepository>,
+    factors: Arc<dyn EmissionFactorRepository>,
+    settings: Arc<dyn Co2SettingsRepository>,
     clock: Arc<dyn Clock>,
 }
 
 impl SetPresenceUseCase {
-    pub fn new(presences: Arc<dyn PresenceRepository>, clock: Arc<dyn Clock>) -> Self {
-        Self { presences, clock }
+    pub fn new(
+        presences: Arc<dyn PresenceRepository>,
+        factors: Arc<dyn EmissionFactorRepository>,
+        settings: Arc<dyn Co2SettingsRepository>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        Self {
+            presences,
+            factors,
+            settings,
+            clock,
+        }
     }
 
     pub async fn execute(
@@ -29,6 +50,7 @@ impl SetPresenceUseCase {
         profile_id: &str,
         day: i64,
         kind: &str,
+        trips: Vec<TripInputDto>,
     ) -> Result<PresenceDto, DomainError> {
         let profile_id = profile_id.trim();
         if profile_id.is_empty() {
@@ -41,17 +63,82 @@ impl SetPresenceUseCase {
         }
         let kind = PresenceType::parse(kind)?;
 
+        let settings = self.settings.load().await?;
+
+        // CO2 is tied to presence: only office/remote days carry a commute.
+        let trips: Vec<TripInput> = if matches!(kind, PresenceType::Office | PresenceType::Remote) {
+            trips
+                .into_iter()
+                .map(|t| t.into_domain(settings.default_car_occupancy))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        for (i, t) in trips.iter().enumerate() {
+            if t.distance_km < 0.0 || !t.distance_km.is_finite() {
+                return Err(DomainError::Validation(format!(
+                    "trip {i}: distance must be >= 0"
+                )));
+            }
+        }
+
+        let factor_map: HashMap<String, EmissionFactor> = self
+            .factors
+            .list(settings.factor_year)
+            .await?
+            .into_iter()
+            .map(|f| (f.id.clone(), f))
+            .collect();
+        let variant_map: HashMap<(String, String), f64> = self
+            .factors
+            .list_grid_variants(settings.factor_year)
+            .await?
+            .into_iter()
+            .map(|v| ((v.mode_id, v.country), v.value))
+            .collect();
+
+        let day_em = Co2Calculator::compute_day(&trips, kind, &factor_map, &variant_map, &settings);
+
+        // Office/remote days store a (possibly zero) total; other types stay NULL
+        // so the calendar shows no footprint for them.
+        let co2_kg = if matches!(kind, PresenceType::Office | PresenceType::Remote) {
+            Some(day_em.total_kg)
+        } else {
+            None
+        };
+
         let now = self.clock.now_ms();
         let presence = Presence {
             id: Uuid::now_v7().to_string(),
             profile_id: profile_id.to_string(),
             day,
             kind,
+            co2_kg,
+            is_estimated: day_em.is_estimated,
             created_at: now,
             updated_at: now,
         };
 
-        let saved = self.presences.set_for_day(&presence).await?;
+        // The persisted presence id is assigned by the repository (it may reuse
+        // an existing row on conflict); leave `presence_id` empty here.
+        let domain_trips: Vec<Trip> = day_em
+            .trips
+            .iter()
+            .enumerate()
+            .map(|(i, ct)| Trip {
+                id: Uuid::now_v7().to_string(),
+                mode_id: ct.mode_id.clone(),
+                distance_km: ct.distance_km,
+                round_trip: ct.round_trip,
+                occupants: ct.occupants,
+                co2_kg: ct.co2_kg,
+                is_estimated: ct.is_estimated,
+                factor_year: settings.factor_year,
+                position: i as i64,
+            })
+            .collect();
+
+        let saved = self.presences.set_for_day(&presence, &domain_trips).await?;
         Ok(PresenceDto::from(saved))
     }
 }

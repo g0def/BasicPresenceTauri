@@ -20,6 +20,7 @@ describe("TauriPresenceRepository", () => {
           profileId: "p1",
           day: 1_717_200_000_000,
           type: "office",
+          trips: [],
         });
         return DTO;
       }

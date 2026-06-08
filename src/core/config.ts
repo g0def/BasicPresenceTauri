@@ -26,4 +26,10 @@ export const COMMANDS = {
   listPresences: "list_presences",
   deletePresence: "delete_presence",
   importPresences: "import_presences",
+  listEmissionFactors: "list_emission_factors",
+  createCommute: "create_commute",
+  listCommutes: "list_commutes",
+  updateCommute: "update_commute",
+  deleteCommute: "delete_commute",
+  getPresenceTrips: "get_presence_trips",
 } as const;

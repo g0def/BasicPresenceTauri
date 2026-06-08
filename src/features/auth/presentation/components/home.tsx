@@ -1,17 +1,22 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 import { SessionCountdown } from "@/features/auth/presentation/components/session-countdown";
+import { CommuteView } from "@/features/commute/presentation/components/commute-view";
 import { PresenceCalendar } from "@/features/presence/presentation/components/presence-calendar";
 import { EmptyProfileState } from "@/features/profile/presentation/components/empty-profile-state";
 import { ProfileBadge } from "@/features/profile/presentation/components/profile-badge";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { Logo } from "@/shared/components/logo";
 
+type View = "calendar" | "commutes";
+
 export function Home() {
   const { logout } = useAuth();
   const { profiles, isLoading } = useProfile();
   const { t } = useTranslation();
+  const [view, setView] = useState<View>("calendar");
 
   return (
     <main className="flex min-h-screen w-full flex-col p-6">
@@ -19,7 +24,10 @@ export function Home() {
         <Logo className="text-sm" />
         <div className="flex items-center gap-3">
           <SessionCountdown />
-          <ProfileBadge onLogout={() => void logout()} />
+          <ProfileBadge
+            onLogout={() => void logout()}
+            onOpenCommutes={() => setView("commutes")}
+          />
         </div>
       </header>
 
@@ -29,6 +37,8 @@ export function Home() {
         </section>
       ) : profiles.length === 0 ? (
         <EmptyProfileState />
+      ) : view === "commutes" ? (
+        <CommuteView onBack={() => setView("calendar")} />
       ) : (
         <PresenceCalendar />
       )}

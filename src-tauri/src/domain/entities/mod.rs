@@ -1,5 +1,9 @@
 pub mod account;
+pub mod co2_settings;
+pub mod commute;
+pub mod emission_factor;
 pub mod presence;
 pub mod profile;
 pub mod session;
+pub mod trip;
 pub mod user;

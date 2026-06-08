@@ -2,6 +2,7 @@ import type {
   ImportPresencesInput,
   ImportSummary,
   Presence,
+  PresenceTrip,
   SetPresenceInput,
 } from "@/features/presence/domain/entities/presence";
 
@@ -11,6 +12,8 @@ export interface PresenceRepository {
   /** Create or update the presence for a day; returns the persisted row. */
   set(input: SetPresenceInput): Promise<Presence>;
   remove(id: string): Promise<void>;
+  /** The commute trip snapshot of a presence day (for re-editing). */
+  getTrips(presenceId: string): Promise<PresenceTrip[]>;
   /** Bulk-import presences for a profile; returns the per-strategy counts. */
   importMany(input: ImportPresencesInput): Promise<ImportSummary>;
 }

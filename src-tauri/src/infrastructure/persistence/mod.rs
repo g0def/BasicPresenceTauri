@@ -1,5 +1,8 @@
 pub mod account_repository;
+pub mod co2_settings_repository;
+pub mod commute_repository;
 pub mod db;
+pub mod emission_factor_repository;
 pub mod keystore_bootstrap;
 pub mod migrations;
 pub mod presence_repository;

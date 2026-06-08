@@ -1,11 +1,18 @@
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
-import type { PresenceDto } from "@/features/presence/data/dto/presence.dto";
-import { toPresence } from "@/features/presence/data/mappers/presence.mapper";
+import type {
+  PresenceDto,
+  PresenceTripDto,
+} from "@/features/presence/data/dto/presence.dto";
+import {
+  toPresence,
+  toPresenceTrip,
+} from "@/features/presence/data/mappers/presence.mapper";
 import type {
   ImportPresencesInput,
   ImportSummary,
   Presence,
+  PresenceTrip,
   SetPresenceInput,
 } from "@/features/presence/domain/entities/presence";
 import type { PresenceRepository } from "@/features/presence/domain/repositories/presence-repository";
@@ -24,12 +31,20 @@ export class TauriPresenceRepository implements PresenceRepository {
       profileId: input.profileId,
       day: input.day,
       type: input.type,
+      trips: input.trips ?? [],
     });
     return toPresence(dto);
   }
 
   async remove(id: string): Promise<void> {
     await invoke<void>(COMMANDS.deletePresence, { id });
+  }
+
+  async getTrips(presenceId: string): Promise<PresenceTrip[]> {
+    const dtos = await invoke<PresenceTripDto[]>(COMMANDS.getPresenceTrips, {
+      presenceId,
+    });
+    return dtos.map(toPresenceTrip);
   }
 
   async importMany(input: ImportPresencesInput): Promise<ImportSummary> {

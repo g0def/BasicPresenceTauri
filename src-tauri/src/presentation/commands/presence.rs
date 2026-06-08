@@ -2,20 +2,24 @@ use tauri::State;
 
 use crate::application::dto::import_presence_dto::{ImportPresenceEntryDto, ImportSummaryDto};
 use crate::application::dto::presence_dto::PresenceDto;
+use crate::application::dto::trip_dto::TripInputDto;
 use crate::presentation::commands::error::AppError;
 use crate::presentation::state::AppState;
 
-/// Set (create or update) the presence type for a day of a profile.
+/// Set (create or update) the presence type for a day of a profile. For
+/// office/remote days, `trips` carries the commute legs whose footprint is
+/// computed and snapshotted; it is absent/empty for other types.
 #[tauri::command]
 pub async fn set_presence(
     profile_id: String,
     day: i64,
     r#type: String,
+    trips: Option<Vec<TripInputDto>>,
     state: State<'_, AppState>,
 ) -> Result<PresenceDto, AppError> {
     Ok(state
         .set_presence
-        .execute(&profile_id, day, &r#type)
+        .execute(&profile_id, day, &r#type, trips.unwrap_or_default())
         .await?)
 }
 

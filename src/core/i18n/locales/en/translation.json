@@ -99,5 +99,84 @@
       "notArray": "The file must contain a JSON array.",
       "empty": "The file contains no entries."
     }
+  },
+  "commute": {
+    "menuItem": "Commute modes",
+    "manager": {
+      "title": "Commute modes",
+      "subtitle": "Save your reusable trips (e.g. 30 km train + 5 km bike).",
+      "empty": "No commute mode saved yet.",
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "roundTripBadge": "round trip",
+      "deleteConfirmTitle": "Delete this commute mode?"
+    },
+    "form": {
+      "addTitle": "New commute mode",
+      "editTitle": "Edit commute mode",
+      "subtitle": "Name it and add the trip segments (one-way distance).",
+      "name": "Name",
+      "roundTrip": "Round trip",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "segment": {
+      "type": "Transport",
+      "typePlaceholder": "Choose a transport",
+      "distance": "Distance (km)",
+      "occupants": "Occupants",
+      "add": "Add a segment",
+      "remove": "Remove segment"
+    },
+    "categories": {
+      "car": "Car",
+      "active": "Bike & walk",
+      "public_transport": "Public transport",
+      "rail": "Train",
+      "air": "Plane",
+      "other": "Other"
+    },
+    "modes": {
+      "car_petrol": "Car — petrol",
+      "car_diesel": "Car — diesel",
+      "car_average": "Car — average engine",
+      "car_phev": "Car — plug-in hybrid",
+      "car_ev": "Car — electric",
+      "taxi": "Taxi / ride-hailing",
+      "walk": "Walking",
+      "bike": "Bicycle",
+      "ebike": "Electric bike",
+      "escooter": "Electric scooter",
+      "scooter_elec": "Electric moped",
+      "public_transport": "Public transport",
+      "bus": "City bus",
+      "coach": "Long-distance coach",
+      "metro_tram": "Metro / tram",
+      "train_sncb": "Intercity train (SNCB)",
+      "train_ter": "Regional train (TER)",
+      "train_hs_fr": "High-speed train (TGV)",
+      "train_eurostar": "Eurostar",
+      "train_thalys": "Thalys",
+      "plane_domestic": "Plane — domestic",
+      "plane_short": "Plane — short-haul",
+      "plane_medium": "Plane — medium-haul",
+      "plane_long": "Plane — long-haul"
+    },
+    "step": {
+      "title": "Choose a commute mode.",
+      "none": "No trip",
+      "custom": "Custom",
+      "back": "Back",
+      "confirm": "Confirm"
+    },
+    "back": "Back to calendar",
+    "validation": {
+      "nameRequired": "Name is required.",
+      "minSegment": "Add at least one segment.",
+      "modeRequired": "Choose a transport for each segment.",
+      "distancePositive": "Distance must be greater than 0."
+    }
   }
 }

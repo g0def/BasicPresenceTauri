@@ -7,9 +7,11 @@ import type {
   ImportPresenceEntry,
   ImportSummary,
   Presence,
+  PresenceTrip,
   PresenceType,
 } from "@/features/presence/domain/entities/presence";
 import { makeDeletePresenceUseCase } from "@/features/presence/domain/use-cases/delete-presence";
+import { makeGetPresenceTripsUseCase } from "@/features/presence/domain/use-cases/get-presence-trips";
 import { makeImportPresencesUseCase } from "@/features/presence/domain/use-cases/import-presences";
 import { makeListPresencesUseCase } from "@/features/presence/domain/use-cases/list-presences";
 import { makeSetPresenceUseCase } from "@/features/presence/domain/use-cases/set-presence";
@@ -25,6 +27,7 @@ const listPresencesUseCase = makeListPresencesUseCase(repo);
 const setPresenceUseCase = makeSetPresenceUseCase(repo);
 const deletePresenceUseCase = makeDeletePresenceUseCase(repo);
 const importPresencesUseCase = makeImportPresencesUseCase(repo);
+const getPresenceTripsUseCase = makeGetPresenceTripsUseCase(repo);
 
 interface PresenceProviderProps {
   children: ReactNode;
@@ -81,12 +84,16 @@ export function PresenceProvider({
   }, [profileId, handleError]);
 
   const setPresence = useCallback(
-    async (day: number, type: PresenceType): Promise<boolean> => {
+    async (
+      day: number,
+      type: PresenceType,
+      trips?: PresenceTrip[],
+    ): Promise<boolean> => {
       if (!profileId) return false;
       setIsSubmitting(true);
       setError(null);
       try {
-        const saved = await setPresenceUseCase({ profileId, day, type });
+        const saved = await setPresenceUseCase({ profileId, day, type, trips });
         // Upsert by day: drop any previous record for that day, keep the rest.
         setPresences((prev) => [
           ...prev.filter((p) => p.day !== saved.day),
@@ -101,6 +108,18 @@ export function PresenceProvider({
       }
     },
     [profileId, handleError],
+  );
+
+  const getPresenceTrips = useCallback(
+    async (presenceId: string): Promise<PresenceTrip[]> => {
+      try {
+        return await getPresenceTripsUseCase(presenceId);
+      } catch (e) {
+        handleError(e);
+        return [];
+      }
+    },
+    [handleError],
   );
 
   const deletePresence = useCallback(
@@ -180,6 +199,7 @@ export function PresenceProvider({
       error,
       setPresence,
       deletePresence,
+      getPresenceTrips,
       importPresences,
       clearError,
     }),
@@ -190,6 +210,7 @@ export function PresenceProvider({
       error,
       setPresence,
       deletePresence,
+      getPresenceTrips,
       importPresences,
       clearError,
     ],

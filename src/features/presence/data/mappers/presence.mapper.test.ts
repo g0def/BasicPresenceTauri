@@ -10,6 +10,8 @@ describe("presence.mapper", () => {
         profileId: "p1",
         day: 1_717_200_000_000,
         type: "remote",
+        co2Kg: 4.776,
+        isEstimated: false,
         createdAt: 1,
         updatedAt: 2,
       }),
@@ -18,8 +20,24 @@ describe("presence.mapper", () => {
       profileId: "p1",
       day: 1_717_200_000_000,
       type: "remote",
+      co2Kg: 4.776,
+      isEstimated: false,
       createdAt: 1,
       updatedAt: 2,
     });
+  });
+
+  it("preserves a null co2Kg (e.g. an imported day with no commute data)", () => {
+    const mapped = toPresence({
+      id: "x2",
+      profileId: "p1",
+      day: 1_717_200_000_000,
+      type: "office",
+      co2Kg: null,
+      isEstimated: false,
+      createdAt: 1,
+      updatedAt: 2,
+    });
+    expect(mapped.co2Kg).toBeNull();
   });
 });
