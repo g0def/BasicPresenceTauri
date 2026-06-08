@@ -192,3 +192,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---- Décor de l'écran d'authentification (cf. auth-backdrop.tsx) ---- */
+@keyframes auth-route-flow {
+  to {
+    /* deux périodes de dasharray (6 + 10) pour une boucle continue */
+    stroke-dashoffset: -32;
+  }
+}
+
+@keyframes auth-leaf-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-7deg);
+  }
+}
+
+/* Halos « vivants » : dérive + respiration (échelle/opacité) très lentes. */
+@keyframes auth-glow-1 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(26px, 20px, 0) scale(1.25);
+    opacity: 1;
+  }
+}
+
+@keyframes auth-glow-2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.15);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(-30px, -18px, 0) scale(0.96);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-route {
+    animation: auth-route-flow 2.4s linear infinite;
+  }
+  .auth-leaf {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: auth-leaf-float 5s ease-in-out infinite;
+  }
+  .auth-glow-1 {
+    animation: auth-glow-1 9s ease-in-out infinite;
+  }
+  .auth-glow-2 {
+    animation: auth-glow-2 13s ease-in-out infinite;
+  }
+}

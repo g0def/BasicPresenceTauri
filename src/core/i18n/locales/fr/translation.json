@@ -11,7 +11,10 @@
     "password": "Mot de passe",
     "submitting": "Veuillez patienter…",
     "submitRegister": "Créer le compte",
-    "submitLogin": "Se connecter"
+    "submitLogin": "Se connecter",
+    "tagline": "Suivez vos présences, mesurez votre empreinte carbone.",
+    "carbon": "CO₂",
+    "local": "100% local · chiffré"
   },
   "home": {
     "logout": "Se déconnecter"

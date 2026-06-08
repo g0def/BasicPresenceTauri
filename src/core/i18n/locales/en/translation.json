@@ -11,7 +11,10 @@
     "password": "Password",
     "submitting": "Please wait…",
     "submitRegister": "Create account",
-    "submitLogin": "Sign in"
+    "submitLogin": "Sign in",
+    "tagline": "Track your presence, measure your carbon footprint.",
+    "carbon": "CO₂",
+    "local": "100% local · encrypted"
   },
   "home": {
     "logout": "Log out"
