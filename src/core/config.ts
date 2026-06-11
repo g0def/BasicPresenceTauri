@@ -32,4 +32,12 @@ export const COMMANDS = {
   updateCommute: "update_commute",
   deleteCommute: "delete_commute",
   getPresenceTrips: "get_presence_trips",
+  createTaskPreset: "create_task_preset",
+  listTaskPresets: "list_task_presets",
+  updateTaskPreset: "update_task_preset",
+  deleteTaskPreset: "delete_task_preset",
+  getWorkEntries: "get_work_entries",
+  setWorkEntries: "set_work_entries",
+  getWorkSchedule: "get_work_schedule",
+  setWorkSchedule: "set_work_schedule",
 } as const;

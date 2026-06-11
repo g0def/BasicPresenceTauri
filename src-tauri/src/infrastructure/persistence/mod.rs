@@ -7,5 +7,7 @@ pub mod keystore_bootstrap;
 pub mod migrations;
 pub mod presence_repository;
 pub mod profile_repository;
+pub mod task_preset_repository;
 pub mod vault;
 pub mod vault_integrity;
+pub mod work_entry_repository;

@@ -110,6 +110,19 @@ impl PresenceRepository for LibsqlPresenceRepository {
         Ok(trips)
     }
 
+    async fn find_by_id(&self, id: &str) -> Result<Option<Presence>, DomainError> {
+        let sql = format!("SELECT {SELECT_COLUMNS} FROM presence WHERE id = ?1");
+        let mut rows = self
+            .conn()?
+            .query(&sql, params![id])
+            .await
+            .map_err(map_storage)?;
+        match rows.next().await.map_err(map_storage)? {
+            Some(row) => Ok(Some(row_to_presence(&row)?)),
+            None => Ok(None),
+        }
+    }
+
     async fn list_by_profile(&self, profile_id: &str) -> Result<Vec<Presence>, DomainError> {
         let sql =
             format!("SELECT {SELECT_COLUMNS} FROM presence WHERE profile_id = ?1 ORDER BY day");

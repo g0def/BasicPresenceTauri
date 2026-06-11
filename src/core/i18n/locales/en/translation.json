@@ -179,5 +179,47 @@
       "modeRequired": "Choose a transport for each segment.",
       "distancePositive": "Distance must be greater than 0."
     }
+  },
+  "workHours": {
+    "encodeButton": "Log hours",
+    "title": "Hours of the day",
+    "back": "Back to calendar",
+    "notEligible": "This day is not an encoded work day.",
+    "totalLabel": "total",
+    "emptyHint": "Add a task to fill the ring.",
+    "saving": "Saving…",
+    "presets": {
+      "title": "Saved tasks",
+      "empty": "No saved tasks yet.",
+      "add": "New task",
+      "edit": "Edit task",
+      "delete": "Delete task",
+      "hint": "This task will be reusable on future days."
+    },
+    "custom": {
+      "add": "One-off task",
+      "hint": "This task is added to the day without being saved."
+    },
+    "form": {
+      "title": "Title",
+      "description": "Description",
+      "duration": "Duration",
+      "color": "Color",
+      "customColor": "Custom color",
+      "save": "Save",
+      "add": "Add",
+      "cancel": "Cancel"
+    },
+    "entries": {
+      "title": "Day timeline",
+      "empty": "No tasks logged for this day.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove"
+    },
+    "schedule": {
+      "start": "Start of day",
+      "end": "End of day"
+    }
   }
 }

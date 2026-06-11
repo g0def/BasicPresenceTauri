@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedCommutesIndexRouteImport } from './routes/_authenticated/commutes/index'
+import { Route as AuthenticatedWorkHoursDayRouteImport } from './routes/_authenticated/work-hours/$day'
 import { Route as AuthenticatedCommutesNewRouteImport } from './routes/_authenticated/commutes/new'
 import { Route as AuthenticatedCommutesCommuteIdEditRouteImport } from './routes/_authenticated/commutes/$commuteId.edit'
 
@@ -36,6 +37,12 @@ const AuthenticatedCommutesIndexRoute =
     path: '/commutes/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedWorkHoursDayRoute =
+  AuthenticatedWorkHoursDayRouteImport.update({
+    id: '/work-hours/$day',
+    path: '/work-hours/$day',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCommutesNewRoute =
   AuthenticatedCommutesNewRouteImport.update({
     id: '/commutes/new',
@@ -53,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
+  '/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
   '/commutes/': typeof AuthenticatedCommutesIndexRoute
   '/commutes/$commuteId/edit': typeof AuthenticatedCommutesCommuteIdEditRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AuthenticatedIndexRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
+  '/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
   '/commutes': typeof AuthenticatedCommutesIndexRoute
   '/commutes/$commuteId/edit': typeof AuthenticatedCommutesCommuteIdEditRoute
 }
@@ -69,6 +78,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/commutes/new': typeof AuthenticatedCommutesNewRoute
+  '/_authenticated/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
   '/_authenticated/commutes/': typeof AuthenticatedCommutesIndexRoute
   '/_authenticated/commutes/$commuteId/edit': typeof AuthenticatedCommutesCommuteIdEditRoute
 }
@@ -78,6 +88,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/commutes/new'
+    | '/work-hours/$day'
     | '/commutes/'
     | '/commutes/$commuteId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -85,6 +96,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/'
     | '/commutes/new'
+    | '/work-hours/$day'
     | '/commutes'
     | '/commutes/$commuteId/edit'
   id:
@@ -93,6 +105,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/'
     | '/_authenticated/commutes/new'
+    | '/_authenticated/work-hours/$day'
     | '/_authenticated/commutes/'
     | '/_authenticated/commutes/$commuteId/edit'
   fileRoutesById: FileRoutesById
@@ -132,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCommutesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/work-hours/$day': {
+      id: '/_authenticated/work-hours/$day'
+      path: '/work-hours/$day'
+      fullPath: '/work-hours/$day'
+      preLoaderRoute: typeof AuthenticatedWorkHoursDayRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/commutes/new': {
       id: '/_authenticated/commutes/new'
       path: '/commutes/new'
@@ -152,6 +172,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCommutesNewRoute: typeof AuthenticatedCommutesNewRoute
+  AuthenticatedWorkHoursDayRoute: typeof AuthenticatedWorkHoursDayRoute
   AuthenticatedCommutesIndexRoute: typeof AuthenticatedCommutesIndexRoute
   AuthenticatedCommutesCommuteIdEditRoute: typeof AuthenticatedCommutesCommuteIdEditRoute
 }
@@ -159,6 +180,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCommutesNewRoute: AuthenticatedCommutesNewRoute,
+  AuthenticatedWorkHoursDayRoute: AuthenticatedWorkHoursDayRoute,
   AuthenticatedCommutesIndexRoute: AuthenticatedCommutesIndexRoute,
   AuthenticatedCommutesCommuteIdEditRoute:
     AuthenticatedCommutesCommuteIdEditRoute,

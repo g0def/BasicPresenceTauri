@@ -151,13 +151,34 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 > **Commute** = modèle de trajet réutilisable (segments ordonnés) rattaché à un profil (`ON DELETE CASCADE`). **Trip** (`presence_trip`) = snapshot par jour figé à l'encodage : un jour passé reste reproductible même si le référentiel ou un commute change ensuite (`factor_year` conservé pour l'audit).
 > La **configuration CO₂** (pays du réseau électrique, forçage radiatif aviation, énergie bâtiment, occupation voiture par défaut…) est un blob JSON dans `vault_meta` (clé `co2_config`), avec repli sur `Co2Settings::default()` — pas encore d'UI de réglages.
 
+### Heures de travail
+
+[work_hours.rs](../src-tauri/src/presentation/commands/work_hours.rs) — encodage des heures d'une journée travaillée, **entièrement dans le coffre chiffré** (migrations [0005](../src-tauri/migrations/vault/0005_add_work_hours.sql)→[0008](../src-tauri/migrations/vault/0008_store_end_minutes.sql)). Même garde d'accès : coffre **déverrouillé** requis (sinon `SESSION_EXPIRED`).
+
+| Commande | Entrée | Sortie |
+| --- | --- | --- |
+| `create_task_preset` | `profileId, title, description?, defaultMinutes, color` | `TaskPresetDto { id, profileId, title, description, defaultMinutes, color, createdAt, updatedAt }` |
+| `list_task_presets` | `profileId` | `TaskPresetDto[]` (triés par titre) |
+| `update_task_preset` | `id, title, description?, defaultMinutes, color` | `TaskPresetDto` |
+| `delete_task_preset` | `id` | `void` |
+| `get_work_entries` | `presenceId` | `WorkEntryDto[] { id, title, description, minutes, color, position }` |
+| `set_work_entries` | `presenceId, entries[]` | `WorkDayDto { entries[], schedule? }` |
+| `get_work_schedule` | `presenceId` | `WorkDayScheduleDto { startMinutes, endMinutes }` \| `null` |
+| `set_work_schedule` | `presenceId, startMinutes` | `WorkDayScheduleDto` |
+
+> **Task preset** = tâche réutilisable rattachée à un profil (`ON DELETE CASCADE`) : titre, durée par défaut (5..=480 min, pas de 5), couleur `#RRGGBB`. **Work entry** = tâche d'une journée, *duration-stacked* (pas d'heure de début explicite ; `position` = ordre, le total du jour = somme des `minutes`). Les entrées **snapshotent** titre/description/couleur à l'encodage : éditer ou supprimer un preset ne réécrit jamais les jours passés.
+
+> Les heures ne s'encodent que sur des jours **`office`/`remote`** (gate vérifié côté use case, qui charge la présence cible). `set_work_entries` a une sémantique **replace-all** : il remplace tout le jeu d'entrées dans **une seule transaction**, la `position` vient de l'ordre du tableau et les ids sont régénérés côté serveur (les entrées ne sont pas des handles stables).
+
+> L'**horaire** (`work_day_schedule`, au plus une ligne par présence) ne stocke que le début saisi ; `endMinutes` est **dérivé** (`start + somme des durées`) et recalculé/stocké à chaque sauvegarde d'entrées ou d'horaire — il peut dépasser 1440 si la journée court après minuit (l'affichage *wrap*). Un jour qui cesse d'être `office`/`remote` perd automatiquement ses entrées **et** son horaire (triggers `AFTER UPDATE OF type` sur `presence`, car l'*upsert* de `set_presence` conserve l'id et ne déclenche donc pas le `CASCADE`).
+
 ## Mapping Clean Architecture
 
 **Backend** ([src-tauri/src/](../src-tauri/src/)) :
 
-- `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`, `Commute`/`CommuteSegment`, `Trip`/`TripInput`, `EmissionFactor`/`GridVariant`, `Co2Settings`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`, `CommuteRepository`, `EmissionFactorRepository`, `Co2SettingsRepository`), service de calcul pur `Co2Calculator`, `DomainError`. Aucune dépendance externe.
-- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`) + DTOs.
-- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
+- `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`, `Commute`/`CommuteSegment`, `Trip`/`TripInput`, `EmissionFactor`/`GridVariant`, `Co2Settings`, `TaskPreset`, `WorkEntry`/`WorkDaySchedule`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`, `CommuteRepository`, `EmissionFactorRepository`, `Co2SettingsRepository`, `TaskPresetRepository`, `WorkEntryRepository`), service de calcul pur `Co2Calculator`, `DomainError`. Aucune dépendance externe.
+- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`, `create_task_preset`, `list_task_presets`, `update_task_preset`, `delete_task_preset`, `get_work_entries`, `set_work_entries`, `get_work_schedule`, `set_work_schedule`) + DTOs.
+- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlTaskPresetRepository`, `LibsqlWorkEntryRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 
 **Frontend** ([src/](../src/)) :
@@ -167,6 +188,7 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 - `features/profile/` — `domain` (`Profile`, `ProfileRepository`, use cases), `data` (DTOs, mapper, `TauriProfileRepository`), `presentation` (`ProfileProvider` = composition root front recevant `onSessionExpired`, `useProfile`, formulaire `Dialog`, et le **badge** = menu compte regroupant profils + langue + thème + déconnexion). Indépendante de `auth` : `logout` est injecté (`onSessionExpired` au provider, `onLogout` au badge) ; langue/thème viennent de `core`/`shared`.
 - `features/presence/` — calendrier mensuel des présences + import. `domain`/`data`/`presentation` (`PresenceProvider`, `usePresence`, `PresenceCalendar`, `PresenceDayDialog`). L'entité de transport `PresenceTrip` est **redéclarée ici** (structurellement identique au `TripInput` de `commute`) pour ne pas faire dépendre le domaine présence du domaine commute.
 - `features/commute/` — modèles de trajet réutilisables + référentiel de facteurs d'émission. `domain` (`Commute`, `EmissionFactor`, `commuteToTrips`, `CommuteRepository`, `EmissionFactorRepository`, use cases), `data` (DTOs, mappers, `TauriCommuteRepository`, `TauriEmissionFactorRepository`), `presentation` (`CommuteProvider` = composition root front, `useCommute`, `CommuteView`, `SegmentEditor`, helpers de formatage/icônes/labels).
+- `features/work-hours/` — encodage des heures d'un jour `office`/`remote` (page routée `/work-hours/$day`). `domain` (`TaskPreset`, `WorkEntry`/`WorkDaySchedule`/`WorkDay`, `TaskPresetRepository`, `WorkEntryRepository`, use cases purs), `data` (DTOs miroir, mappers, `TauriTaskPresetRepository`, `TauriWorkEntryRepository`), `presentation` (`TaskPresetProvider` = composition root front pour les presets ; `useWorkDay` = état local du jour à persistance *live* (debounce + flush au démontage) ; `DayDonut`, `WorkEntryList`, `DayScheduleEditor`, `TaskPresetPanel`, helpers de géométrie/format testés). Consomme `usePresence` pour résoudre la présence du jour (même convention que `commute`).
 
 > **Dépendance dirigée assumée `presence → commute`.** L'empreinte CO₂ étant *par conception* attachée à un jour de présence, `PresenceDayDialog`/`PresenceCalendar` consomment le `SegmentEditor`, `useCommute` et les helpers de `commute` (jamais l'inverse — pas de cycle). C'est une dérogation **délibérée** à l'isolation stricte des features, justifiée par le couplage métier réel ; à conserver unidirectionnelle. (`CommuteProvider` consomme `useProfile` comme le fait déjà `PresenceProvider` — convention admise pour le profil actif.)
 

@@ -14,6 +14,7 @@ import { EmptyProfileState } from "@/features/profile/presentation/components/em
 import { ProfileBadge } from "@/features/profile/presentation/components/profile-badge";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
+import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
 import { Logo } from "@/shared/components/logo";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -37,7 +38,9 @@ function AuthenticatedLayout() {
     <ProfileProvider onSessionExpired={logout}>
       <PresenceProvider onSessionExpired={logout}>
         <CommuteProvider onSessionExpired={logout}>
-          <AppShell />
+          <TaskPresetProvider onSessionExpired={logout}>
+            <AppShell />
+          </TaskPresetProvider>
         </CommuteProvider>
       </PresenceProvider>
     </ProfileProvider>

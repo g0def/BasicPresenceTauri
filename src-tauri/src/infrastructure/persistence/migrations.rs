@@ -36,6 +36,22 @@ pub const VAULT_MIGRATIONS: &[Migration] = &[
         version: 4,
         sql: include_str!("../../../migrations/vault/0004_add_co2.sql"),
     },
+    Migration {
+        version: 5,
+        sql: include_str!("../../../migrations/vault/0005_add_work_hours.sql"),
+    },
+    Migration {
+        version: 6,
+        sql: include_str!("../../../migrations/vault/0006_add_work_schedule.sql"),
+    },
+    Migration {
+        version: 7,
+        sql: include_str!("../../../migrations/vault/0007_simplify_work_schedule.sql"),
+    },
+    Migration {
+        version: 8,
+        sql: include_str!("../../../migrations/vault/0008_store_end_minutes.sql"),
+    },
 ];
 
 /// Idempotently apply migrations in version order, tracking applied versions in
@@ -48,13 +64,18 @@ pub async fn run(conn: &Connection, migrations: &[Migration]) -> Result<(), Doma
     .await
     .map_err(map_storage)?;
 
-    let mut rows = conn
-        .query("SELECT COALESCE(MAX(version), 0) FROM _migrations", ())
-        .await
-        .map_err(map_storage)?;
-    let current: i64 = match rows.next().await.map_err(map_storage)? {
-        Some(row) => row.get(0).map_err(map_storage)?,
-        None => 0,
+    // Scoped so the SELECT cursor is closed before any DDL runs: an open
+    // statement makes schema-changing migrations (DROP TABLE…) fail with
+    // "database table is locked".
+    let current: i64 = {
+        let mut rows = conn
+            .query("SELECT COALESCE(MAX(version), 0) FROM _migrations", ())
+            .await
+            .map_err(map_storage)?;
+        match rows.next().await.map_err(map_storage)? {
+            Some(row) => row.get(0).map_err(map_storage)?,
+            None => 0,
+        }
     };
 
     for m in migrations {

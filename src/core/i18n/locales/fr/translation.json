@@ -179,5 +179,47 @@
       "modeRequired": "Choisissez un transport pour chaque segment.",
       "distancePositive": "La distance doit être supérieure à 0."
     }
+  },
+  "workHours": {
+    "encodeButton": "Encoder les heures",
+    "title": "Heures de la journée",
+    "back": "Retour au calendrier",
+    "notEligible": "Ce jour n'est pas un jour de travail encodé.",
+    "totalLabel": "au total",
+    "emptyHint": "Ajoutez une tâche pour remplir l'anneau.",
+    "saving": "Enregistrement…",
+    "presets": {
+      "title": "Tâches enregistrées",
+      "empty": "Aucune tâche enregistrée pour l'instant.",
+      "add": "Nouvelle tâche",
+      "edit": "Modifier la tâche",
+      "delete": "Supprimer la tâche",
+      "hint": "Cette tâche sera réutilisable pour les prochaines journées."
+    },
+    "custom": {
+      "add": "Tâche ponctuelle",
+      "hint": "Cette tâche est ajoutée à la journée sans être enregistrée."
+    },
+    "form": {
+      "title": "Titre",
+      "description": "Description",
+      "duration": "Durée",
+      "color": "Couleur",
+      "customColor": "Couleur personnalisée",
+      "save": "Enregistrer",
+      "add": "Ajouter",
+      "cancel": "Annuler"
+    },
+    "entries": {
+      "title": "Déroulé de la journée",
+      "empty": "Aucune tâche encodée pour cette journée.",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "remove": "Retirer"
+    },
+    "schedule": {
+      "start": "Début de journée",
+      "end": "Fin de journée"
+    }
   }
 }

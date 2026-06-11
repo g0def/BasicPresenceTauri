@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::application::dto::commute_dto::CommuteSegmentInputDto;
 use crate::application::dto::import_presence_dto::ImportPresenceEntryDto;
 use crate::application::dto::trip_dto::TripInputDto;
+use crate::application::dto::work_entry_dto::WorkEntryInputDto;
 use crate::build_state;
 use crate::domain::error::DomainError;
 use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy, IntegrityPolicy};
@@ -956,6 +957,327 @@ fn commute_crud_and_emission_factors() {
             .is_empty());
 
         state.logout.execute(&session.token).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+/// A day work entry with a default color, for the work-hours tests.
+fn work_entry(title: &str, minutes: i64) -> WorkEntryInputDto {
+    WorkEntryInputDto {
+        title: title.to_string(),
+        description: None,
+        minutes,
+        color: "#4B7F52".to_string(),
+    }
+}
+
+#[test]
+fn task_preset_crud_and_validation() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("task-preset");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        // Vault locked before login: preset operations are refused.
+        assert!(matches!(
+            state.list_task_presets.execute("nope").await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        // Create two presets out of alphabetical order.
+        let beta = state
+            .create_task_preset
+            .execute(&profile.id, "Beta", None, 30, "#CBA53C")
+            .await
+            .expect("create beta");
+        let alpha = state
+            .create_task_preset
+            .execute(
+                &profile.id,
+                "  Alpha  ",
+                Some("  notes  ".to_string()),
+                60,
+                " #4b7f52 ",
+            )
+            .await
+            .expect("create alpha");
+        // Title/description trimmed, color preserved as given (trimmed).
+        assert_eq!(alpha.title, "Alpha");
+        assert_eq!(alpha.description.as_deref(), Some("notes"));
+
+        // Listed alphabetically by title.
+        let listed = state
+            .list_task_presets
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(
+            listed.iter().map(|p| p.title.as_str()).collect::<Vec<_>>(),
+            vec!["Alpha", "Beta"]
+        );
+
+        // Field validation is rejected at the use-case boundary.
+        assert!(matches!(
+            state
+                .create_task_preset
+                .execute(&profile.id, "   ", None, 30, "#CBA53C")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        assert!(matches!(
+            state
+                .create_task_preset
+                .execute(&profile.id, "Bad", None, 7, "#CBA53C")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        assert!(matches!(
+            state
+                .create_task_preset
+                .execute(&profile.id, "Bad", None, 30, "not-a-color")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // Update keeps the id and created_at, refreshes updated_at.
+        let updated = state
+            .update_task_preset
+            .execute(&alpha.id, "Zeta", None, 90, "#005377")
+            .await
+            .expect("update");
+        assert_eq!(updated.id, alpha.id);
+        assert_eq!(updated.created_at, alpha.created_at);
+        assert!(updated.updated_at >= alpha.updated_at);
+        assert_eq!(updated.title, "Zeta");
+        assert_eq!(updated.description, None);
+
+        // Updating an unknown preset is a validation error, not a silent no-op.
+        assert!(matches!(
+            state
+                .update_task_preset
+                .execute("does-not-exist", "X", None, 30, "#005377")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // Re-list reflects the rename (now [Beta, Zeta]).
+        let listed = state
+            .list_task_presets
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(
+            listed.iter().map(|p| p.title.as_str()).collect::<Vec<_>>(),
+            vec!["Beta", "Zeta"]
+        );
+
+        // Delete removes a single preset.
+        state
+            .delete_task_preset
+            .execute(&beta.id)
+            .await
+            .expect("delete");
+        let listed = state
+            .list_task_presets
+            .execute(&profile.id)
+            .await
+            .expect("list");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, alpha.id);
+
+        state.logout.execute(&session.token).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn work_entries_schedule_recompute_and_type_flip_cleanup() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("work-entries");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const DAY_OFFICE: i64 = 1_717_200_000_000;
+        const DAY_VACATION: i64 = DAY_OFFICE + 86_400_000;
+
+        let office = state
+            .set_presence
+            .execute(&profile.id, DAY_OFFICE, "office", vec![])
+            .await
+            .expect("set office");
+        let vacation = state
+            .set_presence
+            .execute(&profile.id, DAY_VACATION, "vacation", vec![])
+            .await
+            .expect("set vacation");
+
+        // A fresh work day has no entries and no schedule.
+        assert!(state
+            .get_work_entries
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(state
+            .get_work_schedule
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .is_none());
+
+        // Hours can only be encoded on office/remote days.
+        assert!(matches!(
+            state
+                .set_work_entries
+                .execute(&vacation.id, vec![work_entry("Nope", 60)])
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        assert!(matches!(
+            state.set_work_schedule.execute(&vacation.id, 510).await,
+            Err(DomainError::Validation(_))
+        ));
+        // An unknown presence is refused too.
+        assert!(matches!(
+            state
+                .set_work_entries
+                .execute("does-not-exist", vec![work_entry("Nope", 60)])
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // Replace-all: positions follow array order; ids are generated server-side.
+        let day = state
+            .set_work_entries
+            .execute(
+                &office.id,
+                vec![work_entry("Dev", 120), work_entry("Réunion", 60)],
+            )
+            .await
+            .expect("set entries");
+        assert_eq!(day.entries.len(), 2);
+        assert_eq!(day.entries[0].position, 0);
+        assert_eq!(day.entries[1].position, 1);
+        assert!(day.entries.iter().all(|e| !e.id.is_empty()));
+        // No schedule yet, so none is returned.
+        assert!(day.schedule.is_none());
+
+        let listed = state.get_work_entries.execute(&office.id).await.unwrap();
+        assert_eq!(
+            listed.iter().map(|e| e.title.as_str()).collect::<Vec<_>>(),
+            vec!["Dev", "Réunion"]
+        );
+
+        // Setting the start derives the stored end (start + sum of durations).
+        let sched = state
+            .set_work_schedule
+            .execute(&office.id, 510) // 08:30
+            .await
+            .expect("set schedule");
+        assert_eq!(sched.start_minutes, 510);
+        assert_eq!(sched.end_minutes, 510 + 180);
+
+        // Editing the entries recomputes and returns the stored end.
+        let first_ids: Vec<String> = listed.iter().map(|e| e.id.clone()).collect();
+        let day = state
+            .set_work_entries
+            .execute(
+                &office.id,
+                vec![
+                    work_entry("Dev", 120),
+                    work_entry("Réunion", 60),
+                    work_entry("Revue", 30),
+                ],
+            )
+            .await
+            .expect("set entries 2");
+        let schedule = day.schedule.expect("schedule recomputed");
+        assert_eq!(schedule.end_minutes, 510 + 210);
+        assert_eq!(
+            state
+                .get_work_schedule
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .end_minutes,
+            510 + 210
+        );
+        // Replace-all regenerates ids (entries are not stable handles).
+        assert!(day.entries.iter().all(|e| !first_ids.contains(&e.id)));
+
+        // A single invalid entry aborts the whole save: nothing is written.
+        assert!(matches!(
+            state
+                .set_work_entries
+                .execute(&office.id, vec![work_entry("Ok", 60), work_entry("Bad", 7)])
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        let after = state.get_work_entries.execute(&office.id).await.unwrap();
+        assert_eq!(after.len(), 3, "failed save must leave the day untouched");
+
+        // Flipping the day off work clears its entries AND its schedule (the
+        // upsert keeps the row id, so the cleanup runs via the type trigger).
+        state
+            .set_presence
+            .execute(&profile.id, DAY_OFFICE, "vacation", vec![])
+            .await
+            .expect("flip to vacation");
+        assert!(state
+            .get_work_entries
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .is_empty());
+        assert!(state
+            .get_work_schedule
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .is_none());
+
+        // Logout locks the vault: work-hours reads are refused again.
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state.get_work_entries.execute(&office.id).await,
+            Err(DomainError::Unauthorized)
+        ));
+
         let _ = std::fs::remove_dir_all(dir);
     });
 }

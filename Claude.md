@@ -100,26 +100,29 @@ src-tauri/
     ├── lib.rs                   # POINT DE COMPOSITION : setup, DI (build_state), commandes
     ├── integration_tests.rs     # Test e2e backend (register→login→session + chiffrement)
     ├── domain/                  # ── Domain (pur, aucune dépendance externe)
-    │   ├── entities/            #    user, account, session, profile, presence,
-    │   │                        #    commute, trip, emission_factor, co2_settings
+    │   ├── entities/            #    user, account, session, profile, presence, commute, trip,
+    │   │                        #    emission_factor, co2_settings, task_preset, work_entry, work_day_schedule
     │   ├── repositories/        #    traits AccountRepository, ProfileRepository, PresenceRepository,
-    │   │                        #    CommuteRepository, EmissionFactorRepository, Co2SettingsRepository
+    │   │                        #    CommuteRepository, EmissionFactorRepository, Co2SettingsRepository,
+    │   │                        #    TaskPresetRepository, WorkEntryRepository
     │   ├── services/            #    ports : PasswordHasher, KeyService, TokenGenerator, SessionStore,
     │   │                        #    VaultManager, Clock + service pur Co2Calculator
     │   └── error.rs             #    DomainError
     ├── application/             # ── Application (dépend du Domain)
     │   ├── use_cases/           #    auth + profils + présences (set/list/delete/import) +
-    │   │                        #    commute (create/update/delete/list), emission_factors, presence_trips
-    │   └── dto/                 #    *Dto (serde camelCase) : user/login/session/profile/presence/commute/trip/emission_factor
+    │   │                        #    commute (create/update/delete/list), emission_factors, presence_trips +
+    │   │                        #    task_preset (create/list/update/delete), work_entries/work_schedule (get/set)
+    │   └── dto/                 #    *Dto (serde camelCase) : user/login/session/profile/presence/commute/
+    │                            #    trip/emission_factor/task_preset/work_entry
     ├── infrastructure/          # ── Infrastructure (implémente les ports)
     │   ├── crypto/              #    Argon2PasswordHasher, Argon2KeyService, RandomTokenGenerator
     │   ├── persistence/         #    db (libsql), migrations, *_repository (account/profile/presence/
-    │   │                        #    commute/emission_factor/co2_settings), vault
+    │   │                        #    commute/emission_factor/co2_settings/task_preset/work_entry), vault
     │   ├── session/             #    InMemorySessionStore
     │   ├── clock.rs             #    SystemClock
     │   └── config.rs            #    AppConfig (chemins, params Argon2, politique session/lockout)
     └── presentation/            # ── Presentation (frontière IPC)
-        ├── commands/            #    auth.rs, profile.rs, presence.rs, commute.rs (fines) + error.rs (AppError)
+        ├── commands/            #    auth.rs, profile.rs, presence.rs, commute.rs, work_hours.rs (fines) + error.rs (AppError)
         └── state.rs             #    AppState injecté via .manage()
 ```
 
@@ -148,7 +151,7 @@ src/
 │   ├── __root.tsx               #    racine typée createRootRouteWithContext<{ auth }> + devtools (dev)
 │   ├── login.tsx                #    /login — beforeLoad: connecté → redirect "/"
 │   ├── _authenticated.tsx       #    garde (beforeLoad → /login) + providers features + shell (header)
-│   └── _authenticated/          #    / (calendrier), /commutes, /commutes/new, /commutes/$id/edit
+│   └── _authenticated/          #    / (calendrier), /commutes, /commutes/new, /commutes/$id/edit, /work-hours/$day
 ├── core/                        # Transverse : config, erreurs, wrapper IPC
 │   ├── ipc.ts                   #    encapsule invoke() — SEUL à importer @tauri-apps/api
 │   ├── errors.ts                #    AppError + normalizeError
@@ -164,11 +167,16 @@ src/
     │   └── presentation/        #    ProfileProvider, useProfile, formulaire (Dialog),
     │                            #    badge = menu compte (profils + langue + thème + déconnexion)
     ├── presence/                #    Calendrier des présences + import (PresenceProvider, usePresence)
-    └── commute/                 #    Trajets domicile-travail + facteurs d'émission CO₂
-        ├── domain/              #    Commute, EmissionFactor, commuteToTrips, repositories, use-cases
-        ├── data/                #    dto, mappers, TauriCommuteRepository / TauriEmissionFactorRepository
-        └── presentation/        #    CommuteProvider, useCommute, SegmentEditor (mutualisé)
-            └── pages/           #    écrans routés : CommuteListPage, CommuteFormPage
+    ├── commute/                 #    Trajets domicile-travail + facteurs d'émission CO₂
+    │   ├── domain/              #    Commute, EmissionFactor, commuteToTrips, repositories, use-cases
+    │   ├── data/                #    dto, mappers, TauriCommuteRepository / TauriEmissionFactorRepository
+    │   └── presentation/        #    CommuteProvider, useCommute, SegmentEditor (mutualisé)
+    │       └── pages/           #    écrans routés : CommuteListPage, CommuteFormPage
+    └── work-hours/              #    Encodage des heures d'un jour office/remote (page /work-hours/$day)
+        ├── domain/              #    TaskPreset, WorkEntry/WorkDaySchedule, repositories, use-cases purs
+        ├── data/                #    dto, mappers, TauriTaskPresetRepository / TauriWorkEntryRepository
+        └── presentation/        #    TaskPresetProvider, useWorkDay (persistance live), DayDonut,
+                                 #    WorkEntryList, DayScheduleEditor + page WorkHoursPage
 ```
 
 > **Dépendance dirigée assumée `presence → commute`** : l'empreinte CO₂ étant attachée à un

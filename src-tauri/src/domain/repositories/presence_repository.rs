@@ -30,6 +30,8 @@ pub trait PresenceRepository: Send + Sync {
     /// The trip snapshot rows recorded for a presence day, ordered by position.
     async fn list_trips(&self, presence_id: &str) -> Result<Vec<Trip>, DomainError>;
 
+    async fn find_by_id(&self, id: &str) -> Result<Option<Presence>, DomainError>;
+
     async fn list_by_profile(&self, profile_id: &str) -> Result<Vec<Presence>, DomainError>;
 
     async fn delete(&self, id: &str) -> Result<(), DomainError>;

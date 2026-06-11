@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { enUS, fr } from "date-fns/locale";
+import { Clock4 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ export function PresenceDayDialog({
   onOpenChange,
 }: PresenceDayDialogProps) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const {
     presencesByDay,
     setPresence,
@@ -209,7 +212,24 @@ export function PresenceDayDialog({
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             {presence && (
-              <DialogFooter>
+              <DialogFooter className="sm:justify-between">
+                {COMMUTE_TYPES.includes(presence.type) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      onOpenChange(false);
+                      void navigate({
+                        to: "/work-hours/$day",
+                        params: { day: String(presence.day) },
+                      });
+                    }}
+                  >
+                    <Clock4 />
+                    {t("workHours.encodeButton")}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="destructive"
