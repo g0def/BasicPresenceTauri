@@ -1,4 +1,5 @@
 use tauri::State;
+use zeroize::Zeroizing;
 
 use crate::application::dto::login_result_dto::LoginResultDto;
 use crate::application::dto::session_status_dto::SessionStatusDto;
@@ -19,7 +20,14 @@ pub async fn register(
     password: String,
     state: State<'_, AppState>,
 ) -> Result<UserDto, AppError> {
-    Ok(state.register_account.execute(&username, &password).await?)
+    // Wrap the secret as soon as it crosses the IPC boundary so this copy is
+    // wiped on drop (serde's transient deserialization buffers remain a known
+    // residual limit of the Tauri IPC).
+    let password = Zeroizing::new(password);
+    Ok(state
+        .register_account
+        .execute(&username, password.as_str())
+        .await?)
 }
 
 /// Authenticate, unlock the vault, and open a 15-minute session.
@@ -29,7 +37,9 @@ pub async fn login(
     password: String,
     state: State<'_, AppState>,
 ) -> Result<LoginResultDto, AppError> {
-    Ok(state.login.execute(&username, &password).await?)
+    // Same zeroization-at-the-boundary as `register`.
+    let password = Zeroizing::new(password);
+    Ok(state.login.execute(&username, password.as_str()).await?)
 }
 
 /// Report whether the given session token is still valid.

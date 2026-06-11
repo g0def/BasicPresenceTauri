@@ -23,10 +23,13 @@ pub struct AuthPolicy {
 /// previous shutdown (an unclean shutdown is always treated as expected).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntegrityPolicy {
-    /// Open anyway and re-baseline (default): a mismatch after a crash is
-    /// expected, and hard-failing would brick the app for legitimate users.
+    /// Open anyway and re-baseline (for lenient deployments). A crash is NOT
+    /// what this covers — an unclean shutdown is always tolerated regardless of
+    /// the policy (dirty marker) — so allowing a clean-shutdown mismatch means
+    /// accepting a genuinely modified vault.
+    #[allow(dead_code)] // kept as a configuration escape hatch (used in tests)
     WarnAndAllow,
-    /// Refuse to open a tampered vault (for security-sensitive deployments).
+    /// Refuse to open a tampered vault (default — bank-grade requirement).
     HardFail,
 }
 
@@ -57,7 +60,10 @@ impl AppConfig {
                 max_attempts: 5,
                 lockout_ms: 5 * 60 * 1000, // 5 minutes
             },
-            integrity: IntegrityPolicy::WarnAndAllow,
+            // Tamper-evidence must block: a MAC mismatch after a *clean*
+            // shutdown has no innocent explanation (crashes go through the
+            // dirty-marker path and are tolerated).
+            integrity: IntegrityPolicy::HardFail,
         }
     }
 }

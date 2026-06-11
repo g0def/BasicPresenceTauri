@@ -1,10 +1,9 @@
-use serde::{Deserialize, Serialize};
-
 /// Org-level CO2 configuration. Persisted as a JSON blob in `vault_meta`
 /// (key `co2_config`); falls back to these defaults when absent. There is no
 /// settings UI yet — the values are overridable directly in the vault.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// (De)serialization lives in the infrastructure repository — the domain
+/// entity stays transport-agnostic.
+#[derive(Debug, Clone)]
 pub struct Co2Settings {
     /// Charging country selecting the electric-grid preset (e.g. `"BE"`).
     pub grid_country: String,
@@ -15,6 +14,7 @@ pub struct Co2Settings {
     /// Phase 2: add building energy for office/remote days.
     pub count_building_energy: bool,
     /// For annual projections (not used in Phase 1 calculations).
+    #[allow(dead_code)] // read by the Phase 2 annual projections
     pub working_days_per_year: i64,
     /// Which referential year to resolve factors against.
     pub factor_year: i32,

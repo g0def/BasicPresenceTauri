@@ -640,6 +640,48 @@ fn legacy_plaintext_keystore_is_migrated_and_sealed() {
 }
 
 #[test]
+fn require_session_gates_data_access() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("require_session");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        // No session yet: the gate every data command goes through refuses.
+        assert!(matches!(
+            state.require_session.execute(),
+            Err(DomainError::Unauthorized)
+        ));
+
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        assert!(state.require_session.execute().is_ok());
+
+        // After logout the gate refuses again (and the vault is locked).
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state.require_session.execute(),
+            Err(DomainError::Unauthorized)
+        ));
+        assert!(matches!(
+            state.list_profiles.execute().await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
 fn tampering_with_the_vault_is_detected_under_hard_fail() {
     tauri::async_runtime::block_on(async {
         let (mut config, dir) = temp_config("tamper");

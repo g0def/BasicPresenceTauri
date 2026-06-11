@@ -26,6 +26,7 @@ use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
 use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
+use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
@@ -184,6 +185,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         ),
         logout: LogoutUseCase::new(sessions.clone(), vault.clone()),
         check_session: CheckSessionUseCase::new(sessions.clone(), vault.clone(), clock.clone()),
+        require_session: RequireSessionUseCase::new(sessions.clone(), vault.clone(), clock.clone()),
         account_exists: AccountExistsUseCase::new(accounts.clone()),
         create_profile: CreateProfileUseCase::new(profiles.clone(), clock.clone()),
         list_profiles: ListProfilesUseCase::new(profiles.clone()),

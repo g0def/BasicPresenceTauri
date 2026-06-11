@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::application::dto::commute_dto::CommuteDto;
-use crate::domain::entities::emission_factor::EmissionFactor;
+use crate::application::use_cases::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::PresenceType;
 use crate::domain::entities::trip::TripInput;
 use crate::domain::error::DomainError;
@@ -43,20 +42,8 @@ impl ListCommutesUseCase {
         // The preview is the commute's own footprint; never fold in building energy.
         settings.count_building_energy = false;
 
-        let factor_map: HashMap<String, EmissionFactor> = self
-            .factors
-            .list(settings.factor_year)
-            .await?
-            .into_iter()
-            .map(|f| (f.id.clone(), f))
-            .collect();
-        let variant_map: HashMap<(String, String), f64> = self
-            .factors
-            .list_grid_variants(settings.factor_year)
-            .await?
-            .into_iter()
-            .map(|v| ((v.mode_id, v.country), v.value))
-            .collect();
+        let (factor_map, variant_map) =
+            load_factor_maps(&self.factors, settings.factor_year).await?;
 
         let commutes = self.commutes.list_by_profile(profile_id).await?;
         let mut out = Vec::with_capacity(commutes.len());

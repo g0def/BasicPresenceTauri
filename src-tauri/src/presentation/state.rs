@@ -14,6 +14,7 @@ use crate::application::use_cases::list_profiles::ListProfilesUseCase;
 use crate::application::use_cases::login::LoginUseCase;
 use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
+use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
@@ -27,6 +28,9 @@ pub struct AppState {
     pub login: LoginUseCase,
     pub logout: LogoutUseCase,
     pub check_session: CheckSessionUseCase,
+    /// Backend-side gate: every vault-touching command calls it first, so the
+    /// absolute session expiry holds even if the frontend never checks in.
+    pub require_session: RequireSessionUseCase,
     pub account_exists: AccountExistsUseCase,
     pub create_profile: CreateProfileUseCase,
     pub list_profiles: ListProfilesUseCase,

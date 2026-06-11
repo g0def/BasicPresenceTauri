@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use uuid::Uuid;
 
 use crate::application::dto::presence_dto::PresenceDto;
 use crate::application::dto::trip_dto::TripInputDto;
-use crate::domain::entities::emission_factor::EmissionFactor;
+use crate::application::use_cases::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::trip::{Trip, TripInput};
 use crate::domain::error::DomainError;
@@ -82,20 +81,8 @@ impl SetPresenceUseCase {
             }
         }
 
-        let factor_map: HashMap<String, EmissionFactor> = self
-            .factors
-            .list(settings.factor_year)
-            .await?
-            .into_iter()
-            .map(|f| (f.id.clone(), f))
-            .collect();
-        let variant_map: HashMap<(String, String), f64> = self
-            .factors
-            .list_grid_variants(settings.factor_year)
-            .await?
-            .into_iter()
-            .map(|v| ((v.mode_id, v.country), v.value))
-            .collect();
+        let (factor_map, variant_map) =
+            load_factor_maps(&self.factors, settings.factor_year).await?;
 
         let day_em = Co2Calculator::compute_day(&trips, kind, &factor_map, &variant_map, &settings);
 

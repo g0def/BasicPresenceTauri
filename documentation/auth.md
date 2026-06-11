@@ -78,7 +78,9 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 
 - **Token** = 32 octets aléatoires (`getrandom`), encodés base64url. [token_generator.rs](../src-tauri/src/infrastructure/crypto/token_generator.rs)
 - **En mémoire uniquement** : côté Rust `InMemorySessionStore` (`Mutex<HashMap>`, [in_memory_session_store.rs](../src-tauri/src/infrastructure/session/in_memory_session_store.rs)) ; côté React un `useRef` dans [auth-provider.tsx](../src/features/auth/presentation/providers/auth-provider.tsx). **Jamais** dans `localStorage`. → app fermée = session perdue = re-login obligatoire.
+- **Tokens jamais stockés en clair** : le store indexe les sessions par **SHA-256 du token** et la copie stockée est expurgée — un dump mémoire ne révèle que des empreintes, et la recherche compare des digests (pas de signal de timing sur le secret).
 - **Expiration absolue 15 min** : basée sur `expiresAt` (epoch ms), donc insensible à la mise en veille / aux changements d'horloge. Timer front : [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts).
+- **Appliquée côté backend** : chaque commande touchant au coffre passe d'abord par [require_session.rs](../src-tauri/src/application/use_cases/require_session.rs) — s'il ne reste aucune session valide, les sessions restantes sont révoquées et le **coffre est verrouillé**, puis `SESSION_EXPIRED` est renvoyé. L'expiration tient donc même si la WebView (compromise ou boguée) n'appelle jamais `check_session`.
 - **Timeout d'inactivité (5 min)** : en complément de l'expiration absolue, l'absence d'interaction (souris / clavier / scroll / retour au premier plan) déclenche une déconnexion. [use-idle-timeout.ts](../src/features/auth/presentation/hooks/use-idle-timeout.ts), seuil dans [config.ts](../src/core/config.ts) (`IDLE_TIMEOUT_MS`).
 - À l'**expiration ou au logout** : session révoquée + coffre **fermé** + DEK **oublié** (re-verrouillage), et la **base d'intégrité (HMAC) du coffre est rafraîchie**. [check_session.rs](../src-tauri/src/application/use_cases/check_session.rs), [logout.rs](../src-tauri/src/application/use_cases/logout.rs). Une fermeture propre de la fenêtre déclenche aussi ce verrouillage (hook `on_window_event` dans [lib.rs](../src-tauri/src/lib.rs)).
 
@@ -104,7 +106,7 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 
 ### Profils
 
-[profile.rs](../src-tauri/src/presentation/commands/profile.rs) — CRUD des profils de présence (stockés dans le **coffre chiffré**). Garde d'accès : aucun token transmis ; le coffre doit être **déverrouillé** (sinon erreur `SESSION_EXPIRED`). Un profil introuvable renvoie `NOT_FOUND`.
+[profile.rs](../src-tauri/src/presentation/commands/profile.rs) — CRUD des profils de présence (stockés dans le **coffre chiffré**). Garde d'accès : aucun token transmis (il n'apporterait rien : il vit dans la WebView), mais chaque commande appelle `require_session` qui vérifie côté Rust qu'une session **non expirée** existe — sinon révocation + verrouillage du coffre + `SESSION_EXPIRED`. Un profil introuvable renvoie `NOT_FOUND`. La même garde s'applique aux commandes présences et CO₂/trajets.
 
 | Commande | Entrée | Sortie |
 | --- | --- | --- |
@@ -183,18 +185,20 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 - **Scellement du `keystore.db` par le trousseau OS** *(résout le brute-force hors-ligne)*. Le keystore est désormais chiffré au repos (AES-256-CBC) avec une **clé de device** stockée dans le trousseau de l'OS (libsecret / Keychain / Credential Manager). Un attaquant qui copie le fichier ne peut plus tester des mots de passe hors-ligne sans **aussi** extraire la clé du trousseau. Bootstrap + migration d'un keystore historique en clair : [keystore_bootstrap.rs](../src-tauri/src/infrastructure/persistence/keystore_bootstrap.rs) (marqueur `keystore.db.sealed`).
   - ⚠️ **Contrainte runtime (Linux)** : un Secret Service actif (GNOME Keyring / KWallet) est requis ; en headless/CI le démarrage échoue explicitement (pas de repli silencieux en clair).
   - ⚠️ **Risque inhérent** : si l'entrée du trousseau est supprimée (reset OS, réinstallation), `keystore.db` devient illisible → coffre perdu. Surfacé via `KeystoreUnrecoverable` (pas d'effacement automatique).
-- **Évidence d'altération du coffre (HMAC-SHA256)** *(atténue le CBC non authentifié)*. À la fermeture propre, un HMAC du fichier `vault.db` (clé MAC enveloppée par le KEK) est écrit dans `vault.db.hmac` ; il est vérifié à l'ouverture. Politique `IntegrityPolicy` ([config.rs](../src-tauri/src/infrastructure/config.rs)) : `WarnAndAllow` (défaut) ou `HardFail`. Un marqueur `vault.db.dirty` distingue un crash (rebaseline silencieux) d'une altération après arrêt propre. [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs).
+- **Évidence d'altération du coffre (HMAC-SHA256)** *(atténue le CBC non authentifié)*. À la fermeture propre, un HMAC du fichier `vault.db` (clé MAC enveloppée par le KEK) est écrit dans `vault.db.hmac` ; il est vérifié à l'ouverture. Politique `IntegrityPolicy` ([config.rs](../src-tauri/src/infrastructure/config.rs)) : **`HardFail` (défaut)** — un mismatch après un arrêt propre refuse l'ouverture (`VAULT_TAMPERED`) ; `WarnAndAllow` reste disponible pour des déploiements tolérants. Un marqueur `vault.db.dirty` distingue un crash (rebaseline silencieux, toléré quelle que soit la politique) d'une altération après arrêt propre. [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs).
   - ⚠️ C'est de la **détection**, pas de la prévention, et uniquement entre sessions propres. libSQL 0.9 n'expose que `Cipher::Aes256Cbc` (aucun AEAD at-rest) — un chiffrement authentifié natif reste à surveiller côté lib.
 - **Timeout d'inactivité** en complément de l'expiration absolue.
 
 ## Limites connues & Phase 2
 
 - `change_password` (peu coûteux : ré-envelopper le DEK + la clé MAC, sans re-chiffrer tout le coffre).
-- Surfacer dans l'UI l'avertissement d'altération en mode `WarnAndAllow` (aujourd'hui silencieux ; `HardFail` refuse l'ouverture).
+- Surfacer dans l'UI l'avertissement d'altération si un déploiement repasse en `WarnAndAllow` (le défaut `HardFail` refuse l'ouverture avec `VAULT_TAMPERED`).
 - Multi-comptes par appareil (le v1 est mono-utilisateur, cohérent avec la clé dérivée du mot de passe).
+- Le mot de passe transite par les buffers de désérialisation de l'IPC Tauri avant d'être enveloppé dans `Zeroizing` (dès la commande, [auth.rs](../src-tauri/src/presentation/commands/auth.rs)) — limite résiduelle connue, non contournable sans changer le transport.
+- Pas encore d'updater signé (Tauri updater + signature) pour distribuer des correctifs de sécurité.
 
 ## Vérification
 
-- `cargo test` — tests crypto (hash/verify, wrap/unwrap) + tests d'intégration : `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement coffre **et** keystore + lockout), `legacy_plaintext_keystore_is_migrated_and_sealed` (migration + scellement), `tampering_with_the_vault_is_detected_under_hard_fail` (évidence d'altération). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
+- `cargo test` — tests crypto (hash/verify, wrap/unwrap) + tests d'intégration : `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement coffre **et** keystore + lockout), `legacy_plaintext_keystore_is_migrated_and_sealed` (migration + scellement), `tampering_with_the_vault_is_detected_under_hard_fail` (évidence d'altération), `require_session_gates_data_access` (garde de session backend). Tests unitaires de la garde (expiration → révocation + verrouillage) dans [require_session.rs](../src-tauri/src/application/use_cases/require_session.rs). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
 - `pnpm test` — mapper, repository (via `mockIPC`), timer de session, flux login → Home.
 - Manuel : `pnpm tauri dev` → **Créer un compte** → **Connexion** → **Home** (« Bonjour {username} » + compte à rebours).
