@@ -180,6 +180,22 @@
       "distancePositive": "Distance must be greater than 0."
     }
   },
+  "updater": {
+    "menuItem": "Check for updates",
+    "autoUpdate": "Automatic updates",
+    "on": "On",
+    "off": "Off",
+    "availableTitle": "Update available — v{{version}}",
+    "availableBody": "Current version: {{current}}",
+    "download": "Download & install",
+    "downloading": "Downloading… {{percent}}%",
+    "installed": "Update installed",
+    "restart": "Restart now",
+    "later": "Later",
+    "checking": "Checking for updates…",
+    "upToDate": "You are up to date",
+    "error": "Update check failed"
+  },
   "workHours": {
     "encodeButton": "Log hours",
     "title": "Hours of the day",
@@ -219,6 +235,7 @@
     },
     "schedule": {
       "start": "Start of day",
+      "startHint": "Type a time (e.g. 8:30) — ↑/↓ arrows adjust by 5 min, Shift for 1 h",
       "end": "End of day"
     }
   }

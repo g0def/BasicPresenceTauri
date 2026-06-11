@@ -78,6 +78,8 @@ use crate::presentation::state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .on_window_event(|window, event| {
             // On a clean window close, lock the vault so its integrity baseline
             // is refreshed (otherwise the next launch sees an "unclean" state).

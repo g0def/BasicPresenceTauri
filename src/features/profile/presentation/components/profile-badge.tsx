@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  BellRing,
   ChevronDown,
+  DownloadCloud,
   LogOut,
   Moon,
   Pencil,
@@ -37,6 +39,7 @@ import { ImportDialog } from "@/features/presence/presentation/components/import
 import type { Profile } from "@/features/profile/domain/entities/profile";
 import { ProfileFormDialog } from "@/features/profile/presentation/components/profile-form-dialog";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
 import { useTheme } from "@/shared/theme/use-theme";
 
 function fullName(p: Profile): string {
@@ -49,17 +52,24 @@ interface ProfileBadgeProps {
   onLogout: () => void;
   /** Open the "Modes de déplacement" view (owned by Home). */
   onOpenCommutes: () => void;
+  /** Trigger a manual update check (owned by the updater feature). */
+  onCheckUpdates: () => void;
 }
 
 /**
  * Header account menu: active-profile photo + name on the right, with a menu to
  * switch/add/edit/delete profiles and to manage language, theme and logout.
  */
-export function ProfileBadge({ onLogout, onOpenCommutes }: ProfileBadgeProps) {
+export function ProfileBadge({
+  onLogout,
+  onOpenCommutes,
+  onCheckUpdates,
+}: ProfileBadgeProps) {
   const { t, i18n } = useTranslation();
   const { profiles, activeProfile, setActiveProfile, deleteProfile } =
     useProfile();
   const { theme, toggleTheme } = useTheme();
+  const { autoUpdateEnabled, toggleAutoUpdate } = useUpdater();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -161,6 +171,25 @@ export function ProfileBadge({ onLogout, onOpenCommutes }: ProfileBadgeProps) {
           >
             {theme === "dark" ? <Sun /> : <Moon />}
             {theme === "dark" ? t("theme.light") : t("theme.dark")}
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => onCheckUpdates()}>
+            <DownloadCloud />
+            {t("updater.menuItem")}
+          </DropdownMenuItem>
+          {/* Keep the menu open on toggle so it reads like a switch. */}
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              toggleAutoUpdate();
+            }}
+          >
+            <BellRing />
+            {t("updater.autoUpdate")}
+            <span className="ml-auto text-xs text-muted-foreground">
+              {autoUpdateEnabled ? t("updater.on") : t("updater.off")}
+            </span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

@@ -43,7 +43,7 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-imports": "warn",
-      // Architecture guard: only core/ipc.ts may talk to @tauri-apps/api.
+      // Architecture guard: only designated boundary files may talk to Tauri plugins.
       "no-restricted-imports": [
         "error",
         {
@@ -53,6 +53,16 @@ export default tseslint.config(
               message:
                 "Only src/core/ipc.ts may import @tauri-apps/api. Go through a repository.",
             },
+            {
+              name: "@tauri-apps/plugin-updater",
+              message:
+                "Only src/features/updater/data/repositories/tauri-updater.repository.ts may import @tauri-apps/plugin-updater.",
+            },
+            {
+              name: "@tauri-apps/plugin-process",
+              message:
+                "Only src/features/updater/data/repositories/tauri-updater.repository.ts may import @tauri-apps/plugin-process.",
+            },
           ],
           patterns: ["@tauri-apps/api/*"],
         },
@@ -60,10 +70,11 @@ export default tseslint.config(
     },
   },
 
-  // Allow the Tauri boundary + tests to import @tauri-apps/api directly
+  // Allow the Tauri boundary + tests to import @tauri-apps/* directly
   {
     files: [
       "src/core/ipc.ts",
+      "src/features/updater/data/repositories/tauri-updater.repository.ts",
       "src/test/**/*.{ts,tsx}",
       "src/**/*.{test,spec}.{ts,tsx}",
     ],

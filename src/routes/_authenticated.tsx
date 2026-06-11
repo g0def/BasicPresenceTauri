@@ -15,6 +15,7 @@ import { ProfileBadge } from "@/features/profile/presentation/components/profile
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
 import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
+import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
 import { Logo } from "@/shared/components/logo";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -53,6 +54,7 @@ function AppShell() {
   const { profiles, isLoading } = useProfile();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { checkForUpdates } = useUpdater();
 
   return (
     <main className="flex min-h-screen w-full flex-col p-6">
@@ -63,6 +65,7 @@ function AppShell() {
           <ProfileBadge
             onLogout={() => void logout()}
             onOpenCommutes={() => void navigate({ to: "/commutes" })}
+            onCheckUpdates={() => void checkForUpdates(true)}
           />
         </div>
       </header>

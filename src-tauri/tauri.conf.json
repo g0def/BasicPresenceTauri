@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "basic-presence",
-        "width": 800,
-        "height": 600
+        "width": 1100,
+        "height": 800
       }
     ],
     "security": {
@@ -24,6 +24,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -31,5 +32,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCMEI2OEY2NDI2QkExNkIKUldScm9XdEM5bWdMNjRmS01QRklwdzhsL053N3VSOUVVdVBTYURiZlF0QWtJK0ZlcnVyVC9ZbFoK",
+      "endpoints": [
+        "https://github.com/g0def/BasicPresenceTauri/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

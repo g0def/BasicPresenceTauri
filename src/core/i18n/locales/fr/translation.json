@@ -180,6 +180,22 @@
       "distancePositive": "La distance doit être supérieure à 0."
     }
   },
+  "updater": {
+    "menuItem": "Vérifier les mises à jour",
+    "autoUpdate": "Mises à jour automatiques",
+    "on": "Activé",
+    "off": "Désactivé",
+    "availableTitle": "Mise à jour disponible — v{{version}}",
+    "availableBody": "Version actuelle : {{current}}",
+    "download": "Télécharger et installer",
+    "downloading": "Téléchargement… {{percent}}%",
+    "installed": "Mise à jour installée",
+    "restart": "Redémarrer maintenant",
+    "later": "Plus tard",
+    "checking": "Vérification des mises à jour…",
+    "upToDate": "Vous êtes à jour",
+    "error": "Échec de la vérification"
+  },
   "workHours": {
     "encodeButton": "Encoder les heures",
     "title": "Heures de la journée",
@@ -219,6 +235,7 @@
     },
     "schedule": {
       "start": "Début de journée",
+      "startHint": "Tapez une heure (ex. 8h30) — flèches ↑/↓ pour ajuster par 5 min, Shift pour 1 h",
       "end": "Fin de journée"
     }
   }
