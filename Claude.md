@@ -24,7 +24,7 @@ système direct au _Shell_ (la WebView). Tout passe par des commandes validées.
 
 | Couche      | Technologies                                                                 |
 | ----------- | ---------------------------------------------------------------------------- |
-| Frontend    | React 19, TypeScript, Vite 7, état via **React Context** (pas de lib externe) |
+| Frontend    | React 19, TypeScript, Vite 7, **TanStack Router** (file-based), état via **React Context** (pas de lib externe) |
 | Bridge      | `@tauri-apps/api` (core)                                                      |
 | Backend     | Rust (édition 2021), Tauri v2                                                 |
 | Persistance | **libSQL** (moteur de Turso), local + **chiffré au repos** (AES-256-CBC)      |
@@ -140,8 +140,15 @@ Organisation **feature-first** : chaque feature porte ses propres couches `domai
 
 ```
 src/
-├── main.tsx                     # Entrée React — monte <AuthProvider>
-├── App.tsx                      # Gate d'auth (Register / Login / Home)
+├── main.tsx                     # Entrée React — monte <AuthProvider> puis <App>
+├── App.tsx                      # Bridge AuthContext → routeur (RouterProvider + invalidate)
+├── router.ts                    # Singleton createRouter (hash history, contexte { auth })
+├── routeTree.gen.ts             # GÉNÉRÉ par @tanstack/router-plugin — committé, jamais édité
+├── routes/                      # Routes file-based (fichiers MINCES : composition seulement)
+│   ├── __root.tsx               #    racine typée createRootRouteWithContext<{ auth }> + devtools (dev)
+│   ├── login.tsx                #    /login — beforeLoad: connecté → redirect "/"
+│   ├── _authenticated.tsx       #    garde (beforeLoad → /login) + providers features + shell (header)
+│   └── _authenticated/          #    / (calendrier), /commutes, /commutes/new, /commutes/$id/edit
 ├── core/                        # Transverse : config, erreurs, wrapper IPC
 │   ├── ipc.ts                   #    encapsule invoke() — SEUL à importer @tauri-apps/api
 │   ├── errors.ts                #    AppError + normalizeError
@@ -160,7 +167,8 @@ src/
     └── commute/                 #    Trajets domicile-travail + facteurs d'émission CO₂
         ├── domain/              #    Commute, EmissionFactor, commuteToTrips, repositories, use-cases
         ├── data/                #    dto, mappers, TauriCommuteRepository / TauriEmissionFactorRepository
-        └── presentation/        #    CommuteProvider, useCommute, CommuteView, SegmentEditor (mutualisé)
+        └── presentation/        #    CommuteProvider, useCommute, SegmentEditor (mutualisé)
+            └── pages/           #    écrans routés : CommuteListPage, CommuteFormPage
 ```
 
 > **Dépendance dirigée assumée `presence → commute`** : l'empreinte CO₂ étant attachée à un
@@ -170,9 +178,21 @@ src/
 
 > Le header authentifié ne garde que le timer de session ; le **badge de profil**
 > (tout à droite) ouvre le menu compte (changer/ajouter/éditer/supprimer un profil,
-> langue, thème, déconnexion). `App.tsx` injecte `onSessionExpired={logout}` au
-> `ProfileProvider` et `Home` injecte `onLogout` au badge — la feature `profile`
-> ne dépend pas de `auth` (langue/thème viennent de `core`/`shared`).
+> langue, thème, déconnexion). `routes/_authenticated.tsx` injecte
+> `onSessionExpired={logout}` aux providers et `onLogout`/`onOpenCommutes` au badge —
+> les features `profile`/`commute` ne dépendent ni de `auth` ni du routeur
+> (langue/thème viennent de `core`/`shared`).
+
+### Routing (TanStack Router, file-based)
+
+- **Fichiers de routes minces** : un fichier de `src/routes/` fait `createFileRoute(...)` + `beforeLoad` éventuel et importe un composant de page — **aucune UI métier ni logique** dedans. Les écrans routés vivent dans `features/<feature>/presentation/pages/`.
+- **`routeTree.gen.ts` est généré** par le plugin Vite (`@tanstack/router-plugin`, déclaré **avant** `react()` avec `autoCodeSplitting: true`). Il est **committé** mais **jamais édité à la main** (ignoré par ESLint/Prettier). Le plugin est **désactivé sous vitest** (`process.env.VITEST`) : sa transformation de code-splitting casse les chunks lazy en jsdom ; l'arbre committé suffit aux tests.
+- **Hash history obligatoire** (`createHashHistory` dans `router.ts`) : le protocole asset de Tauri n'a pas de fallback SPA en prod — un chargement sur un chemin profond ferait un 404 en browser history.
+- **Garde d'auth** : pattern officiel « authenticated routes » — contexte routeur `{ auth }`, route pathless `_authenticated` (`beforeLoad` → `redirect("/login")`), `/login` redirige vers `/` si connecté. **L'auth reste router-agnostique** : `App.tsx` fait `router.invalidate()` quand `isAuthenticated` change ; c'est l'unique mécanisme qui transforme login/logout/idle-timeout/expiration en redirection. Pas de `navigate()` dans la feature auth.
+- Le routeur est un **singleton module-level** (`src/router.ts`) — jamais créé dans un composant (StrictMode).
+- **Navigation typée** : `<Link to="...">` / `useNavigate()` (params vérifiés par TS via `Register`). Les composants réutilisables entre contextes reçoivent des **callbacks** (`onDone`, `onOpenCommutes`) plutôt que d'importer le routeur.
+- **Page vs dialog** : une destination (liste, formulaire de création/édition) = une **page routée** ; une interaction contextuelle (confirmation de suppression, sélection dans un wizard) = un **dialog**.
+- Nouvelle page = ① composant dans `features/<feature>/presentation/pages/`, ② fichier de route sous `src/routes/_authenticated/`, ③ clés i18n `fr` + `en`, ④ relancer `pnpm dev`/`pnpm build` pour régénérer `routeTree.gen.ts` avant commit.
 
 ### Conventions frontend
 
@@ -220,7 +240,7 @@ src/
 
 ## 10. État du projet & feuille de route
 
-**Implémenté (socle v1)** : architecture propre Rust + React, persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Entité **Profile** (profils de présence) : CRUD complet dans le coffre chiffré, gestion **multi-profils** (création, sélection du profil actif, édition, suppression) ; après login, l'accueil propose la création si aucun profil, sinon un badge (photo + nom) en haut à droite. **Présences** : calendrier mensuel (office/remote/vacation/holiday, un upsert par jour) + import depuis l'ancienne application. **Empreinte CO₂** : référentiel de facteurs d'émission versionné, modèles de trajet réutilisables, calcul + snapshot par jour de présence (tout dans le coffre chiffré).
+**Implémenté (socle v1)** : architecture propre Rust + React, **routeur TanStack file-based** (pages `/login`, `/` calendrier, `/commutes` + création/édition de presets en pages), persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Entité **Profile** (profils de présence) : CRUD complet dans le coffre chiffré, gestion **multi-profils** (création, sélection du profil actif, édition, suppression) ; après login, l'accueil propose la création si aucun profil, sinon un badge (photo + nom) en haut à droite. **Présences** : calendrier mensuel (office/remote/vacation/holiday, un upsert par jour) + import depuis l'ancienne application. **Empreinte CO₂** : référentiel de facteurs d'émission versionné, modèles de trajet réutilisables, calcul + snapshot par jour de présence (tout dans le coffre chiffré).
 
 **Phase 2 (à venir)** :
 

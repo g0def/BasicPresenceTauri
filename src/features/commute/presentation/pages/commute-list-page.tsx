@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { ChevronLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -10,53 +11,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { Commute } from "@/features/commute/domain/entities/commute";
-import { CommuteFormDialog } from "@/features/commute/presentation/components/commute-form-dialog";
 import {
   formatCo2,
   summarizeSegments,
 } from "@/features/commute/presentation/commute-format";
 import { useCommute } from "@/features/commute/presentation/hooks/use-commute";
 
-interface CommuteViewProps {
-  /** Return to the calendar. */
-  onBack: () => void;
-}
-
-/** Full-area "Modes de déplacement" page: list + create/edit/delete of saved
- * commutes. Reached from the user menu; replaces the calendar while open. */
-export function CommuteView({ onBack }: CommuteViewProps) {
+/** "Modes de déplacement" page: lists saved commutes with links to the
+ * create/edit pages. Deletion stays inline behind a confirmation dialog. */
+export function CommuteListPage() {
   const { t, i18n } = useTranslation();
   const { commutes, emissionFactors, deleteCommute, isLoading } = useCommute();
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Commute | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const lang = i18n.resolvedLanguage ?? "fr";
-
-  const openCreate = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
-  const openEdit = (commute: Commute) => {
-    setEditing(commute);
-    setFormOpen(true);
-  };
 
   return (
     <section className="mt-6 flex flex-1 flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          aria-label={t("commute.back")}
-        >
-          <ChevronLeft />
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/" aria-label={t("commute.back")}>
+            <ChevronLeft />
+          </Link>
         </Button>
         <h2 className="text-xl font-semibold">{t("commute.manager.title")}</h2>
-        <Button className="ml-auto" onClick={openCreate}>
-          <Plus />
-          {t("commute.manager.add")}
+        <Button className="ml-auto" asChild>
+          <Link to="/commutes/new">
+            <Plus />
+            {t("commute.manager.add")}
+          </Link>
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
@@ -92,13 +74,14 @@ export function CommuteView({ onBack }: CommuteViewProps) {
                   {summarizeSegments(commute.segments, emissionFactors, t)}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => openEdit(commute)}
-                aria-label={t("commute.manager.edit")}
-              >
-                <Pencil />
+              <Button variant="ghost" size="icon-sm" asChild>
+                <Link
+                  to="/commutes/$commuteId/edit"
+                  params={{ commuteId: commute.id }}
+                  aria-label={t("commute.manager.edit")}
+                >
+                  <Pencil />
+                </Link>
               </Button>
               <Button
                 variant="ghost"
@@ -113,12 +96,6 @@ export function CommuteView({ onBack }: CommuteViewProps) {
           ))}
         </ul>
       )}
-
-      <CommuteFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        commute={editing}
-      />
 
       <Dialog
         open={confirmId !== null}

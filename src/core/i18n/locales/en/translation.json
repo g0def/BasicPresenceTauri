@@ -110,7 +110,8 @@
       "edit": "Edit",
       "delete": "Delete",
       "roundTripBadge": "round trip",
-      "deleteConfirmTitle": "Delete this commute mode?"
+      "deleteConfirmTitle": "Delete this commute mode?",
+      "notFound": "This commute no longer exists."
     },
     "form": {
       "addTitle": "New commute mode",

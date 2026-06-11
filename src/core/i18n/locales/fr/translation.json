@@ -110,7 +110,8 @@
       "edit": "Modifier",
       "delete": "Supprimer",
       "roundTripBadge": "aller-retour",
-      "deleteConfirmTitle": "Supprimer ce mode de déplacement ?"
+      "deleteConfirmTitle": "Supprimer ce mode de déplacement ?",
+      "notFound": "Ce mode de déplacement n'existe plus."
     },
     "form": {
       "addTitle": "Nouveau mode de déplacement",

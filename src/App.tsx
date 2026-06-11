@@ -1,39 +1,23 @@
-import { useTranslation } from "react-i18next";
+import { useEffect } from "react";
+import { RouterProvider } from "@tanstack/react-router";
 
-import { Home } from "@/features/auth/presentation/components/home";
-import { LoginPage } from "@/features/auth/presentation/components/login-page";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
-import { CommuteProvider } from "@/features/commute/presentation/providers/commute-provider";
-import { PresenceProvider } from "@/features/presence/presentation/providers/presence-provider";
-import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
+import { router } from "@/router";
 
 /**
- * Auth gate: renders the app only when a valid session exists. Otherwise it
- * shows the register screen (first run) or the login screen.
+ * Bridges AuthContext into the router. Auth gating itself lives in the route
+ * tree (`_authenticated` and `/login` beforeLoad guards); this component only
+ * feeds them fresh auth state.
  */
 export default function App() {
-  const { isAuthenticated, accountExists, logout } = useAuth();
-  const { t } = useTranslation();
+  const auth = useAuth();
 
-  if (isAuthenticated) {
-    return (
-      <ProfileProvider onSessionExpired={logout}>
-        <PresenceProvider onSessionExpired={logout}>
-          <CommuteProvider onSessionExpired={logout}>
-            <Home />
-          </CommuteProvider>
-        </PresenceProvider>
-      </ProfileProvider>
-    );
-  }
+  // Re-run the current route's beforeLoad whenever auth flips — this is what
+  // turns login, manual logout, idle timeout and session expiry into the
+  // appropriate redirect, without the auth feature knowing about the router.
+  useEffect(() => {
+    void router.invalidate();
+  }, [auth.isAuthenticated]);
 
-  if (accountExists === null) {
-    return (
-      <main className="flex min-h-screen items-center justify-center p-6">
-        <p className="text-muted-foreground">{t("common.loading")}</p>
-      </main>
-    );
-  }
-
-  return <LoginPage />;
+  return <RouterProvider router={router} context={{ auth }} />;
 }

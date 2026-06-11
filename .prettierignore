@@ -3,3 +3,4 @@ coverage
 node_modules
 src-tauri
 pnpm-lock.yaml
+src/routeTree.gen.ts

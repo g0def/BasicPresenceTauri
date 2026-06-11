@@ -20,7 +20,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 
 - [ ] **Front** : `pnpm typecheck` ✅ — `pnpm lint` ✅ — `pnpm test` ✅ — `pnpm format:check` ✅
 - [ ] **Rust** (depuis `src-tauri/`) : `cargo fmt --check` ✅ — `cargo clippy --all-targets -- -D warnings` ✅ (zéro warning) — `cargo test` ✅
-- [ ] Le diff ne contient **que** ce qu'annonce le titre de la PR (pas de fichier généré, pas de `console.log`/`dbg!`/`println!` oublié, pas de code commenté mort).
+- [ ] Le diff ne contient **que** ce qu'annonce le titre de la PR (pas de fichier généré — **exception** : [src/routeTree.gen.ts](../src/routeTree.gen.ts), committé volontairement et régénéré par le plugin —, pas de `console.log`/`dbg!`/`println!` oublié, pas de code commenté mort).
 - [ ] Pas de `target/`, `dist/`, `node_modules/`, `.db`, ni secret commité (vérifier `.gitignore`).
 - [ ] Commits descriptifs (Conventional Commits : `feat(profile): …`, `fix(auth): …`).
 
@@ -38,7 +38,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 
 - [ ] ⛔ Le **`domain`** n'importe **rien** de `application`, `infrastructure`/`data`, `presentation`, **React** ni **Tauri**. (Backend : aucun `use crate::infrastructure::…` dans `domain/`. Front : aucun import depuis `data/`, `presentation/`, `@tauri-apps/*` ou React dans `domain/`.)
 - [ ] L'**inversion de dépendance** passe par des **traits** (Rust) / **interfaces** (TS), jamais par des types concrets.
-- [ ] L'injection des implémentations concrètes se fait **uniquement au point de composition** (`lib.rs` côté Rust, `AuthProvider`/`ProfileProvider` côté React) — jamais dans le domaine ni les use cases.
+- [ ] L'injection des implémentations concrètes se fait **uniquement au point de composition** (`lib.rs` côté Rust ; `AuthProvider` et le layout [routes/\_authenticated.tsx](../src/routes/_authenticated.tsx) qui monte les providers de features côté React) — jamais dans le domaine ni les use cases.
 - [ ] Le sens des `use`/`import` respecte le schéma : `presentation → application → domain` et `infrastructure → domain`. Aucune flèche ne sort du domaine.
 - [ ] Une feature ne dépend pas d'une autre via ses couches internes (`features/profile` n'importe pas `features/auth/data/...`). Le transverse vit dans `core/` / `shared/`.
 
@@ -130,7 +130,21 @@ ex. [../src/features/profile/presentation/](../src/features/profile/presentation
 - [ ] État : local pour l'UI, contexte React pour le partagé (pas de lib d'état externe — décision projet, cf. [Claude.md §2](../Claude.md)).
 - [ ] Composant nettoie ses effets (`useEffect` cleanup : timers, listeners — cf. [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts)).
 
-### 3.5 Qualité React / TypeScript
+### 3.5 Routing (TanStack Router, file-based)
+
+[../src/routes/](../src/routes/) · [../src/router.ts](../src/router.ts) — conventions détaillées dans [Claude.md §6](../Claude.md)
+
+- [ ] ⛔ Les fichiers de [src/routes/](../src/routes/) restent **minces** : `createFileRoute` + `beforeLoad` + import d'une page. **Aucune UI métier ni logique** dedans — les écrans vivent dans `features/<feature>/presentation/pages/`.
+- [ ] ⛔ [routeTree.gen.ts](../src/routeTree.gen.ts) **jamais édité à la main** (généré ; ignoré ESLint/Prettier). Route ajoutée/renommée → régénéré (`pnpm dev` ou `pnpm build`) et committé **dans la même PR**.
+- [ ] **Hash history** conservée dans [router.ts](../src/router.ts) (le protocole asset Tauri n'a pas de fallback SPA en prod) ; le routeur reste un **singleton module-level**, jamais créé dans un composant.
+- [ ] La garde d'auth passe par `beforeLoad` + `redirect` (`_authenticated`, `/login`) et le contexte `{ auth }`. 🔒 Toute nouvelle page sous contenu authentifié est **sous `_authenticated/`** (jamais en route racine).
+- [ ] L'auth reste **router-agnostique** : pas de `navigate()`/import du routeur dans `features/auth` — les changements d'état passent par le `router.invalidate()` de [App.tsx](../src/App.tsx).
+- [ ] Navigation **typée** (`<Link to>` / `useNavigate`, params via `Route.useParams()`) — pas de `window.location` ni de chaîne d'URL bricolée. Les composants réutilisables reçoivent des **callbacks** (`onDone`…) plutôt que d'importer le routeur.
+- [ ] Bon choix page vs dialog : destination (liste, création/édition) = **page routée** ; interaction contextuelle (confirmation, étape de wizard) = **dialog**.
+- [ ] Une page paramétrée (`$id`) gère **chargement** et **introuvable** (les données contexte arrivent en async — cf. [\$commuteId.edit.tsx](../src/routes/_authenticated/commutes/$commuteId.edit.tsx)).
+- [ ] Le plugin router reste **désactivé sous vitest** dans [vite.config.ts](../vite.config.ts) (le code-splitting casse les chunks lazy en jsdom) ; les devtools routeur restent chargés **en dev uniquement**.
+
+### 3.6 Qualité React / TypeScript
 
 - [ ] ⛔ Typage strict — **pas d'`any`** (ni `as` abusif). Préférer `unknown` + narrowing.
 - [ ] Alias `@/...` partout — **pas de `../../../`**.
@@ -185,7 +199,7 @@ Pour une nouvelle entité (ex. `Presence`), l'ordre **domain → application →
 4. **Rust presentation** : commandes fines + mapping `AppError` ; câblage dans `build_state` + `invoke_handler` ([lib.rs](../src-tauri/src/lib.rs)).
 5. **Front domain** : entité, interface repository, use cases purs.
 6. **Front data** : DTO (miroir Rust), mapper, `TauriXRepository`.
-7. **Front presentation** : provider (composition root), hook, composants (UI sans logique).
+7. **Front presentation** : provider (composition root), hook, composants (UI sans logique) ; si l'écran est une **destination**, page dans `presentation/pages/` + fichier de route mince sous `src/routes/_authenticated/` (puis régénérer `routeTree.gen.ts`).
 8. **Transverse** : noms de commandes dans [config.ts](../src/core/config.ts), clés i18n `en`+`fr`.
 9. **Tests + doc** des deux côtés.
 10. Dérouler les §0–6 de cette checklist.
@@ -203,6 +217,8 @@ Pour une nouvelle entité (ex. `Presence`), l'ordre **domain → application →
 - 🚩 Édition d'une migration déjà livrée au lieu d'en ajouter une nouvelle.
 - 🚩 Chaîne UI en dur (sans i18n) ou clé présente dans `en` mais pas `fr`.
 - 🚩 Une feature qui en importe une autre par ses couches internes.
+- 🚩 De l'UI métier ou de la logique dans un fichier de `src/routes/`, ou `routeTree.gen.ts` édité à la main.
+- 🚩 Une page authentifiée déclarée hors de `_authenticated/`, ou une navigation via `window.location` au lieu de `Link`/`useNavigate`.
 - 🚩 `cargo clippy`/`pnpm lint` qui ne passent plus « juste pour cette fois ».
 
 ---
