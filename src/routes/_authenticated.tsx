@@ -22,7 +22,7 @@ import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
 import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
 import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
-import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
+import { VersionBadge } from "@/features/updater/presentation/components/version-badge";
 import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
 import { Logo } from "@/shared/components/logo";
 
@@ -66,7 +66,6 @@ function AppShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { presencesByDay, currentMonth } = usePresence();
-  const { checkForUpdates } = useUpdater();
 
   const lang = i18n.resolvedLanguage ?? "fr";
 
@@ -97,7 +96,10 @@ function AppShell() {
   return (
     <main className="flex min-h-screen w-full flex-col p-6">
       <header className="flex flex-wrap items-center justify-between gap-3 pb-4">
-        <Logo className="text-sm" />
+        <div className="flex items-center gap-2">
+          <Logo className="text-sm" />
+          <VersionBadge />
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           {pathname === "/" && profiles.length > 0 && (
             <div className="flex items-center gap-2 mr-2">
@@ -123,7 +125,6 @@ function AppShell() {
           <ProfileBadge
             onLogout={() => void logout()}
             onOpenCommutes={() => void navigate({ to: "/commutes" })}
-            onCheckUpdates={() => void checkForUpdates(true)}
           />
         </div>
       </header>

@@ -8,13 +8,10 @@ import type {
 } from "../../domain/entities/update";
 import type { UpdaterRepository } from "../../domain/repositories/updater-repository";
 import { UpdaterContext } from "../context/updater-context";
-import { useAutoUpdatePreference } from "../hooks/use-auto-update-preference";
 
 const repo: UpdaterRepository = new TauriUpdaterRepository();
 
 export function UpdaterProvider({ children }: { children: ReactNode }) {
-  const { enabled: autoUpdateEnabled, toggleEnabled: toggleAutoUpdate } =
-    useAutoUpdatePreference();
   const [phase, setPhase] = useState<UpdatePhase>("idle");
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
@@ -25,13 +22,20 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
   const checkForUpdates = useCallback(async (manual = false) => {
     if (checking.current) return;
     checking.current = true;
-    setPhase("checking");
+    // The check always runs automatically (startup) or manually (badge). A
+    // silent startup check stays invisible: it only records the update so the
+    // header badge can flag it — installing is always a manual action. Only a
+    // manual check surfaces the "checking…"/dialog flow.
+    if (manual) setPhase("checking");
     try {
       const found = await repo.check();
       if (found) {
         setUpdate(found);
-        setPhase("available");
+        // Open the dialog only on a manual check; a silent check just keeps
+        // `update` set so the badge turns warning, never auto-installs.
+        if (manual) setPhase("available");
       } else {
+        setUpdate(null);
         setPhase(manual ? "upToDate" : "idle");
       }
     } catch {
@@ -56,14 +60,24 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback(() => {
     setPhase("idle");
-    setUpdate(null);
     setProgress(null);
+    // Keep `update` so the header badge keeps flagging the available update
+    // after the user clicks "Later" — it clears only once the update installs.
   }, []);
 
-  // Startup check: run once in production when auto-update is enabled.
+  // Open the updater from the header badge: re-open the dialog when an update is
+  // already known (no re-check), otherwise run a manual check.
+  const openUpdater = useCallback(() => {
+    if (update) setPhase("available");
+    else void checkForUpdates(true);
+  }, [update, checkForUpdates]);
+
+  // Startup check: run once in production so the header badge can flag an
+  // available update. It is always silent — never auto-opens the dialog nor
+  // installs; the user triggers the install manually from the badge.
   // Using a ref so it only fires once per mount without useEffect dependencies.
   const startupDone = useRef(false);
-  if (!startupDone.current && import.meta.env.PROD && autoUpdateEnabled) {
+  if (!startupDone.current && import.meta.env.PROD) {
     startupDone.current = true;
     void checkForUpdates(false);
   }
@@ -74,9 +88,8 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
         phase,
         update,
         progress,
-        autoUpdateEnabled,
-        toggleAutoUpdate,
         checkForUpdates,
+        openUpdater,
         confirmInstall,
         relaunch,
         dismiss,

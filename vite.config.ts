@@ -1,4 +1,6 @@
 /// <reference types="vitest/config" />
+import { readFileSync } from "node:fs";
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -7,8 +9,18 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+// Expose the app version (single source of truth: package.json) to the frontend
+// as a compile-time constant, so the header badge stays in sync with releases.
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+) as { version: string };
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
+
   plugins: [
     // Must come before react(): scans src/routes and generates src/routeTree.gen.ts.
     // Skipped under vitest: the committed routeTree.gen.ts is enough there, and

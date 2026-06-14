@@ -196,10 +196,6 @@
     }
   },
   "updater": {
-    "menuItem": "Vérifier les mises à jour",
-    "autoUpdate": "Mises à jour automatiques",
-    "on": "Activé",
-    "off": "Désactivé",
     "availableTitle": "Mise à jour disponible — v{{version}}",
     "availableBody": "Version actuelle : {{current}}",
     "download": "Télécharger et installer",
@@ -209,7 +205,9 @@
     "later": "Plus tard",
     "checking": "Vérification des mises à jour…",
     "upToDate": "Vous êtes à jour",
-    "error": "Échec de la vérification"
+    "error": "Échec de la vérification",
+    "badgeUpToDate": "Version {{version}} — à jour",
+    "badgeOutdated": "Mise à jour disponible — v{{version}}"
   },
   "workHours": {
     "encodeButton": "Encoder les heures",

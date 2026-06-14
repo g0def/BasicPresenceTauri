@@ -221,7 +221,8 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 - Surfacer dans l'UI l'avertissement d'altération si un déploiement repasse en `WarnAndAllow` (le défaut `HardFail` refuse l'ouverture avec `VAULT_TAMPERED`).
 - Multi-comptes par appareil (le v1 est mono-utilisateur, cohérent avec la clé dérivée du mot de passe).
 - Le mot de passe transite par les buffers de désérialisation de l'IPC Tauri avant d'être enveloppé dans `Zeroizing` (dès la commande, [auth.rs](../src-tauri/src/presentation/commands/auth.rs)) — limite résiduelle connue, non contournable sans changer le transport.
-- Pas encore d'updater signé (Tauri updater + signature) pour distribuer des correctifs de sécurité.
+
+> **Auto-updater** (implémenté) : updater Tauri signé en minisign. Il **vérifie** automatiquement au démarrage (seule sortie réseau, HTTPS vers GitHub, côté Rust) ; l'**installation reste une action manuelle** depuis le badge de version. Détails et procédure : [release.md](release.md).
 
 ## Vérification
 

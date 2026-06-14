@@ -196,10 +196,6 @@
     }
   },
   "updater": {
-    "menuItem": "Check for updates",
-    "autoUpdate": "Automatic updates",
-    "on": "On",
-    "off": "Off",
     "availableTitle": "Update available — v{{version}}",
     "availableBody": "Current version: {{current}}",
     "download": "Download & install",
@@ -209,7 +205,9 @@
     "later": "Later",
     "checking": "Checking for updates…",
     "upToDate": "You are up to date",
-    "error": "Update check failed"
+    "error": "Update check failed",
+    "badgeUpToDate": "Version {{version}} — up to date",
+    "badgeOutdated": "Update available — v{{version}}"
   },
   "workHours": {
     "encodeButton": "Log hours",
