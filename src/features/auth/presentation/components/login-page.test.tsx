@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import App from "@/App";
 import { AuthProvider } from "@/features/auth/presentation/providers/auth-provider";
+import { UpdaterProvider } from "@/features/updater/presentation/providers/updater-provider";
 
 describe("auth flow", () => {
   it("logs in an existing account and lands on the empty-profile home", async () => {
@@ -28,7 +29,9 @@ describe("auth flow", () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
-        <App />
+        <UpdaterProvider>
+          <App />
+        </UpdaterProvider>
       </AuthProvider>,
     );
 
@@ -58,7 +61,9 @@ describe("auth flow", () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
-        <App />
+        <UpdaterProvider>
+          <App />
+        </UpdaterProvider>
       </AuthProvider>,
     );
 

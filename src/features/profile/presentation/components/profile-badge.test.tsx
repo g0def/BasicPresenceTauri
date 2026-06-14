@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import App from "@/App";
 import { AuthProvider } from "@/features/auth/presentation/providers/auth-provider";
+import { UpdaterProvider } from "@/features/updater/presentation/providers/updater-provider";
 
 const ADA = {
   id: "p1",
@@ -44,7 +45,9 @@ describe("profile home", () => {
     const user = userEvent.setup();
     render(
       <AuthProvider>
-        <App />
+        <UpdaterProvider>
+          <App />
+        </UpdaterProvider>
       </AuthProvider>,
     );
 
