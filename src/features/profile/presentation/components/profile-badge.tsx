@@ -44,10 +44,7 @@ import {
   useCellDisplayMode,
   type CellDisplayMode,
 } from "@/shared/cell-display/use-cell-display-mode";
-import {
-  useNoteFont,
-  type NoteFont,
-} from "@/shared/note-font/use-note-font";
+import { useNoteFont, type NoteFont } from "@/shared/note-font/use-note-font";
 import { useTheme } from "@/shared/theme/use-theme";
 
 function fullName(p: Profile): string {

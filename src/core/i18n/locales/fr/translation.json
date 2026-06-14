@@ -222,7 +222,9 @@
     "note": {
       "title": "Notes du jour",
       "empty": "Ajouter une note…",
-      "placeholder": "Écrivez votre journée en Markdown — # Titre, **gras**, listes…"
+      "placeholder": "Écrivez votre journée en Markdown — # Titre, **gras**, listes…",
+      "edit": "Modifier",
+      "done": "Terminé"
     },
     "presets": {
       "title": "Tâches enregistrées",

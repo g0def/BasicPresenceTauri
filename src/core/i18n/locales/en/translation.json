@@ -222,7 +222,9 @@
     "note": {
       "title": "Day notes",
       "empty": "Add a note…",
-      "placeholder": "Write your day in Markdown — # Heading, **bold**, lists…"
+      "placeholder": "Write your day in Markdown — # Heading, **bold**, lists…",
+      "edit": "Edit",
+      "done": "Done"
     },
     "presets": {
       "title": "Saved tasks",

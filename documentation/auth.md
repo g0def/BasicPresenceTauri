@@ -165,6 +165,8 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 | `set_work_entries` | `presenceId, entries[]` | `WorkDayDto { entries[], schedule? }` |
 | `get_work_schedule` | `presenceId` | `WorkDayScheduleDto { startMinutes, endMinutes }` \| `null` |
 | `set_work_schedule` | `presenceId, startMinutes` | `WorkDayScheduleDto` |
+| `get_day_note` | `presenceId` | `DayNoteDto { markdown, html }` |
+| `set_day_note` | `presenceId, markdown?` | `DayNoteDto { markdown, html }` |
 
 > **Task preset** = tâche réutilisable rattachée à un profil (`ON DELETE CASCADE`) : titre, durée par défaut (5..=480 min, pas de 5), couleur `#RRGGBB`. **Work entry** = tâche d'une journée, *duration-stacked* (pas d'heure de début explicite ; `position` = ordre, le total du jour = somme des `minutes`). Les entrées **snapshotent** titre/description/couleur à l'encodage : éditer ou supprimer un preset ne réécrit jamais les jours passés.
 
@@ -172,13 +174,15 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 
 > L'**horaire** (`work_day_schedule`, au plus une ligne par présence) ne stocke que le début saisi ; `endMinutes` est **dérivé** (`start + somme des durées`) et recalculé/stocké à chaque sauvegarde d'entrées ou d'horaire — il peut dépasser 1440 si la journée court après minuit (l'affichage *wrap*). Un jour qui cesse d'être `office`/`remote` perd automatiquement ses entrées **et** son horaire (triggers `AFTER UPDATE OF type` sur `presence`, car l'*upsert* de `set_presence` conserve l'id et ne déclenche donc pas le `CASCADE`).
 
+> La **note du jour** (`presence.note`, Markdown libre, chiffrée dans le coffre, `NULL` = pas de note) est éditée en WYSIWYG côté front (Milkdown) mais **rendue + assainie côté backend** : comrak avec `render.unsafe_=false` (le HTML *écrit* dans la note est échappé) + coloration syntaxique syntect (pur-Rust) + Ammonia. `get/set_day_note` renvoient le Markdown brut **et** le HTML sûr ; une note vide/blanche efface la colonne.
+
 ## Mapping Clean Architecture
 
 **Backend** ([src-tauri/src/](../src-tauri/src/)) :
 
-- `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`, `Commute`/`CommuteSegment`, `Trip`/`TripInput`, `EmissionFactor`/`GridVariant`, `Co2Settings`, `TaskPreset`, `WorkEntry`/`WorkDaySchedule`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`, `CommuteRepository`, `EmissionFactorRepository`, `Co2SettingsRepository`, `TaskPresetRepository`, `WorkEntryRepository`), service de calcul pur `Co2Calculator`, `DomainError`. Aucune dépendance externe.
-- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`, `create_task_preset`, `list_task_presets`, `update_task_preset`, `delete_task_preset`, `get_work_entries`, `set_work_entries`, `get_work_schedule`, `set_work_schedule`) + DTOs.
-- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlTaskPresetRepository`, `LibsqlWorkEntryRepository`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
+- `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`, `Commute`/`CommuteSegment`, `Trip`/`TripInput`, `EmissionFactor`/`GridVariant`, `Co2Settings`, `TaskPreset`, `WorkEntry`/`WorkDaySchedule`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`, `CommuteRepository`, `EmissionFactorRepository`, `Co2SettingsRepository`, `TaskPresetRepository`, `WorkEntryRepository`, `MarkdownRenderer`), service de calcul pur `Co2Calculator`, `DomainError`. Aucune dépendance externe.
+- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`, `create_task_preset`, `list_task_presets`, `update_task_preset`, `delete_task_preset`, `get_work_entries`, `set_work_entries`, `get_work_schedule`, `set_work_schedule`, `get_day_note`, `set_day_note`) + DTOs.
+- `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlTaskPresetRepository`, `LibsqlWorkEntryRepository`, `ComrakMarkdownRenderer`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 
 **Frontend** ([src/](../src/)) :
