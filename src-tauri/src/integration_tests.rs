@@ -1281,3 +1281,88 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
         let _ = std::fs::remove_dir_all(dir);
     });
 }
+
+#[test]
+fn day_note_persists_and_is_rendered_to_safe_html() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("day-note");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const DAY: i64 = 1_717_200_000_000;
+        let presence = state
+            .set_presence
+            .execute(&profile.id, DAY, "office", vec![])
+            .await
+            .expect("set office");
+
+        // A fresh day has no note: empty Markdown and empty HTML.
+        let fresh = state.get_day_note.execute(&presence.id).await.unwrap();
+        assert!(fresh.markdown.is_empty());
+        assert!(fresh.html.trim().is_empty());
+
+        // Saving renders Markdown to sanitized HTML; the raw Markdown round-trips.
+        let saved = state
+            .set_day_note
+            .execute(
+                &presence.id,
+                Some("# Titre\n\n**bold** <script>alert(1)</script>".to_string()),
+            )
+            .await
+            .expect("set note");
+        assert!(saved.markdown.contains("# Titre"));
+        assert!(saved.html.contains("<h1>Titre</h1>"), "got: {}", saved.html);
+        assert!(saved.html.contains("<strong>bold</strong>"));
+        assert!(
+            !saved.html.contains("<script"),
+            "script survived: {}",
+            saved.html
+        );
+
+        // The note is persisted and re-rendered identically on read.
+        let read = state.get_day_note.execute(&presence.id).await.unwrap();
+        assert_eq!(read.markdown, saved.markdown);
+        assert_eq!(read.html, saved.html);
+
+        // A blank note clears the column (stored as NULL).
+        let cleared = state
+            .set_day_note
+            .execute(&presence.id, Some("   \n  ".to_string()))
+            .await
+            .expect("clear note");
+        assert!(cleared.markdown.is_empty());
+        assert!(state
+            .get_day_note
+            .execute(&presence.id)
+            .await
+            .unwrap()
+            .markdown
+            .is_empty());
+
+        // Logout locks the vault: note reads are refused again.
+        state.logout.execute(&session.token).unwrap();
+        assert!(matches!(
+            state.get_day_note.execute(&presence.id).await,
+            Err(DomainError::Unauthorized)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}

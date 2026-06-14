@@ -7,6 +7,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
@@ -21,6 +22,7 @@ use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
+use crate::application::use_cases::set_day_note::SetDayNoteUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::set_work_entries::SetWorkEntriesUseCase;
 use crate::application::use_cases::set_work_schedule::SetWorkScheduleUseCase;
@@ -63,6 +65,8 @@ pub struct AppState {
     pub set_work_entries: SetWorkEntriesUseCase,
     pub get_work_schedule: GetWorkScheduleUseCase,
     pub set_work_schedule: SetWorkScheduleUseCase,
+    pub get_day_note: GetDayNoteUseCase,
+    pub set_day_note: SetDayNoteUseCase,
     /// Vault handle, exposed so a window-close hook can lock it and refresh the
     /// integrity baseline on a clean app exit.
     pub vault: Arc<dyn VaultManager>,

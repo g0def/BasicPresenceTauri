@@ -10,6 +10,7 @@ import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 import type { Presence } from "@/features/presence/domain/entities/presence";
 import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
 import { DayDonut } from "@/features/work-hours/presentation/components/day-donut";
+import { DayNote } from "@/features/work-hours/presentation/components/day-note";
 import { DayScheduleEditor } from "@/features/work-hours/presentation/components/day-schedule-editor";
 import { TaskPresetPanel } from "@/features/work-hours/presentation/components/task-preset-panel";
 import { WorkEntryList } from "@/features/work-hours/presentation/components/work-entry-list";
@@ -50,7 +51,7 @@ export function WorkHoursPage({ presence, date }: WorkHoursPageProps) {
   const typeStyle = PRESENCE_STYLES[presence.type];
 
   return (
-    <section className="mt-6 flex flex-1 flex-col gap-6">
+    <section className="mt-6 flex flex-1 flex-col gap-6 pb-24">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
           <Link to="/" aria-label={t("workHours.back")}>
@@ -123,6 +124,10 @@ export function WorkHoursPage({ presence, date }: WorkHoursPageProps) {
             />
           </section>
         </div>
+      )}
+
+      {!isLoading && (
+        <DayNote presenceId={presence.id} onSessionExpired={logout} />
       )}
     </section>
   );

@@ -20,6 +20,8 @@
     "audit": "pnpm audit --audit-level=high"
   },
   "dependencies": {
+    "@milkdown/crepe": "^7.21.2",
+    "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "4.3.0",
     "@tanstack/react-router": "1.170.15",
     "@tauri-apps/api": "2.11.0",

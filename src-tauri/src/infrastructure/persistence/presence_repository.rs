@@ -166,6 +166,37 @@ impl PresenceRepository for LibsqlPresenceRepository {
         Ok(())
     }
 
+    async fn get_note(&self, presence_id: &str) -> Result<Option<String>, DomainError> {
+        let mut rows = self
+            .conn()?
+            .query(
+                "SELECT note FROM presence WHERE id = ?1",
+                params![presence_id],
+            )
+            .await
+            .map_err(map_storage)?;
+        match rows.next().await.map_err(map_storage)? {
+            Some(row) => Ok(row.get::<Option<String>>(0).map_err(map_storage)?),
+            None => Ok(None),
+        }
+    }
+
+    async fn set_note(
+        &self,
+        presence_id: &str,
+        note: Option<&str>,
+        updated_at: i64,
+    ) -> Result<(), DomainError> {
+        self.conn()?
+            .execute(
+                "UPDATE presence SET note = ?2, updated_at = ?3 WHERE id = ?1",
+                params![presence_id, note.map(|s| s.to_string()), updated_at],
+            )
+            .await
+            .map_err(map_storage)?;
+        Ok(())
+    }
+
     async fn import_many(
         &self,
         profile_id: &str,

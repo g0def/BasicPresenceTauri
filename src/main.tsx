@@ -7,10 +7,13 @@ import App from "@/App";
 import { AuthProvider } from "@/features/auth/presentation/providers/auth-provider";
 import { UpdaterProvider } from "@/features/updater/presentation/providers/updater-provider";
 import { UpdateDialog } from "@/features/updater/presentation/components/update-dialog";
+import { applyStoredNoteFont } from "@/shared/note-font/use-note-font";
 import { applyStoredTheme } from "@/shared/theme/use-theme";
 
-// Apply the persisted theme before the first paint to avoid a flash of light.
+// Apply persisted display prefs before the first paint (theme avoids a flash of
+// light; the note font is set so the editor/preview render in it immediately).
 applyStoredTheme();
+applyStoredNoteFont();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 /* ---- Logo brand font: JetBrains Mono (logo only) ---- */
@@ -251,4 +253,50 @@
   .auth-glow-2 {
     animation: auth-glow-2 13s ease-in-out infinite;
   }
+}
+
+/* ── Milkdown (Crepe) note editor ──────────────────────────────────────────
+   Map Crepe's theme variables onto the app's design tokens so the editor follows
+   light/dark automatically. Scoped to `.milkdown-host .milkdown` so it wins over
+   the frame theme regardless of stylesheet import order. */
+.milkdown-host {
+  min-height: 12rem;
+}
+.milkdown-host .milkdown {
+  --crepe-font-default: var(--note-font);
+  --crepe-font-title: var(--note-font);
+  --crepe-color-background: var(--background);
+  --crepe-color-on-background: var(--foreground);
+  --crepe-color-surface: var(--card);
+  --crepe-color-surface-low: var(--muted);
+  --crepe-color-on-surface: var(--card-foreground);
+  --crepe-color-on-surface-variant: var(--muted-foreground);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-secondary: var(--secondary);
+  --crepe-color-on-secondary: var(--secondary-foreground);
+  --crepe-color-inverse: var(--foreground);
+  --crepe-color-on-inverse: var(--background);
+  --crepe-color-inline-code: var(--destructive);
+  --crepe-color-error: var(--destructive);
+  --crepe-color-hover: var(--accent);
+  --crepe-color-selected: var(--accent);
+  --crepe-color-inline-area: var(--muted);
+  background: transparent;
+}
+
+/* ── Note display font (switchable from the account menu) ───────────────────
+   Drives the font of both the Markdown editor and the rendered view via the
+   `data-note-font` attribute set on <html> by use-note-font. */
+:root {
+  --note-font: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+html[data-note-font="serif"] {
+  --note-font: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+html[data-note-font="mono"] {
+  --note-font: var(--font-jetbrains);
+}
+.note-body {
+  font-family: var(--note-font);
 }

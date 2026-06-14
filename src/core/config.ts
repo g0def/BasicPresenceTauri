@@ -40,4 +40,6 @@ export const COMMANDS = {
   setWorkEntries: "set_work_entries",
   getWorkSchedule: "get_work_schedule",
   setWorkSchedule: "set_work_schedule",
+  getDayNote: "get_day_note",
+  setDayNote: "set_day_note",
 } as const;

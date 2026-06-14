@@ -19,6 +19,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
@@ -33,6 +34,7 @@ use crate::application::use_cases::logout::LogoutUseCase;
 use crate::application::use_cases::register_account::RegisterAccountUseCase;
 use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
+use crate::application::use_cases::set_day_note::SetDayNoteUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
 use crate::application::use_cases::set_work_entries::SetWorkEntriesUseCase;
 use crate::application::use_cases::set_work_schedule::SetWorkScheduleUseCase;
@@ -50,6 +52,7 @@ use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::key_service::KeyService;
+use crate::domain::services::markdown::MarkdownRenderer;
 use crate::domain::services::password_hasher::PasswordHasher;
 use crate::domain::services::session_store::SessionStore;
 use crate::domain::services::token_generator::TokenGenerator;
@@ -59,6 +62,7 @@ use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
 use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
+use crate::infrastructure::markdown::comrak_renderer::ComrakMarkdownRenderer;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
 use crate::infrastructure::persistence::co2_settings_repository::LibsqlCo2SettingsRepository;
 use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
@@ -137,7 +141,9 @@ pub fn run() {
             work_hours::get_work_entries,
             work_hours::set_work_entries,
             work_hours::get_work_schedule,
-            work_hours::set_work_schedule
+            work_hours::set_work_schedule,
+            work_hours::get_day_note,
+            work_hours::set_day_note
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -191,6 +197,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let work_entries: Arc<dyn WorkEntryRepository> =
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
 
     Ok(AppState {
         register_account: RegisterAccountUseCase::new(
@@ -248,6 +255,8 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         set_work_entries: SetWorkEntriesUseCase::new(work_entries.clone(), presences.clone()),
         get_work_schedule: GetWorkScheduleUseCase::new(work_entries.clone()),
         set_work_schedule: SetWorkScheduleUseCase::new(work_entries.clone(), presences.clone()),
+        get_day_note: GetDayNoteUseCase::new(presences.clone(), markdown.clone()),
+        set_day_note: SetDayNoteUseCase::new(presences.clone(), markdown.clone(), clock.clone()),
         vault: vault.clone(),
         keystore_db,
     })

@@ -1,4 +1,5 @@
 pub mod commute_dto;
+pub mod day_note_dto;
 pub mod emission_factor_dto;
 pub mod import_presence_dto;
 pub mod login_result_dto;

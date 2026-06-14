@@ -38,6 +38,12 @@
     "co2": "Émissions (kgCO2)",
     "hours": "Heures travaillées"
   },
+  "noteFont": {
+    "label": "Police des notes",
+    "sans": "Sans",
+    "serif": "Serif",
+    "mono": "Monospace"
+  },
   "profile": {
     "menu": "Menu du compte",
     "emptyTitle": "Aucun profil",
@@ -213,6 +219,11 @@
     "totalLabel": "au total",
     "emptyHint": "Ajoutez une tâche pour remplir l'anneau.",
     "saving": "Enregistrement…",
+    "note": {
+      "title": "Notes du jour",
+      "empty": "Ajouter une note…",
+      "placeholder": "Écrivez votre journée en Markdown — # Titre, **gras**, listes…"
+    },
     "presets": {
       "title": "Tâches enregistrées",
       "empty": "Aucune tâche enregistrée pour l'instant.",

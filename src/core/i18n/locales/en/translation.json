@@ -38,6 +38,12 @@
     "co2": "Emissions (kgCO2)",
     "hours": "Work hours"
   },
+  "noteFont": {
+    "label": "Notes font",
+    "sans": "Sans",
+    "serif": "Serif",
+    "mono": "Monospace"
+  },
   "profile": {
     "menu": "Account menu",
     "emptyTitle": "No profile",
@@ -213,6 +219,11 @@
     "totalLabel": "total",
     "emptyHint": "Add a task to fill the ring.",
     "saving": "Saving…",
+    "note": {
+      "title": "Day notes",
+      "empty": "Add a note…",
+      "placeholder": "Write your day in Markdown — # Heading, **bold**, lists…"
+    },
     "presets": {
       "title": "Saved tasks",
       "empty": "No saved tasks yet.",

@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::application::dto::day_note_dto::DayNoteDto;
 use crate::application::dto::task_preset_dto::TaskPresetDto;
 use crate::application::dto::work_entry_dto::{
     WorkDayDto, WorkDayScheduleDto, WorkEntryDto, WorkEntryInputDto,
@@ -110,4 +111,26 @@ pub async fn set_work_schedule(
         .set_work_schedule
         .execute(&presence_id, start_minutes)
         .await?)
+}
+
+/// Fetch a day's free-form Markdown note plus its backend-rendered, sanitized HTML.
+#[tauri::command]
+pub async fn get_day_note(
+    presence_id: String,
+    state: State<'_, AppState>,
+) -> Result<DayNoteDto, AppError> {
+    state.require_session.execute()?;
+    Ok(state.get_day_note.execute(&presence_id).await?)
+}
+
+/// Save a day's free-form Markdown note (a blank note clears it). Returns the
+/// stored Markdown and its freshly rendered, sanitized HTML.
+#[tauri::command]
+pub async fn set_day_note(
+    presence_id: String,
+    markdown: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<DayNoteDto, AppError> {
+    state.require_session.execute()?;
+    Ok(state.set_day_note.execute(&presence_id, markdown).await?)
 }

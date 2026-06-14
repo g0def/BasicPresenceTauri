@@ -44,6 +44,10 @@ import {
   useCellDisplayMode,
   type CellDisplayMode,
 } from "@/shared/cell-display/use-cell-display-mode";
+import {
+  useNoteFont,
+  type NoteFont,
+} from "@/shared/note-font/use-note-font";
 import { useTheme } from "@/shared/theme/use-theme";
 
 function fullName(p: Profile): string {
@@ -76,6 +80,7 @@ export function ProfileBadge({
   const { autoUpdateEnabled, toggleAutoUpdate } = useUpdater();
   const { mode: cellDisplayMode, setMode: setCellDisplayMode } =
     useCellDisplayMode();
+  const { noteFont, setNoteFont } = useNoteFont();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -178,6 +183,23 @@ export function ProfileBadge({
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="hours">
               {t("cellDisplay.hours")}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{t("noteFont.label")}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={noteFont}
+            onValueChange={(v) => setNoteFont(v as NoteFont)}
+          >
+            <DropdownMenuRadioItem value="sans">
+              {t("noteFont.sans")}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="serif">
+              {t("noteFont.serif")}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="mono">
+              {t("noteFont.mono")}
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
 

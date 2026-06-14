@@ -34,6 +34,18 @@ pub trait PresenceRepository: Send + Sync {
 
     async fn list_by_profile(&self, profile_id: &str) -> Result<Vec<Presence>, DomainError>;
 
+    /// The raw Markdown note of a presence day, or `None` when unset/blank.
+    async fn get_note(&self, presence_id: &str) -> Result<Option<String>, DomainError>;
+
+    /// Set (or clear with `None`) the raw Markdown note of a presence day,
+    /// stamping `updated_at`.
+    async fn set_note(
+        &self,
+        presence_id: &str,
+        note: Option<&str>,
+        updated_at: i64,
+    ) -> Result<(), DomainError>;
+
     async fn delete(&self, id: &str) -> Result<(), DomainError>;
 
     /// Bulk-insert presences for a profile in a single transaction.

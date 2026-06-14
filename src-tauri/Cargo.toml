@@ -60,3 +60,10 @@ thiserror = "2"
 base64 = "0.22"
 async-trait = "0.1"
 
+# Rendu des notes Markdown -> HTML côté backend (source de vérité = Markdown brut).
+# `default-features = false` écarte la CLI + la coloration syntaxique (syntect/onig,
+# une dépendance C) : on n'a besoin que de `markdown_to_html`. Le HTML est ensuite
+# assaini par Ammonia (whitelist html5ever) avant d'être envoyé à la WebView.
+comrak = { version = "0.52.0", default-features = false }
+ammonia = "4.1.2"
+
