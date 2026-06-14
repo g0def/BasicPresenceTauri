@@ -22,7 +22,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] **Rust** (depuis `src-tauri/`) : `cargo fmt --check` ✅ — `cargo clippy --all-targets -- -D warnings` ✅ (zéro warning) — `cargo test` ✅
 - [ ] Le diff ne contient **que** ce qu'annonce le titre de la PR (pas de fichier généré — **exception** : [src/routeTree.gen.ts](../src/routeTree.gen.ts), committé volontairement et régénéré par le plugin —, pas de `console.log`/`dbg!`/`println!` oublié, pas de code commenté mort).
 - [ ] Pas de `target/`, `dist/`, `node_modules/`, `.db`, ni secret commité (vérifier `.gitignore`).
-- [ ] Commits descriptifs (Conventional Commits : `feat(profile): …`, `fix(auth): …`).
+- [ ] Commits descriptifs (Conventional Commits, **scope en PascalCase** — convention du projet : `feat(Profile): …`, `fix(Auth): …`, `feat(Tooltip): …`).
 
 ---
 

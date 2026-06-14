@@ -121,7 +121,7 @@ export function PresenceCalendar() {
               onClick={() => setSelected(d)}
               aria-label={label}
               className={cn(
-                "flex flex-col items-start rounded-lg border p-2 text-sm transition-colors",
+                "flex flex-col items-start rounded-lg border p-2 text-sm transition-colors duration-300 ease-in-out",
                 "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 inMonth
                   ? "border-border"
