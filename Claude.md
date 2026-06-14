@@ -184,12 +184,16 @@ src/
 > `commute` (jamais l'inverse — pas de cycle). Dérogation **délibérée** à l'isolation des
 > features, justifiée par le couplage métier (détail dans [documentation/auth.md](documentation/auth.md)).
 
-> Le header authentifié ne garde que le timer de session ; le **badge de profil**
-> (tout à droite) ouvre le menu compte (changer/ajouter/éditer/supprimer un profil,
-> langue, thème, déconnexion). `routes/_authenticated.tsx` injecte
-> `onSessionExpired={logout}` aux providers et `onLogout`/`onOpenCommutes` au badge —
-> les features `profile`/`commute` ne dépendent ni de `auth` ni du routeur
-> (langue/thème viennent de `core`/`shared`).
+> Le header authentifié contient : le timer de session, les **badges de résumé mensuel**
+> (heures travaillées + CO₂ émis pour le mois en cours — affichés uniquement sur `/` via
+> `useLocation()`) et le **badge de profil** (tout à droite) qui ouvre le menu compte
+> (changer/ajouter/éditer/supprimer un profil, langue, thème, déconnexion).
+> `routes/_authenticated.tsx` injecte `onSessionExpired={logout}` aux providers et
+> `onLogout`/`onOpenCommutes` au badge — les features `profile`/`commute` ne dépendent
+> ni de `auth` ni du routeur (langue/thème viennent de `core`/`shared`).
+> Le résumé mensuel est calculé côté front via `useMemo` sur `PresenceContext.presencesByDay`
+> (champ `workMinutes` chargé par le backend) filtré par `currentMonth` (état partagé dans
+> `PresenceContext`). Voir § `presence → commute` ci-dessous pour la dépendance de feature.
 
 ### Routing (TanStack Router, file-based)
 

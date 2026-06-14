@@ -1,7 +1,10 @@
 import { check as tauriCheck, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch as tauriRelaunch } from "@tauri-apps/plugin-process";
 
-import type { AvailableUpdate, DownloadProgress } from "../../domain/entities/update";
+import type {
+  AvailableUpdate,
+  DownloadProgress,
+} from "../../domain/entities/update";
 import type { UpdaterRepository } from "../../domain/repositories/updater-repository";
 
 /**

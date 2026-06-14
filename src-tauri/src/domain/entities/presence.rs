@@ -50,4 +50,5 @@ pub struct Presence {
     pub is_estimated: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub work_minutes: i64,
 }

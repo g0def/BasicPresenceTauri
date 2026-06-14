@@ -17,6 +17,7 @@ pub struct PresenceDto {
     pub is_estimated: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    pub work_minutes: i64,
 }
 
 impl From<Presence> for PresenceDto {
@@ -30,6 +31,7 @@ impl From<Presence> for PresenceDto {
             is_estimated: p.is_estimated,
             created_at: p.created_at,
             updated_at: p.updated_at,
+            work_minutes: p.work_minutes,
         }
     }
 }

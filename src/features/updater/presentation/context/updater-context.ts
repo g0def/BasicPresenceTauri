@@ -1,6 +1,10 @@
 import { createContext } from "react";
 
-import type { AvailableUpdate, DownloadProgress, UpdatePhase } from "../../domain/entities/update";
+import type {
+  AvailableUpdate,
+  DownloadProgress,
+  UpdatePhase,
+} from "../../domain/entities/update";
 
 export interface UpdaterContextValue {
   phase: UpdatePhase;

@@ -56,6 +56,11 @@ Fichiers concernés :
 - [vault.rs](../src-tauri/src/infrastructure/persistence/vault.rs) — cycle de vie du coffre (`open` au login, `close` au logout/expiration ; vérifie/écrit le HMAC d'intégrité ; expose `connection()` pour les repositories).
 - [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs) — HMAC-SHA256 du fichier + marqueur `dirty` (crash vs altération).
 - [account_repository.rs](../src-tauri/src/infrastructure/persistence/account_repository.rs) — repository du keystore (CRUD compte + compteurs + backfill clé MAC).
+- [presence_repository.rs](../src-tauri/src/infrastructure/persistence/presence_repository.rs) — repository du vault pour les présences. Les requêtes `SELECT` embarquent une **sous-requête corrélée** pour calculer `work_minutes` à la volée :
+  ```sql
+  (SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = presence.id) AS work_minutes
+  ```
+  > **Décision technique** : SQLite `RETURNING` ne supporte pas les sous-requêtes corrélées, donc l'upsert utilise un jeu de colonnes réduit (`RETURNING_COLUMNS`) puis exécute une seconde requête `SELECT SUM(minutes)…` pour récupérer le total après écriture. Le champ `work_minutes` sur `Presence` / `PresenceDto` est toujours présent (0 par défaut si aucune entrée).
 
 ## Migrations
 

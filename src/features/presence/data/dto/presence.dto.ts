@@ -10,6 +10,7 @@ export interface PresenceDto {
   isEstimated: boolean;
   createdAt: number;
   updatedAt: number;
+  workMinutes: number;
 }
 
 /** A persisted trip snapshot returned by `get_presence_trips`. */

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { startOfMonth } from "date-fns";
 
 import { isAppError } from "@/core/errors";
 import { TauriPresenceRepository } from "@/features/presence/data/repositories/tauri-presence.repository";
@@ -45,6 +46,9 @@ export function PresenceProvider({
   const profileId = activeProfile?.id ?? null;
 
   const [presences, setPresences] = useState<Presence[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    startOfMonth(new Date()),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -194,6 +198,9 @@ export function PresenceProvider({
   const value = useMemo<PresenceContextValue>(
     () => ({
       presencesByDay,
+      currentMonth,
+      setCurrentMonth,
+      reload,
       isLoading,
       isSubmitting,
       error,
@@ -205,6 +212,8 @@ export function PresenceProvider({
     }),
     [
       presencesByDay,
+      currentMonth,
+      reload,
       isLoading,
       isSubmitting,
       error,

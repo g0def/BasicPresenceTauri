@@ -11,6 +11,12 @@ import type {
 export interface PresenceContextValue {
   /** Presences of the active profile, keyed by `day` (UTC-midnight epoch ms). */
   presencesByDay: Map<number, Presence>;
+  /** The currently selected month in the calendar. */
+  currentMonth: Date;
+  /** Set the currently selected month. */
+  setCurrentMonth: (date: Date) => void;
+  /** Force-refresh the presence list from the database. */
+  reload: () => Promise<void>;
   /** True while the presence list is (re)loading. */
   isLoading: boolean;
   /** True while a set/delete/import is in flight. */

@@ -13,7 +13,7 @@ import {
 } from "date-fns";
 import { enUS, fr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,20 @@ import { cn } from "@/lib/utils";
  * to date-fns; the component only renders and routes clicks to the dialog. */
 export function PresenceCalendar() {
   const { t, i18n } = useTranslation();
-  const { presencesByDay } = usePresence();
+  const {
+    presencesByDay,
+    currentMonth: month,
+    setCurrentMonth: setMonth,
+    reload,
+  } = usePresence();
 
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState<Date | null>(null);
+
+  // Reload presences on mount (ensures work hour edits are reflected immediately
+  // when navigating back from the work hours page).
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const locale = i18n.resolvedLanguage === "en" ? enUS : fr;
 
@@ -56,7 +66,7 @@ export function PresenceCalendar() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setMonth((m) => subMonths(m, 1))}
+          onClick={() => setMonth(subMonths(month, 1))}
           aria-label={t("presence.prevMonth")}
         >
           <ChevronLeft />
@@ -67,7 +77,7 @@ export function PresenceCalendar() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setMonth((m) => addMonths(m, 1))}
+          onClick={() => setMonth(addMonths(month, 1))}
           aria-label={t("presence.nextMonth")}
         >
           <ChevronRight />

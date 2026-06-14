@@ -30,6 +30,9 @@ describe("PresenceCalendar", () => {
     const calls: Array<{ day: number; type: PresenceType }> = [];
     const value: PresenceContextValue = {
       presencesByDay: new Map(),
+      currentMonth: new Date(),
+      setCurrentMonth: () => {},
+      reload: () => Promise.resolve(),
       isLoading: false,
       isSubmitting: false,
       error: null,

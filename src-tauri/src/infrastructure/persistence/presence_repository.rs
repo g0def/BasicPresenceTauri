@@ -13,6 +13,9 @@ use crate::infrastructure::persistence::db::map_storage;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 
 const SELECT_COLUMNS: &str =
+    "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at, (SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = presence.id) AS work_minutes";
+
+const RETURNING_COLUMNS: &str =
     "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at";
 
 /// Columns written on insert (includes the owning `presence_id`).
@@ -51,6 +54,23 @@ fn row_to_presence(row: &Row) -> Result<Presence, DomainError> {
         is_estimated: is_estimated != 0,
         created_at: row.get(6).map_err(map_storage)?,
         updated_at: row.get(7).map_err(map_storage)?,
+        work_minutes: row.get(8).map_err(map_storage)?,
+    })
+}
+
+fn row_to_presence_returning(row: &Row) -> Result<Presence, DomainError> {
+    let kind: String = row.get(3).map_err(map_storage)?;
+    let is_estimated: i64 = row.get(5).map_err(map_storage)?;
+    Ok(Presence {
+        id: row.get(0).map_err(map_storage)?,
+        profile_id: row.get(1).map_err(map_storage)?,
+        day: row.get(2).map_err(map_storage)?,
+        kind: PresenceType::parse(&kind)?,
+        co2_kg: row.get(4).map_err(map_storage)?,
+        is_estimated: is_estimated != 0,
+        created_at: row.get(6).map_err(map_storage)?,
+        updated_at: row.get(7).map_err(map_storage)?,
+        work_minutes: 0,
     })
 }
 
@@ -187,9 +207,9 @@ async fn set_for_day_in_tx(
          ON CONFLICT(profile_id, day) DO UPDATE SET \
          type = excluded.type, co2_kg = excluded.co2_kg, \
          is_estimated = excluded.is_estimated, updated_at = excluded.updated_at \
-         RETURNING {SELECT_COLUMNS}"
+         RETURNING {RETURNING_COLUMNS}"
     );
-    let saved = {
+    let mut saved = {
         let mut rows = conn
             .query(
                 &sql,
@@ -207,7 +227,7 @@ async fn set_for_day_in_tx(
             .await
             .map_err(map_storage)?;
         match rows.next().await.map_err(map_storage)? {
-            Some(row) => row_to_presence(&row)?,
+            Some(row) => row_to_presence_returning(&row)?,
             None => {
                 return Err(DomainError::Storage(
                     "presence upsert returned no row".into(),
@@ -246,6 +266,23 @@ async fn set_for_day_in_tx(
         .await
         .map_err(map_storage)?;
     }
+
+    // Since the type might have changed or we might have updated the presence,
+    // fetch the work_minutes from the database.
+    let work_minutes = {
+        let mut rows = conn
+            .query(
+                "SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = ?1",
+                params![saved.id.clone()],
+            )
+            .await
+            .map_err(map_storage)?;
+        match rows.next().await.map_err(map_storage)? {
+            Some(row) => row.get::<i64>(0).map_err(map_storage)?,
+            None => 0,
+        }
+    };
+    saved.work_minutes = work_minutes;
 
     Ok(saved)
 }

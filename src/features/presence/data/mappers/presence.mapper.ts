@@ -18,6 +18,7 @@ export function toPresence(dto: PresenceDto): Presence {
     isEstimated: dto.isEstimated ?? false,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
+    workMinutes: dto.workMinutes ?? 0,
   };
 }
 

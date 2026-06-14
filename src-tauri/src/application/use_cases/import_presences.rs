@@ -70,6 +70,7 @@ impl ImportPresencesUseCase {
                 is_estimated: false,
                 created_at,
                 updated_at,
+                work_minutes: 0,
             });
         }
 

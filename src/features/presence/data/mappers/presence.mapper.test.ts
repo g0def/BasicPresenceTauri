@@ -14,6 +14,7 @@ describe("presence.mapper", () => {
         isEstimated: false,
         createdAt: 1,
         updatedAt: 2,
+        workMinutes: 120,
       }),
     ).toEqual({
       id: "x1",
@@ -24,6 +25,7 @@ describe("presence.mapper", () => {
       isEstimated: false,
       createdAt: 1,
       updatedAt: 2,
+      workMinutes: 120,
     });
   });
 
@@ -37,7 +39,9 @@ describe("presence.mapper", () => {
       isEstimated: false,
       createdAt: 1,
       updatedAt: 2,
+      workMinutes: 0,
     });
     expect(mapped.co2Kg).toBeNull();
+    expect(mapped.workMinutes).toBe(0);
   });
 });

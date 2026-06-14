@@ -22,6 +22,8 @@ export interface Presence {
   isEstimated: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Sum of minutes of work entries for this day. */
+  workMinutes: number;
 }
 
 /** One commute leg attached to a presence day. Structurally identical to the

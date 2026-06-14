@@ -104,6 +104,7 @@ impl SetPresenceUseCase {
             is_estimated: day_em.is_estimated,
             created_at: now,
             updated_at: now,
+            work_minutes: 0,
         };
 
         // The persisted presence id is assigned by the repository (it may reuse

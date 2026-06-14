@@ -1,7 +1,11 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { TauriUpdaterRepository } from "../../data/repositories/tauri-updater.repository";
-import type { AvailableUpdate, DownloadProgress, UpdatePhase } from "../../domain/entities/update";
+import type {
+  AvailableUpdate,
+  DownloadProgress,
+  UpdatePhase,
+} from "../../domain/entities/update";
 import type { UpdaterRepository } from "../../domain/repositories/updater-repository";
 import { UpdaterContext } from "../context/updater-context";
 import { useAutoUpdatePreference } from "../hooks/use-auto-update-preference";
@@ -18,27 +22,24 @@ export function UpdaterProvider({ children }: { children: ReactNode }) {
   // Prevent concurrent checks.
   const checking = useRef(false);
 
-  const checkForUpdates = useCallback(
-    async (manual = false) => {
-      if (checking.current) return;
-      checking.current = true;
-      setPhase("checking");
-      try {
-        const found = await repo.check();
-        if (found) {
-          setUpdate(found);
-          setPhase("available");
-        } else {
-          setPhase(manual ? "upToDate" : "idle");
-        }
-      } catch {
-        setPhase(manual ? "error" : "idle");
-      } finally {
-        checking.current = false;
+  const checkForUpdates = useCallback(async (manual = false) => {
+    if (checking.current) return;
+    checking.current = true;
+    setPhase("checking");
+    try {
+      const found = await repo.check();
+      if (found) {
+        setUpdate(found);
+        setPhase("available");
+      } else {
+        setPhase(manual ? "upToDate" : "idle");
       }
-    },
-    [],
-  );
+    } catch {
+      setPhase(manual ? "error" : "idle");
+    } finally {
+      checking.current = false;
+    }
+  }, []);
 
   const confirmInstall = useCallback(async () => {
     setPhase("downloading");

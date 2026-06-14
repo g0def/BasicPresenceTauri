@@ -67,6 +67,10 @@
       "holiday": "Jour férié"
     }
   },
+  "summary": {
+    "hoursWorked": "{{hours}}",
+    "co2Emitted": "{{co2}}"
+  },
   "import": {
     "menuItem": "Importer des données",
     "title": "Importer des présences",
