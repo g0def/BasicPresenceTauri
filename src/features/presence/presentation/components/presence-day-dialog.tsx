@@ -168,7 +168,10 @@ export function PresenceDayDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn(step === "commute" ? "sm:max-w-md" : "sm:max-w-sm")}
+        className={cn(
+          "flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden",
+          step === "commute" ? "sm:max-w-md" : "sm:max-w-sm",
+        )}
       >
         <DialogHeader>
           <DialogTitle className="capitalize">
@@ -183,33 +186,37 @@ export function PresenceDayDialog({
 
         {step === "type" ? (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              {PRESENCE_TYPES.map((type) => {
-                const active = presence?.type === type;
-                const Icon = PRESENCE_STYLES[type].Icon;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => void onSelectType(type)}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md border p-3 text-sm font-medium transition-colors",
-                      "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                      "disabled:pointer-events-none disabled:opacity-50",
-                      active ? "border-ring ring-1 ring-ring" : "border-border",
-                    )}
-                  >
-                    <Icon
-                      className={cn("size-4", PRESENCE_STYLES[type].text)}
-                    />
-                    {t(PRESENCE_STYLES[type].labelKey)}
-                  </button>
-                );
-              })}
-            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+              <div className="grid grid-cols-2 gap-2">
+                {PRESENCE_TYPES.map((type) => {
+                  const active = presence?.type === type;
+                  const Icon = PRESENCE_STYLES[type].Icon;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => void onSelectType(type)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md border p-3 text-sm font-medium transition-colors",
+                        "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        "disabled:pointer-events-none disabled:opacity-50",
+                        active
+                          ? "border-ring ring-1 ring-ring"
+                          : "border-border",
+                      )}
+                    >
+                      <Icon
+                        className={cn("size-4", PRESENCE_STYLES[type].text)}
+                      />
+                      {t(PRESENCE_STYLES[type].labelKey)}
+                    </button>
+                  );
+                })}
+              </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
 
             {presence && (
               <DialogFooter className="sm:justify-between">
@@ -243,85 +250,93 @@ export function PresenceDayDialog({
           </>
         ) : (
           <>
-            <div className="grid max-h-72 gap-2 overflow-y-auto">
-              <button
-                type="button"
-                onClick={() => setChoice("none")}
-                className={cn(
-                  "rounded-md border p-3 text-left text-sm font-medium transition-colors",
-                  "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  choice === "none"
-                    ? "border-ring ring-1 ring-ring"
-                    : "border-border",
-                )}
-              >
-                {t("commute.step.none")}
-              </button>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChoice("none")}
+                  className={cn(
+                    "rounded-md border p-3 text-left text-sm font-medium transition-colors",
+                    "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    choice === "none"
+                      ? "border-ring ring-1 ring-ring"
+                      : "border-border",
+                  )}
+                >
+                  {t("commute.step.none")}
+                </button>
 
-              {commutes.map((commute) => {
-                const active = choice === commute.id;
-                return (
-                  <button
-                    key={commute.id}
-                    type="button"
-                    onClick={() => setChoice(commute.id)}
-                    className={cn(
-                      "flex flex-col items-start gap-0.5 rounded-md border p-3 text-left text-sm transition-colors",
-                      "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                      active ? "border-ring ring-1 ring-ring" : "border-border",
-                    )}
-                  >
-                    <span className="flex w-full items-center gap-2">
-                      <span className="font-medium">{commute.name}</span>
-                      {typeof commute.co2Kg === "number" && (
-                        <span className="ml-auto text-xs font-semibold text-primary">
-                          {formatCo2(commute.co2Kg, lang)}
-                        </span>
+                {commutes.map((commute) => {
+                  const active = choice === commute.id;
+                  return (
+                    <button
+                      key={commute.id}
+                      type="button"
+                      onClick={() => setChoice(commute.id)}
+                      className={cn(
+                        "flex flex-col items-start gap-0.5 rounded-md border p-3 text-left text-sm transition-colors",
+                        "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        active
+                          ? "border-ring ring-1 ring-ring"
+                          : "border-border",
                       )}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {summarizeSegments(commute.segments, emissionFactors, t)}
-                    </span>
-                  </button>
-                );
-              })}
+                    >
+                      <span className="flex w-full items-center gap-2">
+                        <span className="font-medium">{commute.name}</span>
+                        {typeof commute.co2Kg === "number" && (
+                          <span className="ml-auto text-xs font-semibold text-primary">
+                            {formatCo2(commute.co2Kg, lang)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {summarizeSegments(
+                          commute.segments,
+                          emissionFactors,
+                          t,
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
 
-              <button
-                type="button"
-                onClick={() => setChoice("custom")}
-                className={cn(
-                  "rounded-md border p-3 text-left text-sm font-medium transition-colors",
-                  "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  choice === "custom"
-                    ? "border-ring ring-1 ring-ring"
-                    : "border-border",
-                )}
-              >
-                {t("commute.step.custom")}
-              </button>
-            </div>
-
-            {choice === "custom" && (
-              <div className="grid gap-3">
-                <SegmentEditor
-                  segments={customSegments}
-                  onChange={setCustomSegments}
-                  emissionFactors={emissionFactors}
-                  disabled={isSubmitting}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={customRoundTrip}
-                    onChange={(e) => setCustomRoundTrip(e.target.checked)}
-                    className="size-4 rounded border-input accent-primary"
-                  />
-                  {t("commute.form.roundTrip")}
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setChoice("custom")}
+                  className={cn(
+                    "rounded-md border p-3 text-left text-sm font-medium transition-colors",
+                    "hover:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    choice === "custom"
+                      ? "border-ring ring-1 ring-ring"
+                      : "border-border",
+                  )}
+                >
+                  {t("commute.step.custom")}
+                </button>
               </div>
-            )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+              {choice === "custom" && (
+                <div className="grid gap-3">
+                  <SegmentEditor
+                    segments={customSegments}
+                    onChange={setCustomSegments}
+                    emissionFactors={emissionFactors}
+                    disabled={isSubmitting}
+                  />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={customRoundTrip}
+                      onChange={(e) => setCustomRoundTrip(e.target.checked)}
+                      className="size-4 rounded border-input accent-primary"
+                    />
+                    {t("commute.form.roundTrip")}
+                  </label>
+                </div>
+              )}
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
 
             <DialogFooter>
               <Button

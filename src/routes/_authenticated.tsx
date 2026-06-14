@@ -25,6 +25,11 @@ import { TaskPresetProvider } from "@/features/work-hours/presentation/providers
 import { VersionBadge } from "@/features/updater/presentation/components/version-badge";
 import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
 import { Logo } from "@/shared/components/logo";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: ({ context }) => {
@@ -103,22 +108,32 @@ function AppShell() {
         <div className="flex flex-wrap items-center gap-3">
           {pathname === "/" && profiles.length > 0 && (
             <div className="flex items-center gap-2 mr-2">
-              <div
-                className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary"
-                title={t("summary.hoursWorked", { hours: formattedHours })}
-              >
-                <Clock className="size-3.5" />
-                <span>
-                  {t("summary.hoursWorked", { hours: formattedHours })}
-                </span>
-              </div>
-              <div
-                className="flex items-center gap-1.5 rounded-full border border-success/20 bg-success/5 px-3 py-1 text-xs font-semibold text-success"
-                title={t("summary.co2Emitted", { co2: formattedCo2 })}
-              >
-                <Leaf className="size-3.5" />
-                <span>{t("summary.co2Emitted", { co2: formattedCo2 })}</span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                    <Clock className="size-3.5" />
+                    <span>
+                      {t("summary.hoursWorked", { hours: formattedHours })}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {t("summary.hoursWorkedTooltip")}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5 rounded-full border border-success/20 bg-success/5 px-3 py-1 text-xs font-semibold text-success">
+                    <Leaf className="size-3.5" />
+                    <span>
+                      {t("summary.co2Emitted", { co2: formattedCo2 })}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {t("summary.co2EmittedTooltip")}
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
           <SessionCountdown />

@@ -80,7 +80,9 @@
   },
   "summary": {
     "hoursWorked": "{{hours}}",
-    "co2Emitted": "{{co2}}"
+    "co2Emitted": "{{co2}}",
+    "hoursWorkedTooltip": "Total hours worked for the displayed month",
+    "co2EmittedTooltip": "Estimated CO₂ emissions from your commutes for the displayed month"
   },
   "import": {
     "menuItem": "Import data",
