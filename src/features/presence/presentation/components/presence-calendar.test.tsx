@@ -12,6 +12,7 @@ import {
   PresenceContext,
   type PresenceContextValue,
 } from "@/features/presence/presentation/context/presence-context";
+import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
 
 const commuteValue: CommuteContextValue = {
   commutes: [],
@@ -50,7 +51,9 @@ describe("PresenceCalendar", () => {
     render(
       <CommuteContext.Provider value={commuteValue}>
         <PresenceContext.Provider value={value}>
-          <PresenceCalendar />
+          <CellDisplayProvider>
+            <PresenceCalendar />
+          </CellDisplayProvider>
         </PresenceContext.Provider>
       </CommuteContext.Provider>,
     );

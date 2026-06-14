@@ -23,6 +23,7 @@ import { ProfileProvider } from "@/features/profile/presentation/providers/profi
 import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
 import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
 import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
+import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
 import { Logo } from "@/shared/components/logo";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -47,7 +48,9 @@ function AuthenticatedLayout() {
       <PresenceProvider onSessionExpired={logout}>
         <CommuteProvider onSessionExpired={logout}>
           <TaskPresetProvider onSessionExpired={logout}>
-            <AppShell />
+            <CellDisplayProvider>
+              <AppShell />
+            </CellDisplayProvider>
           </TaskPresetProvider>
         </CommuteProvider>
       </PresenceProvider>

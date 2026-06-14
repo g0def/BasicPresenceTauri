@@ -23,6 +23,8 @@ import { dayKey } from "@/features/presence/presentation/day-key";
 import { PresenceDayDialog } from "@/features/presence/presentation/components/presence-day-dialog";
 import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
 import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { useCellDisplayMode } from "@/shared/cell-display/use-cell-display-mode";
 import { cn } from "@/lib/utils";
 
 /** Minimalist month calendar: a grid of square day cells, colored per presence
@@ -38,6 +40,7 @@ export function PresenceCalendar() {
   } = usePresence();
 
   const [selected, setSelected] = useState<Date | null>(null);
+  const { mode: displayMode } = useCellDisplayMode();
 
   // Reload presences on mount (ensures work hour edits are reflected immediately
   // when navigating back from the work hours page).
@@ -128,12 +131,23 @@ export function PresenceCalendar() {
               )}
             >
               <span className="font-medium">{d.getDate()}</span>
-              {presence && presence.co2Kg != null && presence.co2Kg > 0 && (
-                <span className="m-auto text-xs font-semibold tabular-nums">
-                  {formatCo2(presence.co2Kg, i18n.resolvedLanguage ?? "fr")}
-                  {presence.isEstimated ? " ~" : ""}
-                </span>
-              )}
+              {presence &&
+                (displayMode === "hours"
+                  ? presence.workMinutes > 0 && (
+                      <span className="m-auto text-sm font-semibold tabular-nums">
+                        {formatMinutes(presence.workMinutes)}
+                      </span>
+                    )
+                  : presence.co2Kg != null &&
+                    presence.co2Kg > 0 && (
+                      <span className="m-auto text-sm font-semibold tabular-nums">
+                        {formatCo2(
+                          presence.co2Kg,
+                          i18n.resolvedLanguage ?? "fr",
+                        )}
+                        {presence.isEstimated ? " ~" : ""}
+                      </span>
+                    ))}
               {Icon && (
                 <Icon
                   className="mt-auto size-5 self-end opacity-80"

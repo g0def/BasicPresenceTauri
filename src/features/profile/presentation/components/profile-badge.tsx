@@ -40,6 +40,10 @@ import type { Profile } from "@/features/profile/domain/entities/profile";
 import { ProfileFormDialog } from "@/features/profile/presentation/components/profile-form-dialog";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
+import {
+  useCellDisplayMode,
+  type CellDisplayMode,
+} from "@/shared/cell-display/use-cell-display-mode";
 import { useTheme } from "@/shared/theme/use-theme";
 
 function fullName(p: Profile): string {
@@ -70,6 +74,8 @@ export function ProfileBadge({
     useProfile();
   const { theme, toggleTheme } = useTheme();
   const { autoUpdateEnabled, toggleAutoUpdate } = useUpdater();
+  const { mode: cellDisplayMode, setMode: setCellDisplayMode } =
+    useCellDisplayMode();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -159,6 +165,20 @@ export function ProfileBadge({
                 {t(`language.${lng}`)}
               </DropdownMenuRadioItem>
             ))}
+          </DropdownMenuRadioGroup>
+
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>{t("cellDisplay.label")}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={cellDisplayMode}
+            onValueChange={(v) => setCellDisplayMode(v as CellDisplayMode)}
+          >
+            <DropdownMenuRadioItem value="co2">
+              {t("cellDisplay.co2")}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="hours">
+              {t("cellDisplay.hours")}
+            </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
 
           <DropdownMenuSeparator />

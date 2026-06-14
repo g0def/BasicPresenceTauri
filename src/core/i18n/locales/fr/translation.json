@@ -33,6 +33,11 @@
     "dark": "Mode sombre",
     "light": "Mode clair"
   },
+  "cellDisplay": {
+    "label": "Affichage du calendrier",
+    "co2": "Émissions (kgCO2)",
+    "hours": "Heures travaillées"
+  },
   "profile": {
     "menu": "Menu du compte",
     "emptyTitle": "Aucun profil",
