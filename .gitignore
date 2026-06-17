@@ -49,3 +49,9 @@ lerna-debug.log*
 # --- OS ---
 .DS_Store
 Thumbs.db
+
+# --- AUR packaging ---
+basicpresence-bin/pkg/
+basicpresence-bin/src/
+basicpresence-bin/*.pkg.tar.zst
+basicpresence-bin/*.deb

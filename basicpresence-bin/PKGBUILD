@@ -1,0 +1,29 @@
+# Maintainer: g0def <g0def@proton.me>
+pkgname=basic-presence-bin
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="A presence tracking application"
+arch=('x86_64')
+url="https://github.com/g0def/BasicPresenceTauri"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+provides=('basic-presence')
+conflicts=('basic-presence')
+
+source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/g0def/BasicPresenceTauri/releases/download/v${pkgver}/basic-presence_${pkgver}_amd64.deb")
+sha256sums_x86_64=('SKIP')
+
+package() {
+    cd "${srcdir}"
+    ar x "${pkgname}-${pkgver}.deb"
+    bsdtar -xf data.tar.*
+
+    install -Dm755 usr/bin/basic-presence "${pkgdir}/usr/bin/basic-presence"
+    install -Dm644 usr/share/applications/basic-presence.desktop \
+        "${pkgdir}/usr/share/applications/basic-presence.desktop"
+
+    for size in 32x32 128x128; do
+        install -Dm644 "usr/share/icons/hicolor/${size}/apps/basic-presence.png" \
+            "${pkgdir}/usr/share/icons/hicolor/${size}/apps/basic-presence.png"
+    done
+}
