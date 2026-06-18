@@ -118,6 +118,19 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 
 > Le profil actif est persisté dans `vault_meta` (clé `active_profile_id`). Le premier profil créé devient l'actif ; supprimer l'actif le réassigne au premier restant.
 
+### Paramètres par profil
+
+[settings.rs](../src-tauri/src/presentation/commands/settings.rs) — réglages **propres à chaque profil**, en colonnes typées dans la table `profile_settings` du **coffre chiffré** (migration [0010](../src-tauri/migrations/vault/0010_add_profile_settings.sql)). Mêmes gardes d'accès. Le dépôt suit le motif « défaut paresseux » : un profil sans ligne renvoie `ProfileSettings::default()`.
+
+| Commande | Entrée | Sortie |
+| --- | --- | --- |
+| `get_profile_settings` | `profileId` | `ProfileSettingsDto` |
+| `set_profile_settings` | `profileId, settings` | `ProfileSettingsDto` (ligne canonique) |
+
+> `ProfileSettingsDto` (camelCase, à plat) = `{ defaultStartMinutes, noteFont, cellDisplayMode, gridCountry, defaultCarOccupancy, includeRadiativeForcing, countBuildingEnergy, workingDaysPerYear, factorYear }`. Validé côté use case **et** par des `CHECK` SQL (enums `noteFont`/`cellDisplayMode`/`gridCountry`, bornes start/occupants/jours).
+
+> **Heure de départ par défaut** : à la création d'un jour `office`/`remote`, `set_presence` sème la `work_day_schedule` avec `defaultStartMinutes` **si aucun horaire n'existe encore** (jamais d'écrasement d'une heure saisie). La police des notes et le mode d'affichage des cellules — auparavant en `localStorage` (niveau appareil) — sont désormais **par profil** ; seuls le **thème** et la **langue** restent au niveau de l'appareil.
+
 ### Présences
 
 [presence.rs](../src-tauri/src/presentation/commands/presence.rs) — présences quotidiennes (stockées dans le **coffre chiffré**). Même garde d'accès que les profils : coffre **déverrouillé** requis (sinon `SESSION_EXPIRED`). Au plus une présence par `(profileId, day)` — `set_presence` fait un *upsert* sur le jour (conserve `id`/`createdAt`).
@@ -149,7 +162,7 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 
 > **Référentiel de facteurs d'émission** versionné par année (table `emission_factor`, seedée pour 2025 — ADEME/DEFRA/SNCF/SNCB) avec surcharges par pays pour l'électrique (`emission_factor_grid_variant`). Les facteurs **ne sont jamais codés en dur** dans la logique ; le calcul vit dans le service de domaine pur `Co2Calculator` (testé contre les critères d'acceptation AC1→AC10).
 > **Commute** = modèle de trajet réutilisable (segments ordonnés) rattaché à un profil (`ON DELETE CASCADE`). **Trip** (`presence_trip`) = snapshot par jour figé à l'encodage : un jour passé reste reproductible même si le référentiel ou un commute change ensuite (`factor_year` conservé pour l'audit).
-> La **configuration CO₂** (pays du réseau électrique, forçage radiatif aviation, énergie bâtiment, occupation voiture par défaut…) est un blob JSON dans `vault_meta` (clé `co2_config`), avec repli sur `Co2Settings::default()` — pas encore d'UI de réglages.
+> La **configuration CO₂** (pays du réseau électrique, forçage radiatif aviation, énergie bâtiment, occupation voiture par défaut…) est désormais **par profil** (colonnes de `profile_settings`, cf. [Paramètres par profil](#paramètres-par-profil)) et éditable depuis l'écran Réglages ; `set_presence` et `list_commutes` calculent sous la config du profil actif. Le référentiel (`factor_year`) reste fixé à l'année seedée, donc `list_emission_factors` n'a pas besoin du profil. *(L'ancien blob global `vault_meta.co2_config` et son dépôt `Co2SettingsRepository` ont été retirés ; l'entité de domaine `Co2Settings` subsiste, embarquée dans `ProfileSettings`.)*
 
 ### Heures de travail
 
@@ -181,7 +194,7 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 **Backend** ([src-tauri/src/](../src-tauri/src/)) :
 
 - `domain/` — entités (`User`, `Account`, `Session`, `Profile`, `Presence`, `Commute`/`CommuteSegment`, `Trip`/`TripInput`, `EmissionFactor`/`GridVariant`, `Co2Settings`, `TaskPreset`, `WorkEntry`/`WorkDaySchedule`), **ports** (traits : `PasswordHasher`, `KeyService`, `TokenGenerator`, `SessionStore`, `VaultManager`, `Clock`, `AccountRepository`, `ProfileRepository`, `PresenceRepository`, `CommuteRepository`, `EmissionFactorRepository`, `Co2SettingsRepository`, `TaskPresetRepository`, `WorkEntryRepository`, `MarkdownRenderer`), service de calcul pur `Co2Calculator`, `DomainError`. Aucune dépendance externe.
-- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`, `create_task_preset`, `list_task_presets`, `update_task_preset`, `delete_task_preset`, `get_work_entries`, `set_work_entries`, `get_work_schedule`, `set_work_schedule`, `get_day_note`, `set_day_note`) + DTOs.
+- `application/` — use cases (`register_account`, `login`, `check_session`, `logout`, `account_exists`, `create_profile`, `list_profiles`, `update_profile`, `delete_profile`, `set_active_profile`, `get_profile_settings`, `set_profile_settings`, `set_presence`, `list_presences`, `delete_presence`, `import_presences`, `create_commute`, `update_commute`, `delete_commute`, `list_commutes`, `list_emission_factors`, `get_presence_trips`, `create_task_preset`, `list_task_presets`, `update_task_preset`, `delete_task_preset`, `get_work_entries`, `set_work_entries`, `get_work_schedule`, `set_work_schedule`, `get_day_note`, `set_day_note`) + DTOs.
 - `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlTaskPresetRepository`, `LibsqlWorkEntryRepository`, `ComrakMarkdownRenderer`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 

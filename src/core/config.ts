@@ -22,6 +22,8 @@ export const COMMANDS = {
   updateProfile: "update_profile",
   deleteProfile: "delete_profile",
   setActiveProfile: "set_active_profile",
+  getProfileSettings: "get_profile_settings",
+  setProfileSettings: "set_profile_settings",
   setPresence: "set_presence",
   listPresences: "list_presences",
   deletePresence: "delete_presence",

@@ -7,10 +7,12 @@ use crate::application::dto::trip_dto::TripInputDto;
 use crate::application::use_cases::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::trip::{Trip, TripInput};
+use crate::domain::entities::work_day_schedule::WorkDaySchedule;
 use crate::domain::error::DomainError;
-use crate::domain::repositories::co2_settings_repository::Co2SettingsRepository;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
+use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
+use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::co2_calculator::Co2Calculator;
 
@@ -22,10 +24,15 @@ const MS_PER_DAY: i64 = 86_400_000;
 /// compute + snapshot the day's commute footprint. Re-setting the same day
 /// overwrites the type/trips rather than duplicating the row. CO2 is tied to
 /// presence: only office/remote days carry trips; other types clear them.
+///
+/// On first creation of an office/remote day it also seeds the work-day
+/// schedule with the profile's default start time, so the work-hours page is
+/// pre-filled instead of blank. CO2 is computed under the profile's own config.
 pub struct SetPresenceUseCase {
     presences: Arc<dyn PresenceRepository>,
     factors: Arc<dyn EmissionFactorRepository>,
-    settings: Arc<dyn Co2SettingsRepository>,
+    profile_settings: Arc<dyn ProfileSettingsRepository>,
+    entries: Arc<dyn WorkEntryRepository>,
     clock: Arc<dyn Clock>,
 }
 
@@ -33,13 +40,15 @@ impl SetPresenceUseCase {
     pub fn new(
         presences: Arc<dyn PresenceRepository>,
         factors: Arc<dyn EmissionFactorRepository>,
-        settings: Arc<dyn Co2SettingsRepository>,
+        profile_settings: Arc<dyn ProfileSettingsRepository>,
+        entries: Arc<dyn WorkEntryRepository>,
         clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
             presences,
             factors,
-            settings,
+            profile_settings,
+            entries,
             clock,
         }
     }
@@ -62,7 +71,11 @@ impl SetPresenceUseCase {
         }
         let kind = PresenceType::parse(kind)?;
 
-        let settings = self.settings.load().await?;
+        // CO2 is computed under the profile's own config; the default start time
+        // is seeded after the presence is saved (see end of execute).
+        let profile_settings = self.profile_settings.load(profile_id).await?;
+        let default_start = profile_settings.default_start_minutes;
+        let settings = &profile_settings.co2;
 
         // CO2 is tied to presence: only office/remote days carry a commute.
         let trips: Vec<TripInput> = if matches!(kind, PresenceType::Office | PresenceType::Remote) {
@@ -84,7 +97,7 @@ impl SetPresenceUseCase {
         let (factor_map, variant_map) =
             load_factor_maps(&self.factors, settings.factor_year).await?;
 
-        let day_em = Co2Calculator::compute_day(&trips, kind, &factor_map, &variant_map, &settings);
+        let day_em = Co2Calculator::compute_day(&trips, kind, &factor_map, &variant_map, settings);
 
         // Office/remote days store a (possibly zero) total; other types stay NULL
         // so the calendar shows no footprint for them.
@@ -127,6 +140,25 @@ impl SetPresenceUseCase {
             .collect();
 
         let saved = self.presences.set_for_day(&presence, &domain_trips).await?;
+
+        // Seed the default start time once, the first time the day becomes a
+        // work day. The guard is keyed on the PERSISTED id (set_for_day reuses
+        // the existing row on conflict) and on "no schedule yet", so a user-set
+        // start is never clobbered, while a re-created work day (e.g.
+        // vacation -> office, whose type-change trigger dropped the old
+        // schedule) gets re-seeded. A fresh day has no entries, so end == start.
+        if matches!(saved.kind, PresenceType::Office | PresenceType::Remote)
+            && self.entries.get_schedule(&saved.id).await?.is_none()
+        {
+            self.entries
+                .set_schedule(&WorkDaySchedule {
+                    presence_id: saved.id.clone(),
+                    start_minutes: default_start,
+                    end_minutes: default_start,
+                })
+                .await?;
+        }
+
         Ok(PresenceDto::from(saved))
     }
 }

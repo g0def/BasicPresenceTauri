@@ -49,7 +49,23 @@
     "title": "Settings",
     "back": "Back to calendar",
     "profilesSection": "Profiles",
-    "noteFontSection": "Note font"
+    "logHourSection": "Work hours",
+    "defaultStartTime": "Default start time",
+    "defaultStartTimeHint": "Time applied automatically to each new worked day (office or remote).",
+    "noteFontSection": "Note font",
+    "cellDisplaySection": "Cell display",
+    "co2Section": "CO2 configuration",
+    "co2": {
+      "gridCountry": "Electricity grid country",
+      "carOccupancy": "Car occupants (default)",
+      "radiativeForcing": "Include radiative forcing (aviation)",
+      "countries": {
+        "FR": "France",
+        "BE": "Belgium",
+        "DE": "Germany",
+        "EU": "Europe"
+      }
+    }
   },
   "profile": {
     "menu": "Account menu",

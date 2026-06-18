@@ -1,33 +1,31 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
+import { useProfileSettings } from "@/features/profile-settings/presentation/hooks/use-profile-settings";
 import {
   CellDisplayContext,
   type CellDisplayMode,
 } from "./cell-display-context";
 
-const STORAGE_KEY = "cell-display-mode";
-
-function readStoredMode(): CellDisplayMode {
-  if (typeof localStorage === "undefined") return "co2";
-  return localStorage.getItem(STORAGE_KEY) === "hours" ? "hours" : "co2";
-}
-
 /**
  * Shares the calendar cell display preference (CO2 vs work hours) across the
  * tree so the header menu and the calendar — which live in different subtrees —
- * stay in sync. Choice persisted in localStorage; defaults to "co2" to preserve
- * the original calendar behavior.
+ * stay in sync. The value is now sourced from (and written back to) the active
+ * profile's settings, so the choice is per-profile and persisted in the vault.
  */
 export function CellDisplayProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<CellDisplayMode>(readStoredMode);
+  const { settings, update } = useProfileSettings();
 
-  const setMode = useCallback((next: CellDisplayMode) => {
-    localStorage.setItem(STORAGE_KEY, next);
-    setModeState(next);
-  }, []);
+  const value = useMemo(
+    () => ({
+      mode: settings.cellDisplayMode,
+      setMode: (next: CellDisplayMode) =>
+        void update({ cellDisplayMode: next }),
+    }),
+    [settings.cellDisplayMode, update],
+  );
 
   return (
-    <CellDisplayContext.Provider value={{ mode, setMode }}>
+    <CellDisplayContext.Provider value={value}>
       {children}
     </CellDisplayContext.Provider>
   );

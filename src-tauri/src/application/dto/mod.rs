@@ -5,6 +5,7 @@ pub mod import_presence_dto;
 pub mod login_result_dto;
 pub mod presence_dto;
 pub mod profile_dto;
+pub mod profile_settings_dto;
 pub mod session_status_dto;
 pub mod task_preset_dto;
 pub mod trip_dto;

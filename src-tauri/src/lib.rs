@@ -21,6 +21,7 @@ use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
+use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_presences::ImportPresencesUseCase;
@@ -36,6 +37,7 @@ use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_day_note::SetDayNoteUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
+use crate::application::use_cases::set_profile_settings::SetProfileSettingsUseCase;
 use crate::application::use_cases::set_work_entries::SetWorkEntriesUseCase;
 use crate::application::use_cases::set_work_schedule::SetWorkScheduleUseCase;
 use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
@@ -43,11 +45,11 @@ use crate::application::use_cases::update_profile::UpdateProfileUseCase;
 use crate::application::use_cases::update_task_preset::UpdateTaskPresetUseCase;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::account_repository::AccountRepository;
-use crate::domain::repositories::co2_settings_repository::Co2SettingsRepository;
 use crate::domain::repositories::commute_repository::CommuteRepository;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_repository::ProfileRepository;
+use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 use crate::domain::services::clock::Clock;
@@ -64,7 +66,6 @@ use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
 use crate::infrastructure::markdown::comrak_renderer::ComrakMarkdownRenderer;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
-use crate::infrastructure::persistence::co2_settings_repository::LibsqlCo2SettingsRepository;
 use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
 use crate::infrastructure::persistence::db::connect;
 use crate::infrastructure::persistence::emission_factor_repository::LibsqlEmissionFactorRepository;
@@ -72,11 +73,12 @@ use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keys
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
 use crate::infrastructure::persistence::profile_repository::LibsqlProfileRepository;
+use crate::infrastructure::persistence::profile_settings_repository::LibsqlProfileSettingsRepository;
 use crate::infrastructure::persistence::task_preset_repository::LibsqlTaskPresetRepository;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRepository;
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
-use crate::presentation::commands::{auth, commute, presence, profile, work_hours};
+use crate::presentation::commands::{auth, commute, presence, profile, settings, work_hours};
 use crate::presentation::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -134,6 +136,8 @@ pub fn run() {
             commute::update_commute,
             commute::delete_commute,
             commute::get_presence_trips,
+            settings::get_profile_settings,
+            settings::set_profile_settings,
             work_hours::create_task_preset,
             work_hours::list_task_presets,
             work_hours::update_task_preset,
@@ -190,8 +194,8 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlEmissionFactorRepository::new(vault_impl.clone()));
     let commutes: Arc<dyn CommuteRepository> =
         Arc::new(LibsqlCommuteRepository::new(vault_impl.clone()));
-    let co2_settings: Arc<dyn Co2SettingsRepository> =
-        Arc::new(LibsqlCo2SettingsRepository::new(vault_impl.clone()));
+    let profile_settings: Arc<dyn ProfileSettingsRepository> =
+        Arc::new(LibsqlProfileSettingsRepository::new(vault_impl.clone()));
     let task_presets: Arc<dyn TaskPresetRepository> =
         Arc::new(LibsqlTaskPresetRepository::new(vault_impl.clone()));
     let work_entries: Arc<dyn WorkEntryRepository> =
@@ -228,25 +232,25 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         set_presence: SetPresenceUseCase::new(
             presences.clone(),
             factors.clone(),
-            co2_settings.clone(),
+            profile_settings.clone(),
+            work_entries.clone(),
             clock.clone(),
         ),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
         import_presences: ImportPresencesUseCase::new(presences.clone(), clock.clone()),
-        list_emission_factors: ListEmissionFactorsUseCase::new(
-            factors.clone(),
-            co2_settings.clone(),
-        ),
+        list_emission_factors: ListEmissionFactorsUseCase::new(factors.clone()),
         create_commute: CreateCommuteUseCase::new(commutes.clone(), clock.clone()),
         list_commutes: ListCommutesUseCase::new(
             commutes.clone(),
             factors.clone(),
-            co2_settings.clone(),
+            profile_settings.clone(),
         ),
         update_commute: UpdateCommuteUseCase::new(commutes.clone(), clock.clone()),
         delete_commute: DeleteCommuteUseCase::new(commutes.clone()),
         get_presence_trips: GetPresenceTripsUseCase::new(presences.clone()),
+        get_profile_settings: GetProfileSettingsUseCase::new(profile_settings.clone()),
+        set_profile_settings: SetProfileSettingsUseCase::new(profile_settings.clone()),
         create_task_preset: CreateTaskPresetUseCase::new(task_presets.clone(), clock.clone()),
         list_task_presets: ListTaskPresetsUseCase::new(task_presets.clone()),
         update_task_preset: UpdateTaskPresetUseCase::new(task_presets.clone(), clock.clone()),

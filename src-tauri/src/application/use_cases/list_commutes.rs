@@ -5,25 +5,25 @@ use crate::application::use_cases::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::PresenceType;
 use crate::domain::entities::trip::TripInput;
 use crate::domain::error::DomainError;
-use crate::domain::repositories::co2_settings_repository::Co2SettingsRepository;
 use crate::domain::repositories::commute_repository::CommuteRepository;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
+use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
 use crate::domain::services::co2_calculator::Co2Calculator;
 
 /// List a profile's saved commutes, each annotated with an indicative per-trip
-/// CO2 footprint computed under the current settings (building energy excluded
-/// from the preview so it reflects the commute alone).
+/// CO2 footprint computed under the profile's own settings (building energy
+/// excluded from the preview so it reflects the commute alone).
 pub struct ListCommutesUseCase {
     commutes: Arc<dyn CommuteRepository>,
     factors: Arc<dyn EmissionFactorRepository>,
-    settings: Arc<dyn Co2SettingsRepository>,
+    settings: Arc<dyn ProfileSettingsRepository>,
 }
 
 impl ListCommutesUseCase {
     pub fn new(
         commutes: Arc<dyn CommuteRepository>,
         factors: Arc<dyn EmissionFactorRepository>,
-        settings: Arc<dyn Co2SettingsRepository>,
+        settings: Arc<dyn ProfileSettingsRepository>,
     ) -> Self {
         Self {
             commutes,
@@ -38,7 +38,7 @@ impl ListCommutesUseCase {
             return Err(DomainError::Validation("profileId is required".to_string()));
         }
 
-        let mut settings = self.settings.load().await?;
+        let mut settings = self.settings.load(profile_id).await?.co2;
         // The preview is the commute's own footprint; never fold in building energy.
         settings.count_building_energy = false;
 

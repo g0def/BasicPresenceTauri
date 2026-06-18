@@ -12,7 +12,7 @@ import {
   PresenceContext,
   type PresenceContextValue,
 } from "@/features/presence/presentation/context/presence-context";
-import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
+import { CellDisplayContext } from "@/shared/cell-display/cell-display-context";
 
 const commuteValue: CommuteContextValue = {
   commutes: [],
@@ -51,9 +51,11 @@ describe("PresenceCalendar", () => {
     render(
       <CommuteContext.Provider value={commuteValue}>
         <PresenceContext.Provider value={value}>
-          <CellDisplayProvider>
+          <CellDisplayContext.Provider
+            value={{ mode: "co2", setMode: () => {} }}
+          >
             <PresenceCalendar />
-          </CellDisplayProvider>
+          </CellDisplayContext.Provider>
         </PresenceContext.Provider>
       </CommuteContext.Provider>,
     );

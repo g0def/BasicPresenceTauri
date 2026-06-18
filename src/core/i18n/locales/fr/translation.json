@@ -49,7 +49,23 @@
     "title": "Paramètres",
     "back": "Retour au calendrier",
     "profilesSection": "Profils",
-    "noteFontSection": "Police des notes"
+    "logHourSection": "Heures de travail",
+    "defaultStartTime": "Heure de départ par défaut",
+    "defaultStartTimeHint": "Heure appliquée automatiquement à chaque nouvelle journée de travail (bureau ou télétravail).",
+    "noteFontSection": "Police des notes",
+    "cellDisplaySection": "Affichage des cellules",
+    "co2Section": "Configuration CO2",
+    "co2": {
+      "gridCountry": "Pays du réseau électrique",
+      "carOccupancy": "Occupants par voiture (par défaut)",
+      "radiativeForcing": "Inclure le forçage radiatif (aviation)",
+      "countries": {
+        "FR": "France",
+        "BE": "Belgique",
+        "DE": "Allemagne",
+        "EU": "Europe"
+      }
+    }
   },
   "profile": {
     "menu": "Menu du compte",

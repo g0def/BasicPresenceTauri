@@ -1,8 +1,6 @@
-/// Org-level CO2 configuration. Persisted as a JSON blob in `vault_meta`
-/// (key `co2_config`); falls back to these defaults when absent. There is no
-/// settings UI yet — the values are overridable directly in the vault.
-/// (De)serialization lives in the infrastructure repository — the domain
-/// entity stays transport-agnostic.
+/// CO2 configuration consumed by the calculator. Stored per profile, embedded
+/// in [`ProfileSettings`](crate::domain::entities::profile_settings::ProfileSettings);
+/// these defaults apply when a profile has no stored row.
 #[derive(Debug, Clone)]
 pub struct Co2Settings {
     /// Charging country selecting the electric-grid preset (e.g. `"BE"`).

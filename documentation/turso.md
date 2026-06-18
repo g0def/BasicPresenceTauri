@@ -72,6 +72,8 @@ Runner maison minimal : [migrations.rs](../src-tauri/src/infrastructure/persiste
   - [migrations/keystore/0002_add_mac_key.sql](../src-tauri/migrations/keystore/0002_add_mac_key.sql) — colonnes `wrapped_mac_key`, `mac_key_nonce` (nullable ; backfill au login).
   - [migrations/vault/0001_init.sql](../src-tauri/migrations/vault/0001_init.sql) — table `vault_meta` (placeholder ; prouve que le coffre chiffré s'ouvre et s'écrit).
   - `migrations/vault/0002_add_profiles.sql`, `0003_add_presence.sql` — tables `profile` et `presence`.
+  - `0004_add_co2.sql` → `0009_add_presence_note.sql` — référentiel CO₂/trajets, heures de travail (horaire dérivé) et note Markdown du jour.
+  - [migrations/vault/0010_add_profile_settings.sql](../src-tauri/migrations/vault/0010_add_profile_settings.sql) — table `profile_settings` (réglages **par profil**, colonnes typées : heure de départ par défaut, police de notes, mode d'affichage, config CO₂), avec `CHECK` sur les énums et backfill d'une ligne par profil existant.
 
 **Ajouter une migration** : déposer `000X_*.sql` dans le bon dossier, puis l'ajouter à `KEYSTORE_MIGRATIONS` ou `VAULT_MIGRATIONS` dans `migrations.rs`.
 

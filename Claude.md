@@ -100,10 +100,10 @@ src-tauri/
     ├── lib.rs                   # POINT DE COMPOSITION : setup, DI (build_state), commandes
     ├── integration_tests.rs     # Test e2e backend (register→login→session + chiffrement)
     ├── domain/                  # ── Domain (pur, aucune dépendance externe)
-    │   ├── entities/            #    user, account, session, profile, presence, commute, trip,
-    │   │                        #    emission_factor, co2_settings, task_preset, work_entry, work_day_schedule
-    │   ├── repositories/        #    traits AccountRepository, ProfileRepository, PresenceRepository,
-    │   │                        #    CommuteRepository, EmissionFactorRepository, Co2SettingsRepository,
+    │   ├── entities/            #    user, account, session, profile, profile_settings, presence, commute,
+    │   │                        #    trip, emission_factor, co2_settings, task_preset, work_entry, work_day_schedule
+    │   ├── repositories/        #    traits AccountRepository, ProfileRepository, ProfileSettingsRepository,
+    │   │                        #    PresenceRepository, CommuteRepository, EmissionFactorRepository,
     │   │                        #    TaskPresetRepository, WorkEntryRepository
     │   ├── services/            #    ports : PasswordHasher, KeyService, TokenGenerator, SessionStore,
     │   │                        #    VaultManager, Clock + service pur Co2Calculator
@@ -111,18 +111,19 @@ src-tauri/
     ├── application/             # ── Application (dépend du Domain)
     │   ├── use_cases/           #    auth + profils + présences (set/list/delete/import) +
     │   │                        #    commute (create/update/delete/list), emission_factors, presence_trips +
-    │   │                        #    task_preset (create/list/update/delete), work_entries/work_schedule (get/set)
-    │   └── dto/                 #    *Dto (serde camelCase) : user/login/session/profile/presence/commute/
-    │                            #    trip/emission_factor/task_preset/work_entry
+    │   │                        #    task_preset (create/list/update/delete), work_entries/work_schedule (get/set),
+    │   │                        #    profile_settings (get/set)
+    │   └── dto/                 #    *Dto (serde camelCase) : user/login/session/profile/profile_settings/
+    │                            #    presence/commute/trip/emission_factor/task_preset/work_entry
     ├── infrastructure/          # ── Infrastructure (implémente les ports)
     │   ├── crypto/              #    Argon2PasswordHasher, Argon2KeyService, RandomTokenGenerator
     │   ├── persistence/         #    db (libsql), migrations, *_repository (account/profile/presence/
-    │   │                        #    commute/emission_factor/co2_settings/task_preset/work_entry), vault
+    │   │                        #    commute/emission_factor/profile_settings/task_preset/work_entry), vault
     │   ├── session/             #    InMemorySessionStore
     │   ├── clock.rs             #    SystemClock
     │   └── config.rs            #    AppConfig (chemins, params Argon2, politique session/lockout)
     └── presentation/            # ── Presentation (frontière IPC)
-        ├── commands/            #    auth.rs, profile.rs, presence.rs, commute.rs, work_hours.rs (fines) + error.rs (AppError)
+        ├── commands/            #    auth.rs, profile.rs, settings.rs, presence.rs, commute.rs, work_hours.rs (fines) + error.rs (AppError)
         └── state.rs             #    AppState injecté via .manage()
 ```
 
@@ -252,10 +253,10 @@ src/
 
 ## 10. État du projet & feuille de route
 
-**Implémenté (socle v1)** : architecture propre Rust + React, **routeur TanStack file-based** (pages `/login`, `/` calendrier, `/commutes` + création/édition de presets en pages), persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Entité **Profile** (profils de présence) : CRUD complet dans le coffre chiffré, gestion **multi-profils** (création, sélection du profil actif, édition, suppression) ; après login, l'accueil propose la création si aucun profil, sinon un badge (photo + nom) en haut à droite. **Présences** : calendrier mensuel (office/remote/vacation/holiday, un upsert par jour) + import depuis l'ancienne application. **Empreinte CO₂** : référentiel de facteurs d'émission versionné, modèles de trajet réutilisables, calcul + snapshot par jour de présence (tout dans le coffre chiffré).
+**Implémenté (socle v1)** : architecture propre Rust + React, **routeur TanStack file-based** (pages `/login`, `/` calendrier, `/commutes` + création/édition de presets en pages), persistance libSQL locale chiffrée, première entité **User** + authentification complète (Argon2id, envelope encryption, session 15 min, anti-bruteforce). Entité **Profile** (profils de présence) : CRUD complet dans le coffre chiffré, gestion **multi-profils** (création, sélection du profil actif, édition, suppression) ; après login, l'accueil propose la création si aucun profil, sinon un badge (photo + nom) en haut à droite. **Présences** : calendrier mensuel (office/remote/vacation/holiday, un upsert par jour) + import depuis l'ancienne application. **Empreinte CO₂** : référentiel de facteurs d'émission versionné, modèles de trajet réutilisables, calcul + snapshot par jour de présence (tout dans le coffre chiffré). **Paramètres par profil** : table `profile_settings` typée (heure de départ par défaut semée à la création d'un jour travaillé, police des notes, mode d'affichage des cellules, configuration CO₂), éditable depuis l'écran Réglages — le thème et la langue restant au niveau de l'appareil.
 
 **Phase 2 (à venir)** :
 
 - **Synchronisation cloud Turso** (isolée dans `infrastructure/persistence/db.rs` ; arbitrer le compromis chiffrement-vs-sync de libSQL — voir [documentation/turso.md](documentation/turso.md)).
-- UI de réglages CO₂ (pays réseau électrique, forçage radiatif, énergie bâtiment — aujourd'hui pilotés par `co2_config` dans `vault_meta`), projections annuelles.
+- Projections annuelles CO₂ (`workingDaysPerYear`) et référentiel multi-millésime (`factorYear`, aujourd'hui figé à l'année seedée). _(La config CO₂ de base — pays réseau, forçage radiatif, énergie bâtiment — est désormais réglable par profil, cf. `profile_settings`.)_
 - `change_password`, intégrité-au-repos, idle-timeout, multi-comptes.

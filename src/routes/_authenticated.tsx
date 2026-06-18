@@ -16,6 +16,7 @@ import { CommuteProvider } from "@/features/commute/presentation/providers/commu
 import { formatCo2 } from "@/features/commute/presentation/commute-format";
 import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
 import { PresenceProvider } from "@/features/presence/presentation/providers/presence-provider";
+import { ProfileSettingsProvider } from "@/features/profile-settings/presentation/providers/profile-settings-provider";
 import { EmptyProfileState } from "@/features/profile/presentation/components/empty-profile-state";
 import { ProfileBadge } from "@/features/profile/presentation/components/profile-badge";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
@@ -50,15 +51,17 @@ function AuthenticatedLayout() {
 
   return (
     <ProfileProvider onSessionExpired={logout}>
-      <PresenceProvider onSessionExpired={logout}>
-        <CommuteProvider onSessionExpired={logout}>
-          <TaskPresetProvider onSessionExpired={logout}>
-            <CellDisplayProvider>
-              <AppShell />
-            </CellDisplayProvider>
-          </TaskPresetProvider>
-        </CommuteProvider>
-      </PresenceProvider>
+      <ProfileSettingsProvider onSessionExpired={logout}>
+        <PresenceProvider onSessionExpired={logout}>
+          <CommuteProvider onSessionExpired={logout}>
+            <TaskPresetProvider onSessionExpired={logout}>
+              <CellDisplayProvider>
+                <AppShell />
+              </CellDisplayProvider>
+            </TaskPresetProvider>
+          </CommuteProvider>
+        </PresenceProvider>
+      </ProfileSettingsProvider>
     </ProfileProvider>
   );
 }

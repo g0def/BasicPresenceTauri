@@ -1145,16 +1145,26 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
             .await
             .expect("set vacation");
 
-        // A fresh work day has no entries and no schedule.
+        // A fresh work day has no entries, but its schedule is seeded with the
+        // profile's default start (08:30); end == start until entries are added.
         assert!(state
             .get_work_entries
             .execute(&office.id)
             .await
             .unwrap()
             .is_empty());
-        assert!(state
+        let seeded = state
             .get_work_schedule
             .execute(&office.id)
+            .await
+            .unwrap()
+            .expect("a fresh office day seeds a default schedule");
+        assert_eq!(seeded.start_minutes, 510);
+        assert_eq!(seeded.end_minutes, 510);
+        // Non-work days never get a seeded schedule.
+        assert!(state
+            .get_work_schedule
+            .execute(&vacation.id)
             .await
             .unwrap()
             .is_none());
@@ -1193,8 +1203,12 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
         assert_eq!(day.entries[0].position, 0);
         assert_eq!(day.entries[1].position, 1);
         assert!(day.entries.iter().all(|e| !e.id.is_empty()));
-        // No schedule yet, so none is returned.
-        assert!(day.schedule.is_none());
+        // The seeded schedule's end was recomputed from the new entries (start + 180).
+        let sched = day
+            .schedule
+            .expect("seeded schedule recomputed on entries save");
+        assert_eq!(sched.start_minutes, 510);
+        assert_eq!(sched.end_minutes, 510 + 180);
 
         let listed = state.get_work_entries.execute(&office.id).await.unwrap();
         assert_eq!(
@@ -1277,6 +1291,226 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
             state.get_work_entries.execute(&office.id).await,
             Err(DomainError::Unauthorized)
         ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn office_day_seeds_default_start_time() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("seed-start");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let _session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("profile");
+
+        const DAY: i64 = 1_717_200_000_000;
+        const DAY_IMPORT: i64 = DAY + 86_400_000;
+
+        // Set a custom default start (10:00) for this profile.
+        let mut settings = state
+            .get_profile_settings
+            .execute(&profile.id)
+            .await
+            .expect("get settings");
+        settings.default_start_minutes = 600;
+        state
+            .set_profile_settings
+            .execute(&profile.id, settings)
+            .await
+            .expect("set settings");
+
+        // Creating an office day seeds the schedule at the configured default.
+        let office = state
+            .set_presence
+            .execute(&profile.id, DAY, "office", vec![])
+            .await
+            .expect("office");
+        let sched = state
+            .get_work_schedule
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .expect("seeded schedule");
+        assert_eq!(sched.start_minutes, 600);
+        assert_eq!(sched.end_minutes, 600);
+
+        // A user-set start is never clobbered by a later re-set (e.g. flipping
+        // office <-> remote, both work days, keeps the same row id and schedule).
+        state
+            .set_work_schedule
+            .execute(&office.id, 420) // user picks 07:00
+            .await
+            .expect("user sets start");
+        let remote = state
+            .set_presence
+            .execute(&profile.id, DAY, "remote", vec![])
+            .await
+            .expect("flip to remote");
+        assert_eq!(remote.id, office.id);
+        assert_eq!(
+            state
+                .get_work_schedule
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .start_minutes,
+            420,
+            "re-setting a work day must not overwrite the user's start"
+        );
+
+        // office -> vacation drops the schedule (type trigger); vacation -> office
+        // re-creates it, so the default is re-seeded.
+        state
+            .set_presence
+            .execute(&profile.id, DAY, "vacation", vec![])
+            .await
+            .expect("vacation");
+        assert!(state
+            .get_work_schedule
+            .execute(&office.id)
+            .await
+            .unwrap()
+            .is_none());
+        let reoffice = state
+            .set_presence
+            .execute(&profile.id, DAY, "office", vec![])
+            .await
+            .expect("re-office");
+        assert_eq!(
+            state
+                .get_work_schedule
+                .execute(&reoffice.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .start_minutes,
+            600,
+            "a re-created work day is re-seeded with the default"
+        );
+
+        // Bulk import never seeds a schedule (it does not go through set_presence).
+        state
+            .import_presences
+            .execute(
+                &profile.id,
+                vec![ImportPresenceEntryDto {
+                    day: DAY_IMPORT,
+                    kind: "office".to_string(),
+                    created_at: None,
+                    updated_at: None,
+                }],
+                false,
+            )
+            .await
+            .expect("import");
+        let imported = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.day == DAY_IMPORT)
+            .unwrap();
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&imported.id)
+                .await
+                .unwrap()
+                .is_none(),
+            "import must not seed schedules"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn presence_co2_is_computed_per_profile() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("co2-per-profile");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let _session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let solo = state
+            .create_profile
+            .execute("Solo", "Driver", "Acme", None)
+            .await
+            .expect("profile solo");
+        let pool = state
+            .create_profile
+            .execute("Car", "Pool", "Acme", None)
+            .await
+            .expect("profile pool");
+
+        // The carpool profile rides two-up; the solo profile keeps the default 1.
+        let mut pool_settings = state
+            .get_profile_settings
+            .execute(&pool.id)
+            .await
+            .expect("get pool settings");
+        pool_settings.default_car_occupancy = 2;
+        state
+            .set_profile_settings
+            .execute(&pool.id, pool_settings)
+            .await
+            .expect("set pool settings");
+
+        const DAY: i64 = 1_717_200_000_000;
+        // Falls back to the profile's default occupancy (occupants: None).
+        let trip = || TripInputDto {
+            mode_id: "car_petrol".to_string(),
+            distance_km: 15.0,
+            round_trip: true,
+            occupants: None,
+        };
+
+        let solo_day = state
+            .set_presence
+            .execute(&solo.id, DAY, "office", vec![trip()])
+            .await
+            .expect("solo office");
+        let pool_day = state
+            .set_presence
+            .execute(&pool.id, DAY, "office", vec![trip()])
+            .await
+            .expect("pool office");
+
+        let solo_co2 = solo_day.co2_kg.expect("solo co2");
+        let pool_co2 = pool_day.co2_kg.expect("pool co2");
+        // Per-vehicle factor split across occupants: two-up is half the footprint.
+        assert!((solo_co2 - 7.164).abs() < 1e-3, "solo {solo_co2}");
+        assert!(
+            (pool_co2 - solo_co2 / 2.0).abs() < 1e-3,
+            "pool {pool_co2} should be half of solo {solo_co2}"
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     });

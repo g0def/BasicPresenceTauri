@@ -9,6 +9,7 @@ use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
+use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_presences::ImportPresencesUseCase;
@@ -24,6 +25,7 @@ use crate::application::use_cases::require_session::RequireSessionUseCase;
 use crate::application::use_cases::set_active_profile::SetActiveProfileUseCase;
 use crate::application::use_cases::set_day_note::SetDayNoteUseCase;
 use crate::application::use_cases::set_presence::SetPresenceUseCase;
+use crate::application::use_cases::set_profile_settings::SetProfileSettingsUseCase;
 use crate::application::use_cases::set_work_entries::SetWorkEntriesUseCase;
 use crate::application::use_cases::set_work_schedule::SetWorkScheduleUseCase;
 use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
@@ -57,6 +59,8 @@ pub struct AppState {
     pub update_commute: UpdateCommuteUseCase,
     pub delete_commute: DeleteCommuteUseCase,
     pub get_presence_trips: GetPresenceTripsUseCase,
+    pub get_profile_settings: GetProfileSettingsUseCase,
+    pub set_profile_settings: SetProfileSettingsUseCase,
     pub create_task_preset: CreateTaskPresetUseCase,
     pub list_task_presets: ListTaskPresetsUseCase,
     pub update_task_preset: UpdateTaskPresetUseCase,

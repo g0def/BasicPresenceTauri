@@ -1,7 +1,8 @@
 import { createContext } from "react";
 
-/** What each calendar day cell renders: the CO2 footprint or the work hours. */
-export type CellDisplayMode = "co2" | "hours";
+import type { CellDisplayMode } from "./cell-display-mode";
+
+export type { CellDisplayMode };
 
 export interface CellDisplayContextValue {
   mode: CellDisplayMode;
