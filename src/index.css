@@ -285,16 +285,19 @@
   background: transparent;
 }
 
-/* ── Note display font (switchable from the account menu) ───────────────────
+/* ── Note display font (switchable from the settings page) ──────────────────
    Drives the font of both the Markdown editor and the rendered view via the
-   `data-note-font` attribute set on <html> by use-note-font. */
-:root {
+   `data-note-font` attribute set on <html> by use-note-font. The selectors are
+   not scoped to <html> so any element carrying the attribute (e.g. the font
+   preview in settings) resolves the same `--note-font` — single source of truth. */
+:root,
+[data-note-font="sans"] {
   --note-font: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 }
-html[data-note-font="serif"] {
+[data-note-font="serif"] {
   --note-font: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
-html[data-note-font="mono"] {
+[data-note-font="mono"] {
   --note-font: var(--font-jetbrains);
 }
 .note-body {

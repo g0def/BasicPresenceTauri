@@ -44,6 +44,13 @@
     "serif": "Serif",
     "mono": "Monospace"
   },
+  "settings": {
+    "menuItem": "Settings",
+    "title": "Settings",
+    "back": "Back to calendar",
+    "profilesSection": "Profiles",
+    "noteFontSection": "Note font"
+  },
   "profile": {
     "menu": "Account menu",
     "emptyTitle": "No profile",
@@ -63,6 +70,7 @@
     "poste": "Role",
     "optional": "(optional)",
     "profilesLabel": "Profiles",
+    "active": "Active",
     "deleteConfirmTitle": "Delete this profile?",
     "deleteConfirmBody": "The profile \"{{name}}\" will be permanently deleted."
   },

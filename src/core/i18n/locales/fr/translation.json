@@ -44,6 +44,13 @@
     "serif": "Serif",
     "mono": "Monospace"
   },
+  "settings": {
+    "menuItem": "Paramètres",
+    "title": "Paramètres",
+    "back": "Retour au calendrier",
+    "profilesSection": "Profils",
+    "noteFontSection": "Police des notes"
+  },
   "profile": {
     "menu": "Menu du compte",
     "emptyTitle": "Aucun profil",
@@ -63,6 +70,7 @@
     "poste": "Poste",
     "optional": "(optionnel)",
     "profilesLabel": "Profils",
+    "active": "Actif",
     "deleteConfirmTitle": "Supprimer ce profil ?",
     "deleteConfirmBody": "Le profil « {{name}} » sera définitivement supprimé."
   },

@@ -8,6 +8,12 @@ export interface Profile {
   updatedAt: number;
 }
 
+/** Display name for a profile (`"Prénom Nom"`). Single source of truth so the
+ * header badge and the settings list format names identically. */
+export function fullName(p: Profile): string {
+  return `${p.firstName} ${p.lastName}`;
+}
+
 /** Fields supplied when creating a profile (`createdAt`/`updatedAt` are backend-managed). */
 export interface CreateProfileInput {
   firstName: string;
