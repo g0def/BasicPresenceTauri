@@ -23,12 +23,13 @@ export interface PresenceContextValue {
   isSubmitting: boolean;
   error: string | null;
   /** Create or update the presence for a day, optionally with commute trips
-   * (office/remote). Returns `true` on success. */
+   * (office/remote). Returns the saved presence on success, `null` on failure
+   * (the caller needs the new id to attach work hours when pasting a day). */
   setPresence: (
     day: number,
     type: PresenceType,
     trips?: PresenceTrip[],
-  ) => Promise<boolean>;
+  ) => Promise<Presence | null>;
   /** Delete a presence by id. Returns `true` on success. */
   deletePresence: (id: string) => Promise<boolean>;
   /** Fetch the commute trips recorded for a presence day (for re-editing). */

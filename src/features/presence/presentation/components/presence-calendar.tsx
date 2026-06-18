@@ -12,16 +12,22 @@ import {
   subMonths,
 } from "date-fns";
 import { enUS, fr } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatCo2 } from "@/features/commute/presentation/commute-format";
 import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
 import { dayKey } from "@/features/presence/presentation/day-key";
 import { PresenceDayDialog } from "@/features/presence/presentation/components/presence-day-dialog";
 import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
+import { useDayClipboard } from "@/features/presence/presentation/hooks/use-day-clipboard";
 import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
 import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
 import { useCellDisplayMode } from "@/shared/cell-display/use-cell-display-mode";
@@ -41,12 +47,23 @@ export function PresenceCalendar() {
 
   const [selected, setSelected] = useState<Date | null>(null);
   const { mode: displayMode } = useCellDisplayMode();
+  const { mode, arm, disarm, copyDay, pasteOnto } = useDayClipboard();
 
   // Reload presences on mount (ensures work hour edits are reflected immediately
   // when navigating back from the work hours page).
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Leave copy mode on Escape.
+  useEffect(() => {
+    if (mode === "idle") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") disarm();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, disarm]);
 
   const locale = i18n.resolvedLanguage === "en" ? enUS : fr;
 
@@ -63,9 +80,18 @@ export function PresenceCalendar() {
     [days, locale],
   );
 
+  // Contextual label for the copy toggle (also its tooltip), driven by mode.
+  const toggleLabel = t(
+    mode === "pasting"
+      ? "presence.copyMode.paste"
+      : mode === "picking"
+        ? "presence.copyMode.pick"
+        : "presence.copyMode.start",
+  );
+
   return (
     <section className="mt-6 flex flex-1 flex-col gap-3">
-      <div className="flex items-center justify-center gap-4">
+      <div className="relative flex items-center justify-center gap-4">
         <Button
           variant="ghost"
           size="icon"
@@ -85,6 +111,40 @@ export function PresenceCalendar() {
         >
           <ChevronRight />
         </Button>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => (mode === "idle" ? arm() : disarm())}
+              aria-pressed={mode !== "idle"}
+              aria-label={toggleLabel}
+              className={cn(
+                "absolute top-1/2 right-0 -translate-y-1/2",
+                mode === "picking" && "text-orange-500 hover:text-orange-500",
+                mode === "pasting" && "text-destructive hover:text-destructive",
+              )}
+            >
+              <span className="relative inline-flex">
+                <Copy />
+                {mode === "pasting" && (
+                  <X
+                    className="absolute -top-1.5 -right-1.5 size-3 rounded-full bg-background"
+                    aria-hidden
+                  />
+                )}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-medium">{toggleLabel}</p>
+            <p className="mt-1 text-muted-foreground">
+              {t("presence.copyMode.help")}
+            </p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="grid grid-cols-7 gap-2">
@@ -118,7 +178,17 @@ export function PresenceCalendar() {
             <button
               key={key}
               type="button"
-              onClick={() => setSelected(d)}
+              onClick={() => {
+                if (mode === "picking") {
+                  // Copy a fully-encoded day; empty days have nothing to copy.
+                  if (presence) void copyDay(presence);
+                } else if (mode === "pasting") {
+                  // Paint only empty days; existing presences are left as is.
+                  if (!presence) void pasteOnto(key);
+                } else {
+                  setSelected(d);
+                }
+              }}
               aria-label={label}
               className={cn(
                 "flex flex-col items-start rounded-lg border p-2 text-sm transition-colors duration-300 ease-in-out",
@@ -128,6 +198,10 @@ export function PresenceCalendar() {
                   : "border-transparent text-muted-foreground/40",
                 style ? style.cell : emptyCell,
                 today && "ring-1 ring-ring",
+                mode === "picking" &&
+                  (presence ? "cursor-copy" : "cursor-not-allowed"),
+                mode === "pasting" &&
+                  (presence ? "cursor-not-allowed" : "cursor-copy"),
               )}
             >
               <span className="font-medium">{d.getDate()}</span>

@@ -95,6 +95,12 @@
     "delete": "Supprimer",
     "prevMonth": "Mois précédent",
     "nextMonth": "Mois suivant",
+    "copyMode": {
+      "start": "Copier un jour",
+      "pick": "Choisissez le jour à copier",
+      "paste": "Cliquez les jours à remplir — cliquez pour quitter",
+      "help": "Remplissez vite le calendrier : choisissez un jour déjà encodé pour le copier (type, trajet, horaire et tâches), puis cliquez les jours vides pour y coller la même configuration."
+    },
     "types": {
       "office": "Bureau",
       "remote": "Télétravail",
