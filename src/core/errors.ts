@@ -6,6 +6,7 @@ export type AppErrorCode =
   | "SESSION_EXPIRED"
   | "NOT_FOUND"
   | "INTERNAL"
+  | "EXPORT_FAILED"
   | "UNKNOWN";
 
 /** Shape the Rust backend serializes on the `Err` side: `{ code, message }`. */
@@ -37,6 +38,7 @@ const KNOWN_CODES: readonly string[] = [
   "SESSION_EXPIRED",
   "NOT_FOUND",
   "INTERNAL",
+  "EXPORT_FAILED",
 ];
 
 /** Convert anything thrown by `invoke` into a typed {@link AppError}. */

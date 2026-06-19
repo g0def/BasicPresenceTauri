@@ -19,6 +19,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
@@ -57,6 +58,7 @@ use crate::domain::services::key_service::KeyService;
 use crate::domain::services::markdown::MarkdownRenderer;
 use crate::domain::services::password_hasher::PasswordHasher;
 use crate::domain::services::session_store::SessionStore;
+use crate::domain::services::spreadsheet_exporter::SpreadsheetExporter;
 use crate::domain::services::token_generator::TokenGenerator;
 use crate::domain::services::vault::VaultManager;
 use crate::infrastructure::clock::SystemClock;
@@ -64,6 +66,7 @@ use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
 use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
+use crate::infrastructure::export::ods_writer::OdsSpreadsheetExporter;
 use crate::infrastructure::markdown::comrak_renderer::ComrakMarkdownRenderer;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
 use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
@@ -78,7 +81,9 @@ use crate::infrastructure::persistence::task_preset_repository::LibsqlTaskPreset
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRepository;
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
-use crate::presentation::commands::{auth, commute, presence, profile, settings, work_hours};
+use crate::presentation::commands::{
+    auth, commute, export, presence, profile, settings, work_hours,
+};
 use crate::presentation::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -86,6 +91,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .on_window_event(|window, event| {
             // On a clean window close, lock the vault so its integrity baseline
             // is refreshed (otherwise the next launch sees an "unclean" state).
@@ -147,7 +153,8 @@ pub fn run() {
             work_hours::get_work_schedule,
             work_hours::set_work_schedule,
             work_hours::get_day_note,
-            work_hours::set_day_note
+            work_hours::set_day_note,
+            export::export_profile_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -202,6 +209,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
+    let exporter: Arc<dyn SpreadsheetExporter> = Arc::new(OdsSpreadsheetExporter::new());
 
     Ok(AppState {
         register_account: RegisterAccountUseCase::new(
@@ -261,6 +269,11 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         set_work_schedule: SetWorkScheduleUseCase::new(work_entries.clone(), presences.clone()),
         get_day_note: GetDayNoteUseCase::new(presences.clone(), markdown.clone()),
         set_day_note: SetDayNoteUseCase::new(presences.clone(), markdown.clone(), clock.clone()),
+        export_profile_data: ExportProfileDataUseCase::new(
+            presences.clone(),
+            work_entries.clone(),
+            exporter.clone(),
+        ),
         vault: vault.clone(),
         keystore_db,
     })

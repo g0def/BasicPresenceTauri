@@ -145,6 +145,56 @@
       "empty": "Le fichier ne contient aucune entrée."
     }
   },
+  "export": {
+    "menuItem": "Exporter des données",
+    "title": "Exporter les données",
+    "description": "Génère un fichier OpenDocument (.ods) ouvrable dans Excel ou LibreOffice, avec un onglet par type de données.",
+    "fileBaseName": "presences",
+    "fields": {
+      "includeCarbon": "Empreinte carbone (CO₂ et estimation)",
+      "includeHours": "Heures travaillées",
+      "includeTasks": "Tâches du jour",
+      "includeTrips": "Trajets (détail des déplacements)",
+      "includeNotes": "Notes",
+      "includeTimestamps": "Dates de création et de modification"
+    },
+    "sheet": {
+      "presences": "Présences",
+      "tasks": "Tâches",
+      "trips": "Trajets",
+      "notes": "Notes",
+      "yes": "Oui",
+      "no": "Non",
+      "cols": {
+        "date": "Date",
+        "type": "Type",
+        "co2": "CO₂ (kg)",
+        "estimated": "Estimé",
+        "hours": "Heures",
+        "created": "Créé le",
+        "updated": "Modifié le",
+        "title": "Titre",
+        "description": "Description",
+        "minutes": "Minutes",
+        "color": "Couleur",
+        "order": "Ordre",
+        "mode": "Mode",
+        "distance": "Distance (km)",
+        "roundTrip": "Aller-retour",
+        "occupants": "Occupants",
+        "factorYear": "Année facteur",
+        "note": "Note"
+      }
+    },
+    "exportButton": "Exporter",
+    "exporting": "Export en cours…",
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "result": "Export réussi : {{days}} jour(s), {{tasks}} tâche(s), {{trips}} trajet(s).",
+    "errors": {
+      "failed": "Échec de l'export : le fichier n'a pas pu être écrit."
+    }
+  },
   "commute": {
     "menuItem": "Modes de déplacement",
     "manager": {

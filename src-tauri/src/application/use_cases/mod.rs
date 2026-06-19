@@ -7,6 +7,7 @@ pub mod delete_commute;
 pub mod delete_presence;
 pub mod delete_profile;
 pub mod delete_task_preset;
+pub mod export_profile_data;
 pub(crate) mod factor_maps;
 pub mod get_day_note;
 pub mod get_presence_trips;

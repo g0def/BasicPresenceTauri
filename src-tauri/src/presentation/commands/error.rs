@@ -49,6 +49,10 @@ impl From<DomainError> for AppError {
                 "VAULT_TAMPERED",
                 "L'intégrité du stockage chiffré a échoué : le fichier a été modifié.",
             ),
+            DomainError::Export(_) => AppError::new(
+                "EXPORT_FAILED",
+                "Échec de l'export : le fichier n'a pas pu être écrit.",
+            ),
             DomainError::Storage(_)
             | DomainError::Hashing(_)
             | DomainError::Crypto(_)

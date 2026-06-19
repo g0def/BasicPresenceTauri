@@ -40,6 +40,9 @@ pub enum DomainError {
     #[error("keychain error: {0}")]
     Keychain(String),
 
+    #[error("export error: {0}")]
+    Export(String),
+
     #[error("keystore unrecoverable: the device key is missing or changed")]
     KeystoreUnrecoverable,
 

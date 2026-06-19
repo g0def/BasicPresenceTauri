@@ -145,6 +145,56 @@
       "empty": "The file contains no entries."
     }
   },
+  "export": {
+    "menuItem": "Export data",
+    "title": "Export data",
+    "description": "Generates an OpenDocument (.ods) file you can open in Excel or LibreOffice, with one sheet per data type.",
+    "fileBaseName": "presence",
+    "fields": {
+      "includeCarbon": "Carbon footprint (CO₂ and estimation)",
+      "includeHours": "Worked hours",
+      "includeTasks": "Daily tasks",
+      "includeTrips": "Trips (commute details)",
+      "includeNotes": "Notes",
+      "includeTimestamps": "Created and updated dates"
+    },
+    "sheet": {
+      "presences": "Presence",
+      "tasks": "Tasks",
+      "trips": "Trips",
+      "notes": "Notes",
+      "yes": "Yes",
+      "no": "No",
+      "cols": {
+        "date": "Date",
+        "type": "Type",
+        "co2": "CO₂ (kg)",
+        "estimated": "Estimated",
+        "hours": "Hours",
+        "created": "Created",
+        "updated": "Updated",
+        "title": "Title",
+        "description": "Description",
+        "minutes": "Minutes",
+        "color": "Color",
+        "order": "Order",
+        "mode": "Mode",
+        "distance": "Distance (km)",
+        "roundTrip": "Round trip",
+        "occupants": "Occupants",
+        "factorYear": "Factor year",
+        "note": "Note"
+      }
+    },
+    "exportButton": "Export",
+    "exporting": "Exporting…",
+    "cancel": "Cancel",
+    "done": "Done",
+    "result": "Export complete: {{days}} day(s), {{tasks}} task(s), {{trips}} trip(s).",
+    "errors": {
+      "failed": "Export failed: the file could not be written."
+    }
+  },
   "commute": {
     "menuItem": "Commute modes",
     "manager": {

@@ -7,6 +7,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
@@ -71,6 +72,7 @@ pub struct AppState {
     pub set_work_schedule: SetWorkScheduleUseCase,
     pub get_day_note: GetDayNoteUseCase,
     pub set_day_note: SetDayNoteUseCase,
+    pub export_profile_data: ExportProfileDataUseCase,
     /// Vault handle, exposed so a window-close hook can lock it and refresh the
     /// integrity baseline on a clean app exit.
     pub vault: Arc<dyn VaultManager>,

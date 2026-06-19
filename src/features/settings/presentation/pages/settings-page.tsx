@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { fullName } from "@/features/profile/domain/entities/profile";
 import type { Profile } from "@/features/profile/domain/entities/profile";
 import { ProfileFormDialog } from "@/features/profile/presentation/components/profile-form-dialog";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { ExportDialog } from "@/features/export/presentation/components/export-dialog";
 import { ImportDialog } from "@/features/presence/presentation/components/import-dialog";
 import { StartTimePicker } from "@/features/work-hours/presentation/components/start-time-picker";
 import type { CellDisplayMode } from "@/shared/cell-display/cell-display-context";
@@ -36,6 +37,7 @@ export function SettingsPage() {
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Car-occupancy is a free number field: keep a local draft, commit on blur.
   const [occupancy, setOccupancy] = useState(
@@ -299,6 +301,22 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Export section — needs an active profile to know whose data to export. */}
+      {activeProfile && (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-base font-medium">{t("export.title")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {t("export.description")}
+          </p>
+          <div>
+            <Button onClick={() => setExportOpen(true)}>
+              <Download />
+              {t("export.menuItem")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <ProfileFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -306,6 +324,14 @@ export function SettingsPage() {
       />
 
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      {activeProfile && (
+        <ExportDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          profileId={activeProfile.id}
+        />
+      )}
 
       <Dialog
         open={confirmId !== null}

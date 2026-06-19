@@ -4,5 +4,6 @@ pub mod key_service;
 pub mod markdown;
 pub mod password_hasher;
 pub mod session_store;
+pub mod spreadsheet_exporter;
 pub mod token_generator;
 pub mod vault;
