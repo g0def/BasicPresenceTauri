@@ -51,7 +51,7 @@ describe("profile home", () => {
       </AuthProvider>,
     );
 
-    await screen.findByRole("heading", { name: "Connexion" });
+    await screen.findByLabelText("Nom d'utilisateur");
     await user.type(screen.getByLabelText("Nom d'utilisateur"), "alice");
     await user.type(screen.getByLabelText("Mot de passe"), "secret123");
     await user.click(screen.getByRole("button", { name: "Se connecter" }));

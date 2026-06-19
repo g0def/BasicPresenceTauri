@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
-import { Logo } from "@/shared/components/logo";
 import { ModeToggle } from "@/shared/components/mode-toggle";
 import { LanguageSwitcher } from "@/shared/components/language-switcher";
 import { AuthBackdrop } from "@/features/auth/presentation/components/auth-backdrop";
@@ -50,11 +49,22 @@ export function LoginPage() {
 
       <div className="flex w-full max-w-sm flex-col gap-5">
         <Card className="shadow-lg">
-          <CardHeader className="space-y-2 text-center">
-            <Logo className="text-lg" />
-            <h1 className="text-xl font-semibold">
-              {isRegister ? t("auth.registerTitle") : t("auth.loginTitle")}
-            </h1>
+          <CardHeader className="flex flex-col items-center space-y-2 text-center">
+            <img
+              src="/basic-presence-icon/icon-512.png"
+              alt=""
+              aria-hidden="true"
+              className="block size-20 dark:hidden"
+            />
+            <img
+              src="/basic-presence-icon/icon-512-dark.png"
+              alt=""
+              aria-hidden="true"
+              className="hidden size-20 dark:block"
+            />
+            <span className="font-jetbrains text-lg font-semibold tracking-tight text-foreground">
+              Basic Presence
+            </span>
             <CardDescription>
               {isRegister
                 ? t("auth.registerSubtitle")

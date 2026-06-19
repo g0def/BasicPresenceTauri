@@ -3,8 +3,6 @@
     "loading": "Loading…"
   },
   "auth": {
-    "loginTitle": "Sign in",
-    "registerTitle": "Create an account",
     "loginSubtitle": "Enter your password to unlock your data.",
     "registerSubtitle": "First time here: create your owner account.",
     "username": "Username",

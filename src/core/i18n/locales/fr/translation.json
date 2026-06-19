@@ -3,8 +3,6 @@
     "loading": "Chargement…"
   },
   "auth": {
-    "loginTitle": "Connexion",
-    "registerTitle": "Créer un compte",
     "loginSubtitle": "Entrez votre mot de passe pour déverrouiller vos données.",
     "registerSubtitle": "Première utilisation : créez votre compte propriétaire.",
     "username": "Nom d'utilisateur",

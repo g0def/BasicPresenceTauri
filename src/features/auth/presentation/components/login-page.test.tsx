@@ -36,7 +36,7 @@ describe("auth flow", () => {
     );
 
     // The backend reports an existing account → login screen.
-    await screen.findByRole("heading", { name: "Connexion" });
+    await screen.findByLabelText("Nom d'utilisateur");
 
     await user.type(screen.getByLabelText("Nom d'utilisateur"), "alice");
     await user.type(screen.getByLabelText("Mot de passe"), "secret123");
@@ -68,14 +68,11 @@ describe("auth flow", () => {
     );
 
     // Starts in French (pinned by the test setup).
-    await screen.findByRole("heading", { name: "Connexion" });
+    await screen.findByLabelText("Nom d'utilisateur");
 
     await user.click(screen.getByRole("combobox", { name: "Langue" }));
     await user.click(await screen.findByRole("option", { name: "English" }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Sign in" }),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Username")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Username")).toBeInTheDocument();
   });
 });
