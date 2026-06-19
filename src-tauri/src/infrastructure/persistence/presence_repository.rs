@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,7 +7,7 @@ use uuid::Uuid;
 use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::trip::Trip;
 use crate::domain::error::DomainError;
-use crate::domain::repositories::presence_repository::{ImportCounts, PresenceRepository};
+use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::infrastructure::persistence::db::map_storage;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 
@@ -196,31 +195,6 @@ impl PresenceRepository for LibsqlPresenceRepository {
             .map_err(map_storage)?;
         Ok(())
     }
-
-    async fn import_many(
-        &self,
-        profile_id: &str,
-        entries: &[Presence],
-        replace_existing: bool,
-    ) -> Result<ImportCounts, DomainError> {
-        let conn = self.conn()?;
-
-        // Wrap the whole batch in a transaction so the import is atomic: a
-        // failure on any row rolls everything back rather than leaving a
-        // half-imported vault.
-        conn.execute("BEGIN", ()).await.map_err(map_storage)?;
-        match import_in_tx(&conn, profile_id, entries, replace_existing).await {
-            Ok(counts) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
-                Ok(counts)
-            }
-            Err(e) => {
-                // Best-effort rollback; surface the original error.
-                let _ = conn.execute("ROLLBACK", ()).await;
-                Err(e)
-            }
-        }
-    }
 }
 
 /// Upsert the presence and replace its trip snapshot, inside an open transaction.
@@ -316,74 +290,4 @@ async fn set_for_day_in_tx(
     saved.work_minutes = work_minutes;
 
     Ok(saved)
-}
-
-/// Body of [`LibsqlPresenceRepository::import_many`], run inside an open
-/// transaction so the caller can COMMIT/ROLLBACK around it.
-async fn import_in_tx(
-    conn: &Connection,
-    profile_id: &str,
-    entries: &[Presence],
-    replace_existing: bool,
-) -> Result<ImportCounts, DomainError> {
-    // Snapshot the profile's existing days up front: under `ON CONFLICT DO
-    // UPDATE`, `rows_affected()` is 1 for both a fresh insert and an update, so
-    // it can't tell them apart. The set also makes duplicate days *within* the
-    // same import deterministic (a repeated day is treated as a conflict).
-    let mut existing: HashSet<i64> = HashSet::new();
-    {
-        let mut rows = conn
-            .query(
-                "SELECT day FROM presence WHERE profile_id = ?1",
-                params![profile_id],
-            )
-            .await
-            .map_err(map_storage)?;
-        while let Some(row) = rows.next().await.map_err(map_storage)? {
-            let day: i64 = row.get(0).map_err(map_storage)?;
-            existing.insert(day);
-        }
-    }
-
-    let sql = if replace_existing {
-        "INSERT INTO presence (id, profile_id, day, type, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-         ON CONFLICT(profile_id, day) DO UPDATE SET \
-         type = excluded.type, updated_at = excluded.updated_at"
-    } else {
-        "INSERT INTO presence (id, profile_id, day, type, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-         ON CONFLICT(profile_id, day) DO NOTHING"
-    };
-
-    let mut counts = ImportCounts::default();
-    for p in entries {
-        let conflicts = existing.contains(&p.day);
-        conn.execute(
-            sql,
-            params![
-                p.id.clone(),
-                p.profile_id.clone(),
-                p.day,
-                p.kind.as_str(),
-                p.created_at,
-                p.updated_at,
-            ],
-        )
-        .await
-        .map_err(map_storage)?;
-
-        if conflicts {
-            // `replace` updated the existing row; `skip` did nothing (the use
-            // case derives `skipped = total - inserted - updated`).
-            if replace_existing {
-                counts.updated += 1;
-            }
-        } else {
-            counts.inserted += 1;
-            existing.insert(p.day);
-        }
-    }
-
-    Ok(counts)
 }

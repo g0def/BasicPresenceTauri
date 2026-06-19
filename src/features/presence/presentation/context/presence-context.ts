@@ -1,8 +1,6 @@
 import { createContext } from "react";
 
 import type {
-  ImportPresenceEntry,
-  ImportSummary,
   Presence,
   PresenceTrip,
   PresenceType,
@@ -19,7 +17,7 @@ export interface PresenceContextValue {
   reload: () => Promise<void>;
   /** True while the presence list is (re)loading. */
   isLoading: boolean;
-  /** True while a set/delete/import is in flight. */
+  /** True while a set/delete is in flight. */
   isSubmitting: boolean;
   error: string | null;
   /** Create or update the presence for a day, optionally with commute trips
@@ -34,15 +32,6 @@ export interface PresenceContextValue {
   deletePresence: (id: string) => Promise<boolean>;
   /** Fetch the commute trips recorded for a presence day (for re-editing). */
   getPresenceTrips: (presenceId: string) => Promise<PresenceTrip[]>;
-  /**
-   * Bulk-import presences for the active profile, then refresh the list.
-   * Returns the summary, or `null` if there's no active profile or the command
-   * failed (in which case `error` is set).
-   */
-  importPresences: (
-    entries: ImportPresenceEntry[],
-    replaceExisting: boolean,
-  ) => Promise<ImportSummary | null>;
   clearError: () => void;
 }
 

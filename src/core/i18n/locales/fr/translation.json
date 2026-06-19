@@ -112,37 +112,55 @@
     "hoursWorkedTooltip": "Total des heures travaillées sur le mois affiché",
     "co2EmittedTooltip": "Émissions de CO₂ estimées de vos trajets sur le mois affiché"
   },
-  "import": {
-    "menuItem": "Importer des données",
-    "title": "Importer des présences",
-    "description": "Sélectionnez un fichier JSON exporté depuis l'ancienne application.",
-    "chooseFile": "Choisir un fichier…",
-    "importing": "Importation…",
-    "cancel": "Annuler",
-    "done": "Terminé",
-    "review": {
-      "valid": "{{count}} entrée(s) valide(s) prête(s) à importer.",
-      "conflicts": "{{count}} jour(s) possèdent déjà une présence.",
-      "nothingValid": "Aucune entrée valide à importer."
+  "transfer": {
+    "section": "Partage de profil (.json)",
+    "sectionHint": "Exportez votre profil dans un fichier .json pour l'envoyer à quelqu'un, ou importez un profil reçu.",
+    "fields": {
+      "includeDays": "Présences (jours)",
+      "includeTrips": "Trajets",
+      "includeWorkHours": "Heures & tâches",
+      "includeNotes": "Notes",
+      "includeTaskPresets": "Modèles de tâches",
+      "includeCommutes": "Trajets enregistrés",
+      "includeSettings": "Paramètres du profil"
     },
-    "importValid": "Importer {{count}}",
-    "skip": "Ignorer les existants",
-    "replace": "Remplacer les existants",
-    "result": "Importés : {{imported}}, remplacés : {{replaced}}, ignorés : {{skipped}} sur {{total}}.",
-    "resultInvalid": "{{count}} ligne(s) ignorée(s) car illisibles.",
-    "invalid": {
-      "heading": "Lignes non importées :",
-      "more": "…et {{count}} de plus.",
-      "row": "Ligne {{row}}",
-      "missingDate": "date manquante",
-      "badDate": "date illisible « {{value}} »",
-      "missingMode": "mode manquant",
-      "unknownMode": "mode inconnu « {{value}} »"
+    "export": {
+      "menuItem": "Exporter le profil (.json)",
+      "title": "Exporter le profil",
+      "description": "Génère un fichier .json partageable. Cochez les données à inclure.",
+      "fileBaseName": "profil",
+      "exportButton": "Exporter",
+      "exporting": "Export en cours…",
+      "cancel": "Annuler",
+      "done": "Terminé",
+      "result": "Profil exporté : {{days}} jour(s), {{trips}} trajet(s), {{workEntries}} tâche(s), {{notes}} note(s), {{taskPresets}} modèle(s), {{commutes}} trajet(s) enregistré(s).",
+      "resultSettings": "Paramètres inclus."
     },
-    "errors": {
-      "malformed": "Le fichier n'est pas un JSON valide.",
-      "notArray": "Le fichier doit contenir un tableau JSON.",
-      "empty": "Le fichier ne contient aucune entrée."
+    "import": {
+      "menuItem": "Importer un profil (.json)",
+      "title": "Importer un profil",
+      "description": "Sélectionnez un fichier de profil (.json) exporté depuis l'application.",
+      "chooseFile": "Choisir un fichier…",
+      "importing": "Importation…",
+      "importButton": "Importer",
+      "cancel": "Annuler",
+      "done": "Terminé",
+      "fileFrom": "Fichier de « {{name}} »",
+      "categoriesHeading": "Données à importer",
+      "incompatible": "Ce fichier a été créé par une version plus récente de l'application et ne peut pas être importé.",
+      "unknownModes": "{{count}} mode(s) de transport inconnu(s) : l'empreinte est conservée, mais ces jours ne seront pas modifiables.",
+      "target": {
+        "heading": "Destination",
+        "new": "Nouveau profil",
+        "existing": "Fusionner dans un profil existant",
+        "selectProfile": "Choisir un profil"
+      },
+      "conflict": {
+        "heading": "Si des jours existent déjà dans ce profil :",
+        "skip": "Ignorer les existants",
+        "replace": "Remplacer les existants"
+      },
+      "result": "Profil importé. Jours : {{imported}} ajouté(s), {{replaced}} remplacé(s), {{skipped}} ignoré(s)."
     }
   },
   "export": {

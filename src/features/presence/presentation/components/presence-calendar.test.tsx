@@ -72,7 +72,6 @@ describe("PresenceCalendar", () => {
       },
       deletePresence: () => Promise.resolve(true),
       getPresenceTrips: () => Promise.resolve([]),
-      importPresences: () => Promise.resolve(null),
       clearError: () => {},
     };
 
@@ -110,7 +109,6 @@ describe("PresenceCalendar", () => {
       },
       deletePresence: () => Promise.resolve(true),
       getPresenceTrips: () => Promise.resolve([]),
-      importPresences: () => Promise.resolve(null),
       clearError: () => {},
     };
 

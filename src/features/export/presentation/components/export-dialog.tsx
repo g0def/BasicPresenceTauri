@@ -42,7 +42,7 @@ const OPTION_KEYS: (keyof ExportOptions)[] = [
 /**
  * Export the active profile's data to a multi-sheet .ods file. Flow: tick the
  * data to include → pick a save location (native dialog) → the Rust backend
- * writes the file → show a summary. Mirrors the ImportDialog structure.
+ * writes the file → show a summary.
  */
 export function ExportDialog({
   open,

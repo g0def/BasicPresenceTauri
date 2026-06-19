@@ -112,37 +112,55 @@
     "hoursWorkedTooltip": "Total hours worked for the displayed month",
     "co2EmittedTooltip": "Estimated CO₂ emissions from your commutes for the displayed month"
   },
-  "import": {
-    "menuItem": "Import data",
-    "title": "Import presence",
-    "description": "Select a JSON file exported from the previous app.",
-    "chooseFile": "Choose a file…",
-    "importing": "Importing…",
-    "cancel": "Cancel",
-    "done": "Done",
-    "review": {
-      "valid": "{{count}} valid entries ready to import.",
-      "conflicts": "{{count}} day(s) already have a presence.",
-      "nothingValid": "No valid entry to import."
+  "transfer": {
+    "section": "Profile sharing (.json)",
+    "sectionHint": "Export your profile to a .json file to send it to someone, or import a profile you received.",
+    "fields": {
+      "includeDays": "Presences (days)",
+      "includeTrips": "Trips",
+      "includeWorkHours": "Hours & tasks",
+      "includeNotes": "Notes",
+      "includeTaskPresets": "Task presets",
+      "includeCommutes": "Saved commutes",
+      "includeSettings": "Profile settings"
     },
-    "importValid": "Import {{count}}",
-    "skip": "Skip existing",
-    "replace": "Replace existing",
-    "result": "Imported {{imported}}, replaced {{replaced}}, skipped {{skipped}} of {{total}}.",
-    "resultInvalid": "{{count}} row(s) skipped as unreadable.",
-    "invalid": {
-      "heading": "Rows not imported:",
-      "more": "…and {{count}} more.",
-      "row": "Row {{row}}",
-      "missingDate": "missing date",
-      "badDate": "unreadable date \"{{value}}\"",
-      "missingMode": "missing mode",
-      "unknownMode": "unknown mode \"{{value}}\""
+    "export": {
+      "menuItem": "Export profile (.json)",
+      "title": "Export profile",
+      "description": "Produces a shareable .json file. Tick the data to include.",
+      "fileBaseName": "profile",
+      "exportButton": "Export",
+      "exporting": "Exporting…",
+      "cancel": "Cancel",
+      "done": "Done",
+      "result": "Profile exported: {{days}} day(s), {{trips}} trip(s), {{workEntries}} task(s), {{notes}} note(s), {{taskPresets}} preset(s), {{commutes}} saved commute(s).",
+      "resultSettings": "Settings included."
     },
-    "errors": {
-      "malformed": "The file is not valid JSON.",
-      "notArray": "The file must contain a JSON array.",
-      "empty": "The file contains no entries."
+    "import": {
+      "menuItem": "Import profile (.json)",
+      "title": "Import profile",
+      "description": "Select a profile file (.json) exported from the app.",
+      "chooseFile": "Choose a file…",
+      "importing": "Importing…",
+      "importButton": "Import",
+      "cancel": "Cancel",
+      "done": "Done",
+      "fileFrom": "File from \"{{name}}\"",
+      "categoriesHeading": "Data to import",
+      "incompatible": "This file was created by a newer version of the app and cannot be imported.",
+      "unknownModes": "{{count}} unknown transport mode(s): the footprint is kept, but those days won't be editable.",
+      "target": {
+        "heading": "Destination",
+        "new": "New profile",
+        "existing": "Merge into an existing profile",
+        "selectProfile": "Choose a profile"
+      },
+      "conflict": {
+        "heading": "If days already exist in this profile:",
+        "skip": "Skip existing",
+        "replace": "Replace existing"
+      },
+      "result": "Profile imported. Days: {{imported}} added, {{replaced}} replaced, {{skipped}} skipped."
     }
   },
   "export": {

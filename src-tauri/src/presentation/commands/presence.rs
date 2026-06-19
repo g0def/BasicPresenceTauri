@@ -1,6 +1,5 @@
 use tauri::State;
 
-use crate::application::dto::import_presence_dto::{ImportPresenceEntryDto, ImportSummaryDto};
 use crate::application::dto::presence_dto::PresenceDto;
 use crate::application::dto::trip_dto::TripInputDto;
 use crate::presentation::commands::error::AppError;
@@ -44,21 +43,4 @@ pub async fn delete_presence(id: String, state: State<'_, AppState>) -> Result<(
     state.require_session.execute()?;
     state.delete_presence.execute(&id).await?;
     Ok(())
-}
-
-/// Bulk-import presences for a profile from an exported file. `replace_existing`
-/// decides what happens to days that already exist: `false` skips them, `true`
-/// overwrites them.
-#[tauri::command]
-pub async fn import_presences(
-    profile_id: String,
-    entries: Vec<ImportPresenceEntryDto>,
-    replace_existing: bool,
-    state: State<'_, AppState>,
-) -> Result<ImportSummaryDto, AppError> {
-    state.require_session.execute()?;
-    Ok(state
-        .import_presences
-        .execute(&profile_id, entries, replace_existing)
-        .await?)
 }

@@ -46,6 +46,7 @@ function profileCtx(active: Profile | null): ProfileContextValue {
     updateProfile: () => Promise.resolve(true),
     deleteProfile: () => Promise.resolve(),
     setActiveProfile: () => Promise.resolve(),
+    refresh: () => Promise.resolve(),
     clearError: () => {},
   };
 }

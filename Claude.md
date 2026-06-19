@@ -167,12 +167,17 @@ src/
     │   ├── data/                #    dto, mapper, TauriProfileRepository (→ core/ipc)
     │   └── presentation/        #    ProfileProvider, useProfile, formulaire (Dialog),
     │                            #    badge = menu compte (profils + langue + thème + déconnexion)
-    ├── presence/                #    Calendrier des présences + import (PresenceProvider, usePresence)
+    ├── presence/                #    Calendrier des présences (PresenceProvider, usePresence)
     ├── commute/                 #    Trajets domicile-travail + facteurs d'émission CO₂
     │   ├── domain/              #    Commute, EmissionFactor, commuteToTrips, repositories, use-cases
     │   ├── data/                #    dto, mappers, TauriCommuteRepository / TauriEmissionFactorRepository
     │   └── presentation/        #    CommuteProvider, useCommute, SegmentEditor (mutualisé)
     │       └── pages/           #    écrans routés : CommuteListPage, CommuteFormPage
+    ├── export/                  #    Export tableur .ods (ExportDialog → export_profile_data)
+    ├── profile-transfer/        #    Partage de profil .json : export / inspect / import bundle
+    │   ├── domain/              #    bundle (types), TransferRepository
+    │   ├── data/                #    TauriTransferRepository (→ core/ipc + plugin-dialog)
+    │   └── presentation/        #    useProfileTransfer, ExportProfileDialog, ImportProfileDialog
     └── work-hours/              #    Encodage des heures d'un jour office/remote (page /work-hours/$day)
         ├── domain/              #    TaskPreset, WorkEntry/WorkDaySchedule, repositories, use-cases purs
         ├── data/                #    dto, mappers, TauriTaskPresetRepository / TauriWorkEntryRepository

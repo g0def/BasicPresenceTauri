@@ -166,6 +166,7 @@ export function ProfileProvider({
       updateProfile,
       deleteProfile,
       setActiveProfile,
+      refresh,
       clearError,
     }),
     [
@@ -178,6 +179,7 @@ export function ProfileProvider({
       updateProfile,
       deleteProfile,
       setActiveProfile,
+      refresh,
       clearError,
     ],
   );

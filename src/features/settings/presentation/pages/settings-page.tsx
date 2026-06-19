@@ -20,7 +20,8 @@ import type { Profile } from "@/features/profile/domain/entities/profile";
 import { ProfileFormDialog } from "@/features/profile/presentation/components/profile-form-dialog";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 import { ExportDialog } from "@/features/export/presentation/components/export-dialog";
-import { ImportDialog } from "@/features/presence/presentation/components/import-dialog";
+import { ExportProfileDialog } from "@/features/profile-transfer/presentation/components/export-profile-dialog";
+import { ImportProfileDialog } from "@/features/profile-transfer/presentation/components/import-profile-dialog";
 import { StartTimePicker } from "@/features/work-hours/presentation/components/start-time-picker";
 import type { CellDisplayMode } from "@/shared/cell-display/cell-display-context";
 import { NOTE_FONTS } from "@/shared/note-font/use-note-font";
@@ -36,8 +37,9 @@ export function SettingsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportBundleOpen, setExportBundleOpen] = useState(false);
+  const [importBundleOpen, setImportBundleOpen] = useState(false);
 
   // Car-occupancy is a free number field: keep a local draft, commit on blur.
   const [occupancy, setOccupancy] = useState(
@@ -285,23 +287,8 @@ export function SettingsPage() {
         </>
       )}
 
-      {/* Import section — needs an active profile to import into; without one
-          importPresences silently no-ops (presence-provider), so hide it. */}
-      {activeProfile && (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-base font-medium">{t("import.title")}</h3>
-          <p className="text-sm text-muted-foreground">
-            {t("import.description")}
-          </p>
-          <div>
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
-              {t("import.menuItem")}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Export section — needs an active profile to know whose data to export. */}
+      {/* Spreadsheet export (.ods) — needs an active profile to know whose data
+          to export. */}
       {activeProfile && (
         <div className="flex flex-col gap-3">
           <h3 className="text-base font-medium">{t("export.title")}</h3>
@@ -317,13 +304,30 @@ export function SettingsPage() {
         </div>
       )}
 
+      {/* Profile transfer (shareable .json): export the whole profile, or import
+          one (into a new profile or merged into an existing one). */}
+      {activeProfile && (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-base font-medium">{t("transfer.section")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {t("transfer.sectionHint")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setExportBundleOpen(true)}>
+              {t("transfer.export.menuItem")}
+            </Button>
+            <Button variant="outline" onClick={() => setImportBundleOpen(true)}>
+              {t("transfer.import.menuItem")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <ProfileFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
         profile={editing}
       />
-
-      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       {activeProfile && (
         <ExportDialog
@@ -332,6 +336,19 @@ export function SettingsPage() {
           profileId={activeProfile.id}
         />
       )}
+
+      {activeProfile && (
+        <ExportProfileDialog
+          open={exportBundleOpen}
+          onOpenChange={setExportBundleOpen}
+          profileId={activeProfile.id}
+        />
+      )}
+
+      <ImportProfileDialog
+        open={importBundleOpen}
+        onOpenChange={setImportBundleOpen}
+      />
 
       <Dialog
         open={confirmId !== null}

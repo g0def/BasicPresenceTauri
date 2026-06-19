@@ -20,6 +20,8 @@ export interface ProfileContextValue {
   updateProfile: (input: UpdateProfileInput) => Promise<boolean>;
   deleteProfile: (id: string) => Promise<void>;
   setActiveProfile: (id: string) => Promise<void>;
+  /** Re-fetch the profile list + active id (e.g. after importing a profile). */
+  refresh: () => Promise<void>;
   clearError: () => void;
 }
 

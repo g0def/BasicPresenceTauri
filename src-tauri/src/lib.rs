@@ -19,13 +19,15 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
-use crate::application::use_cases::import_presences::ImportPresencesUseCase;
+use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
+use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
@@ -57,6 +59,7 @@ use crate::domain::services::clock::Clock;
 use crate::domain::services::key_service::KeyService;
 use crate::domain::services::markdown::MarkdownRenderer;
 use crate::domain::services::password_hasher::PasswordHasher;
+use crate::domain::services::profile_bundle::ProfileBundleCodec;
 use crate::domain::services::session_store::SessionStore;
 use crate::domain::services::spreadsheet_exporter::SpreadsheetExporter;
 use crate::domain::services::token_generator::TokenGenerator;
@@ -81,8 +84,9 @@ use crate::infrastructure::persistence::task_preset_repository::LibsqlTaskPreset
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRepository;
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
+use crate::infrastructure::transfer::json_bundle_codec::JsonProfileBundleCodec;
 use crate::presentation::commands::{
-    auth, commute, export, presence, profile, settings, work_hours,
+    auth, commute, export, presence, profile, settings, transfer, work_hours,
 };
 use crate::presentation::state::AppState;
 
@@ -135,7 +139,6 @@ pub fn run() {
             presence::set_presence,
             presence::list_presences,
             presence::delete_presence,
-            presence::import_presences,
             commute::list_emission_factors,
             commute::create_commute,
             commute::list_commutes,
@@ -154,7 +157,10 @@ pub fn run() {
             work_hours::set_work_schedule,
             work_hours::get_day_note,
             work_hours::set_day_note,
-            export::export_profile_data
+            export::export_profile_data,
+            transfer::export_profile_bundle,
+            transfer::inspect_profile_bundle,
+            transfer::import_profile_bundle
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -210,6 +216,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
     let exporter: Arc<dyn SpreadsheetExporter> = Arc::new(OdsSpreadsheetExporter::new());
+    let bundle_codec: Arc<dyn ProfileBundleCodec> = Arc::new(JsonProfileBundleCodec::new());
 
     Ok(AppState {
         register_account: RegisterAccountUseCase::new(
@@ -246,7 +253,6 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         ),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
-        import_presences: ImportPresencesUseCase::new(presences.clone(), clock.clone()),
         list_emission_factors: ListEmissionFactorsUseCase::new(factors.clone()),
         create_commute: CreateCommuteUseCase::new(commutes.clone(), clock.clone()),
         list_commutes: ListCommutesUseCase::new(
@@ -273,6 +279,30 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             presences.clone(),
             work_entries.clone(),
             exporter.clone(),
+        ),
+        export_profile_bundle: ExportProfileBundleUseCase::new(
+            profiles.clone(),
+            presences.clone(),
+            work_entries.clone(),
+            task_presets.clone(),
+            commutes.clone(),
+            profile_settings.clone(),
+            bundle_codec.clone(),
+            clock.clone(),
+        ),
+        inspect_profile_bundle: InspectProfileBundleUseCase::new(
+            bundle_codec.clone(),
+            factors.clone(),
+        ),
+        import_profile_bundle: ImportProfileBundleUseCase::new(
+            bundle_codec.clone(),
+            profiles.clone(),
+            presences.clone(),
+            work_entries.clone(),
+            task_presets.clone(),
+            commutes.clone(),
+            profile_settings.clone(),
+            clock.clone(),
         ),
         vault: vault.clone(),
         keystore_db,

@@ -4,7 +4,9 @@
 use std::path::PathBuf;
 
 use crate::application::dto::commute_dto::CommuteSegmentInputDto;
-use crate::application::dto::import_presence_dto::ImportPresenceEntryDto;
+use crate::application::dto::profile_bundle_dto::{
+    BundleExportOptionsDto, BundleImportSelectionDto, BundleImportTargetDto,
+};
 use crate::application::dto::trip_dto::TripInputDto;
 use crate::application::dto::work_entry_dto::WorkEntryInputDto;
 use crate::build_state;
@@ -331,167 +333,6 @@ fn presence_set_list_delete_with_upsert_per_day() {
         state.logout.execute(&session.token).unwrap();
         assert!(matches!(
             state.list_presences.execute(&profile.id).await,
-            Err(DomainError::Unauthorized)
-        ));
-
-        let _ = std::fs::remove_dir_all(dir);
-    });
-}
-
-#[test]
-fn presence_import_skip_and_replace() {
-    tauri::async_runtime::block_on(async {
-        let (config, dir) = temp_config("presence_import");
-        let state = build_state(config, &TEST_DEVICE_KEY)
-            .await
-            .expect("build_state");
-
-        state
-            .register_account
-            .execute("alice", "password123")
-            .await
-            .expect("register");
-        let session = state
-            .login
-            .execute("alice", "password123")
-            .await
-            .expect("login");
-        let profile = state
-            .create_profile
-            .execute("Ada", "Lovelace", "Analytical Engine", None)
-            .await
-            .expect("create profile");
-
-        const DAY_1: i64 = 1_717_200_000_000; // UTC-midnight epoch ms
-        const DAY_2: i64 = DAY_1 + 86_400_000;
-        const DAY_3: i64 = DAY_1 + 2 * 86_400_000;
-        const TS: i64 = 1_700_000_000_000;
-
-        // Build an entry exactly as the command would receive it from the front.
-        let entry = |day: i64, kind: &str, created: Option<i64>| ImportPresenceEntryDto {
-            day,
-            kind: kind.to_string(),
-            created_at: created,
-            updated_at: None,
-        };
-
-        // Initial import into an empty profile: everything inserted, and the
-        // file's created_at is honored (with a fallback when absent).
-        let s = state
-            .import_presences
-            .execute(
-                &profile.id,
-                vec![
-                    entry(DAY_1, "office", Some(TS)),
-                    entry(DAY_2, "remote", None),
-                ],
-                false,
-            )
-            .await
-            .expect("import");
-        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (2, 0, 0, 2));
-        let day1 = state
-            .list_presences
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|p| p.day == DAY_1)
-            .unwrap();
-        assert_eq!(day1.kind, "office");
-        assert_eq!(day1.created_at, TS, "created_at preserved from the file");
-
-        // Re-import overlapping DAY_1 (different type) + new DAY_3 with the skip
-        // strategy: DAY_1 is left untouched, DAY_3 is inserted.
-        let s = state
-            .import_presences
-            .execute(
-                &profile.id,
-                vec![
-                    entry(DAY_1, "vacation", Some(TS + 1)),
-                    entry(DAY_3, "holiday", None),
-                ],
-                false,
-            )
-            .await
-            .expect("import skip");
-        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (1, 1, 0, 2));
-        let day1 = state
-            .list_presences
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|p| p.day == DAY_1)
-            .unwrap();
-        assert_eq!(day1.kind, "office", "skip kept the original type");
-        assert_eq!(day1.created_at, TS, "skip kept the original created_at");
-
-        // Re-import DAY_1 with the replace strategy: the type is overwritten but
-        // the original created_at is preserved.
-        let s = state
-            .import_presences
-            .execute(
-                &profile.id,
-                vec![entry(DAY_1, "vacation", Some(TS + 99))],
-                true,
-            )
-            .await
-            .expect("import replace");
-        assert_eq!((s.imported, s.skipped, s.replaced, s.total), (0, 0, 1, 1));
-        let day1 = state
-            .list_presences
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|p| p.day == DAY_1)
-            .unwrap();
-        assert_eq!(day1.kind, "vacation", "replace overwrote the type");
-        assert_eq!(
-            day1.created_at, TS,
-            "replace preserved the original created_at"
-        );
-
-        // A duplicate day within a single import keeps the counts consistent.
-        const DAY_DUP: i64 = DAY_1 + 10 * 86_400_000;
-        let s = state
-            .import_presences
-            .execute(
-                &profile.id,
-                vec![
-                    entry(DAY_DUP, "office", None),
-                    entry(DAY_DUP, "remote", None),
-                ],
-                true,
-            )
-            .await
-            .expect("import dup");
-        assert_eq!(s.imported + s.replaced + s.skipped, s.total);
-
-        // Unknown type and non-midnight day are rejected by validation.
-        assert!(matches!(
-            state
-                .import_presences
-                .execute(&profile.id, vec![entry(DAY_2, "carpool", None)], false)
-                .await,
-            Err(DomainError::Validation(_))
-        ));
-        assert!(matches!(
-            state
-                .import_presences
-                .execute(&profile.id, vec![entry(DAY_1 + 1, "office", None)], false)
-                .await,
-            Err(DomainError::Validation(_))
-        ));
-
-        // Logout locks the vault; import is refused.
-        state.logout.execute(&session.token).unwrap();
-        assert!(matches!(
-            state
-                .import_presences
-                .execute(&profile.id, vec![entry(DAY_1, "office", None)], false)
-                .await,
             Err(DomainError::Unauthorized)
         ));
 
@@ -1320,7 +1161,6 @@ fn office_day_seeds_default_start_time() {
             .expect("profile");
 
         const DAY: i64 = 1_717_200_000_000;
-        const DAY_IMPORT: i64 = DAY + 86_400_000;
 
         // Set a custom default start (10:00) for this profile.
         let mut settings = state
@@ -1403,39 +1243,6 @@ fn office_day_seeds_default_start_time() {
                 .start_minutes,
             600,
             "a re-created work day is re-seeded with the default"
-        );
-
-        // Bulk import never seeds a schedule (it does not go through set_presence).
-        state
-            .import_presences
-            .execute(
-                &profile.id,
-                vec![ImportPresenceEntryDto {
-                    day: DAY_IMPORT,
-                    kind: "office".to_string(),
-                    created_at: None,
-                    updated_at: None,
-                }],
-                false,
-            )
-            .await
-            .expect("import");
-        let imported = state
-            .list_presences
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .into_iter()
-            .find(|p| p.day == DAY_IMPORT)
-            .unwrap();
-        assert!(
-            state
-                .get_work_schedule
-                .execute(&imported.id)
-                .await
-                .unwrap()
-                .is_none(),
-            "import must not seed schedules"
         );
 
         let _ = std::fs::remove_dir_all(dir);
@@ -1596,6 +1403,348 @@ fn day_note_persists_and_is_rendered_to_safe_html() {
             state.get_day_note.execute(&presence.id).await,
             Err(DomainError::Unauthorized)
         ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn profile_bundle_round_trips_through_export_and_import() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("profile_bundle");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let _session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let source = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", Some("Engineer"))
+            .await
+            .expect("profile");
+
+        // Custom settings, so we can assert they transfer.
+        let mut settings = state
+            .get_profile_settings
+            .execute(&source.id)
+            .await
+            .expect("get settings");
+        settings.default_start_minutes = 600;
+        settings.grid_country = "FR".to_string();
+        state
+            .set_profile_settings
+            .execute(&source.id, settings)
+            .await
+            .expect("set settings");
+
+        const DAY_OFFICE: i64 = 1_717_200_000_000;
+        const DAY_REMOTE: i64 = DAY_OFFICE + 86_400_000;
+
+        // Office day with a commute trip, work entries, a custom start and a note.
+        let office = state
+            .set_presence
+            .execute(
+                &source.id,
+                DAY_OFFICE,
+                "office",
+                vec![TripInputDto {
+                    mode_id: "car_petrol".into(),
+                    distance_km: 15.0,
+                    round_trip: true,
+                    occupants: None,
+                }],
+            )
+            .await
+            .expect("office day");
+        let source_co2 = office.co2_kg.expect("co2 present");
+
+        state
+            .set_work_entries
+            .execute(
+                &office.id,
+                vec![
+                    WorkEntryInputDto {
+                        title: "Dev".into(),
+                        description: Some("feature".into()),
+                        minutes: 90,
+                        color: "#112233".into(),
+                    },
+                    WorkEntryInputDto {
+                        title: "Réunion".into(),
+                        description: None,
+                        minutes: 30,
+                        color: "#445566".into(),
+                    },
+                ],
+            )
+            .await
+            .expect("work entries");
+        state
+            .set_work_schedule
+            .execute(&office.id, 540)
+            .await
+            .expect("schedule");
+        state
+            .set_day_note
+            .execute(&office.id, Some("# Notes\nBonjour".into()))
+            .await
+            .expect("note");
+
+        // A remote day with nothing attached.
+        state
+            .set_presence
+            .execute(&source.id, DAY_REMOTE, "remote", vec![])
+            .await
+            .expect("remote day");
+
+        state
+            .create_task_preset
+            .execute(&source.id, "Standup", Some("daily".into()), 15, "#0A0B0C")
+            .await
+            .expect("preset");
+        state
+            .create_commute
+            .execute(
+                &source.id,
+                "Train + vélo",
+                true,
+                vec![
+                    CommuteSegmentInputDto {
+                        mode_id: "train_sncb".into(),
+                        distance_km: 30.0,
+                        occupants: None,
+                    },
+                    CommuteSegmentInputDto {
+                        mode_id: "bike".into(),
+                        distance_km: 5.0,
+                        occupants: None,
+                    },
+                ],
+            )
+            .await
+            .expect("commute");
+
+        // --- Export everything to a JSON bundle. ---
+        let bundle_path = dir.join("profile.json");
+        let path = bundle_path.to_str().unwrap();
+        let all = BundleExportOptionsDto {
+            include_days: true,
+            include_trips: true,
+            include_work_hours: true,
+            include_notes: true,
+            include_task_presets: true,
+            include_commutes: true,
+            include_settings: true,
+        };
+        let summary = state
+            .export_profile_bundle
+            .execute(&source.id, all, path)
+            .await
+            .expect("export");
+        assert_eq!(
+            (
+                summary.days,
+                summary.trips,
+                summary.work_entries,
+                summary.notes,
+                summary.task_presets,
+                summary.commutes,
+                summary.settings
+            ),
+            (2, 1, 2, 1, 1, 1, true)
+        );
+
+        // --- Inspect reports the same counts and resolves every mode. ---
+        let manifest = state
+            .inspect_profile_bundle
+            .execute(path)
+            .await
+            .expect("inspect");
+        assert!(manifest.compatible);
+        assert_eq!(manifest.profile_first_name, "Ada");
+        assert_eq!(
+            (
+                manifest.days,
+                manifest.trips,
+                manifest.work_entries,
+                manifest.notes,
+                manifest.task_presets,
+                manifest.commutes,
+                manifest.has_settings
+            ),
+            (2, 1, 2, 1, 1, 1, true)
+        );
+        assert!(
+            manifest.unknown_mode_ids.is_empty(),
+            "all modes are seeded: {:?}",
+            manifest.unknown_mode_ids
+        );
+
+        // --- Import everything into a NEW profile. ---
+        let selection = BundleImportSelectionDto {
+            include_days: true,
+            include_trips: true,
+            include_work_hours: true,
+            include_notes: true,
+            include_task_presets: true,
+            include_commutes: true,
+            include_settings: true,
+        };
+        let result = state
+            .import_profile_bundle
+            .execute(
+                path,
+                selection,
+                BundleImportTargetDto {
+                    kind: "new".into(),
+                    profile_id: None,
+                    first_name: None,
+                    last_name: None,
+                    enterprise: None,
+                    poste: None,
+                },
+                "skip",
+            )
+            .await
+            .expect("import new");
+        assert_eq!(
+            (
+                result.days_imported,
+                result.days_replaced,
+                result.days_skipped
+            ),
+            (2, 0, 0)
+        );
+        assert_ne!(result.profile_id, source.id, "a new profile was created");
+        let new_id = result.profile_id.clone();
+
+        // The freshly imported profile became active.
+        let profiles = state.list_profiles.execute().await.unwrap();
+        assert_eq!(profiles.profiles.len(), 2);
+        assert_eq!(profiles.active_profile_id.as_deref(), Some(new_id.as_str()));
+
+        // Presences + the frozen footprint transferred verbatim.
+        let days = state.list_presences.execute(&new_id).await.unwrap();
+        assert_eq!(days.len(), 2);
+        let imported_office = days
+            .iter()
+            .find(|p| p.day == DAY_OFFICE)
+            .expect("office day imported");
+        assert_eq!(imported_office.kind, "office");
+        assert!((imported_office.co2_kg.unwrap() - source_co2).abs() < 1e-9);
+
+        let trips = state
+            .get_presence_trips
+            .execute(&imported_office.id)
+            .await
+            .unwrap();
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].mode_id, "car_petrol");
+        assert!((trips[0].co2_kg - source_co2).abs() < 1e-9);
+
+        let entries = state
+            .get_work_entries
+            .execute(&imported_office.id)
+            .await
+            .unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].title, "Dev");
+        assert_eq!(entries[0].minutes, 90);
+
+        let schedule = state
+            .get_work_schedule
+            .execute(&imported_office.id)
+            .await
+            .unwrap()
+            .expect("schedule imported");
+        assert_eq!(schedule.start_minutes, 540);
+        assert_eq!(schedule.end_minutes, 660);
+
+        let note = state
+            .get_day_note
+            .execute(&imported_office.id)
+            .await
+            .unwrap();
+        assert!(note.markdown.contains("Bonjour"));
+
+        let presets = state.list_task_presets.execute(&new_id).await.unwrap();
+        assert_eq!(presets.len(), 1);
+        assert_eq!(presets[0].title, "Standup");
+
+        let commutes = state.list_commutes.execute(&new_id).await.unwrap();
+        assert_eq!(commutes.len(), 1);
+        assert_eq!(commutes[0].name, "Train + vélo");
+        assert_eq!(commutes[0].segments.len(), 2);
+
+        let imported_settings = state.get_profile_settings.execute(&new_id).await.unwrap();
+        assert_eq!(imported_settings.default_start_minutes, 600);
+        assert_eq!(imported_settings.grid_country, "FR");
+
+        // --- Merge back into the same profile: skip leaves the days untouched. ---
+        let skip_again = state
+            .import_profile_bundle
+            .execute(
+                path,
+                selection,
+                BundleImportTargetDto {
+                    kind: "existing".into(),
+                    profile_id: Some(new_id.clone()),
+                    first_name: None,
+                    last_name: None,
+                    enterprise: None,
+                    poste: None,
+                },
+                "skip",
+            )
+            .await
+            .expect("merge skip");
+        assert_eq!(
+            (
+                skip_again.days_imported,
+                skip_again.days_replaced,
+                skip_again.days_skipped
+            ),
+            (0, 0, 2)
+        );
+
+        // Replace overwrites the existing days in place (no duplication).
+        let replace_again = state
+            .import_profile_bundle
+            .execute(
+                path,
+                selection,
+                BundleImportTargetDto {
+                    kind: "existing".into(),
+                    profile_id: Some(new_id.clone()),
+                    first_name: None,
+                    last_name: None,
+                    enterprise: None,
+                    poste: None,
+                },
+                "replace",
+            )
+            .await
+            .expect("merge replace");
+        assert_eq!(
+            (
+                replace_again.days_imported,
+                replace_again.days_replaced,
+                replace_again.days_skipped
+            ),
+            (0, 2, 0)
+        );
+        assert_eq!(
+            state.list_presences.execute(&new_id).await.unwrap().len(),
+            2
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     });

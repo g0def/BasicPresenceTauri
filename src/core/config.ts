@@ -27,7 +27,6 @@ export const COMMANDS = {
   setPresence: "set_presence",
   listPresences: "list_presences",
   deletePresence: "delete_presence",
-  importPresences: "import_presences",
   listEmissionFactors: "list_emission_factors",
   createCommute: "create_commute",
   listCommutes: "list_commutes",
@@ -45,4 +44,7 @@ export const COMMANDS = {
   getDayNote: "get_day_note",
   setDayNote: "set_day_note",
   exportProfileData: "export_profile_data",
+  exportProfileBundle: "export_profile_bundle",
+  inspectProfileBundle: "inspect_profile_bundle",
+  importProfileBundle: "import_profile_bundle",
 } as const;

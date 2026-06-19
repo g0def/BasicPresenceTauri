@@ -5,4 +5,5 @@ pub mod export;
 pub mod presence;
 pub mod profile;
 pub mod settings;
+pub mod transfer;
 pub mod work_hours;

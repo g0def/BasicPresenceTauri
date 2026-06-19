@@ -7,13 +7,15 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
-use crate::application::use_cases::import_presences::ImportPresencesUseCase;
+use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
+use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
@@ -53,7 +55,6 @@ pub struct AppState {
     pub set_presence: SetPresenceUseCase,
     pub list_presences: ListPresencesUseCase,
     pub delete_presence: DeletePresenceUseCase,
-    pub import_presences: ImportPresencesUseCase,
     pub list_emission_factors: ListEmissionFactorsUseCase,
     pub create_commute: CreateCommuteUseCase,
     pub list_commutes: ListCommutesUseCase,
@@ -73,6 +74,9 @@ pub struct AppState {
     pub get_day_note: GetDayNoteUseCase,
     pub set_day_note: SetDayNoteUseCase,
     pub export_profile_data: ExportProfileDataUseCase,
+    pub export_profile_bundle: ExportProfileBundleUseCase,
+    pub inspect_profile_bundle: InspectProfileBundleUseCase,
+    pub import_profile_bundle: ImportProfileBundleUseCase,
     /// Vault handle, exposed so a window-close hook can lock it and refresh the
     /// integrity baseline on a clean app exit.
     pub vault: Arc<dyn VaultManager>,

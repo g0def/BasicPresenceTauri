@@ -9,8 +9,6 @@ import {
   toPresenceTrip,
 } from "@/features/presence/data/mappers/presence.mapper";
 import type {
-  ImportPresencesInput,
-  ImportSummary,
   Presence,
   PresenceTrip,
   SetPresenceInput,
@@ -45,16 +43,5 @@ export class TauriPresenceRepository implements PresenceRepository {
       presenceId,
     });
     return dtos.map(toPresenceTrip);
-  }
-
-  async importMany(input: ImportPresencesInput): Promise<ImportSummary> {
-    // The wire shape matches `ImportSummary`/`ImportPresenceEntry` 1:1 (camelCase),
-    // so no DTO/mapper is needed. `undefined` timestamps are dropped by JSON
-    // serialization and become `None` on the backend.
-    return invoke<ImportSummary>(COMMANDS.importPresences, {
-      profileId: input.profileId,
-      entries: input.entries,
-      replaceExisting: input.replaceExisting,
-    });
   }
 }

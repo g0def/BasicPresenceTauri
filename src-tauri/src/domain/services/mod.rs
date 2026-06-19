@@ -3,6 +3,7 @@ pub mod co2_calculator;
 pub mod key_service;
 pub mod markdown;
 pub mod password_hasher;
+pub mod profile_bundle;
 pub mod session_store;
 pub mod spreadsheet_exporter;
 pub mod token_generator;
