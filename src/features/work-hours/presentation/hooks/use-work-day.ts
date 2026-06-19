@@ -1,23 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isAppError } from "@/core/errors";
-import { TauriWorkEntryRepository } from "@/features/work-hours/data/repositories/tauri-work-entry.repository";
 import {
   toWorkEntryInput,
   type WorkDaySchedule,
   type WorkEntry,
   type WorkEntryInput,
 } from "@/features/work-hours/domain/entities/work-hours";
-import { makeGetWorkEntriesUseCase } from "@/features/work-hours/domain/use-cases/get-work-entries";
-import { makeGetWorkScheduleUseCase } from "@/features/work-hours/domain/use-cases/get-work-schedule";
-import { makeSetWorkEntriesUseCase } from "@/features/work-hours/domain/use-cases/set-work-entries";
-import { makeSetWorkScheduleUseCase } from "@/features/work-hours/domain/use-cases/set-work-schedule";
-
-const entryRepo = new TauriWorkEntryRepository();
-const getEntriesUseCase = makeGetWorkEntriesUseCase(entryRepo);
-const setEntriesUseCase = makeSetWorkEntriesUseCase(entryRepo);
-const getScheduleUseCase = makeGetWorkScheduleUseCase(entryRepo);
-const setScheduleUseCase = makeSetWorkScheduleUseCase(entryRepo);
+import {
+  getWorkEntries as getEntriesUseCase,
+  getWorkSchedule as getScheduleUseCase,
+  setWorkEntries as setEntriesUseCase,
+  setWorkSchedule as setScheduleUseCase,
+} from "@/features/work-hours/presentation/work-day-actions";
 
 /** Delay between the last local mutation and the persisting replace-all call. */
 const SAVE_DEBOUNCE_MS = 600;

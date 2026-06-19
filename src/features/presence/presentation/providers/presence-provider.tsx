@@ -92,8 +92,8 @@ export function PresenceProvider({
       day: number,
       type: PresenceType,
       trips?: PresenceTrip[],
-    ): Promise<boolean> => {
-      if (!profileId) return false;
+    ): Promise<Presence | null> => {
+      if (!profileId) return null;
       setIsSubmitting(true);
       setError(null);
       try {
@@ -103,10 +103,10 @@ export function PresenceProvider({
           ...prev.filter((p) => p.day !== saved.day),
           saved,
         ]);
-        return true;
+        return saved;
       } catch (e) {
         handleError(e);
-        return false;
+        return null;
       } finally {
         setIsSubmitting(false);
       }
