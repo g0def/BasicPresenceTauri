@@ -21,7 +21,9 @@ import {
 } from "@/components/ui/select";
 import {
   DAY_CHILD_KEYS,
+  effective,
   presentCategories,
+  selectionFromManifest,
   type BundleImportSummary,
   type BundleManifest,
   type BundleSelection,
@@ -45,30 +47,6 @@ interface NewProfileForm {
   lastName: string;
   enterprise: string;
   poste: string;
-}
-
-function selectionFromManifest(m: BundleManifest): BundleSelection {
-  const present = new Set(presentCategories(m).map((c) => c.key));
-  return {
-    includeDays: present.has("includeDays"),
-    includeTrips: present.has("includeTrips"),
-    includeWorkHours: present.has("includeWorkHours"),
-    includeNotes: present.has("includeNotes"),
-    includeTaskPresets: present.has("includeTaskPresets"),
-    includeCommutes: present.has("includeCommutes"),
-    includeSettings: present.has("includeSettings"),
-  };
-}
-
-/** Children are dropped from the payload when the days are not imported. */
-function effective(sel: BundleSelection): BundleSelection {
-  if (sel.includeDays) return sel;
-  return {
-    ...sel,
-    includeTrips: false,
-    includeWorkHours: false,
-    includeNotes: false,
-  };
 }
 
 /**

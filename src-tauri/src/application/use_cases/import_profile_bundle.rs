@@ -7,10 +7,14 @@ use uuid::Uuid;
 use crate::application::dto::profile_bundle_dto::{
     BundleImportSelectionDto, BundleImportSummaryDto, BundleImportTargetDto,
 };
+use crate::application::dto::profile_settings_dto::ProfileSettingsDto;
 use crate::application::use_cases::create_profile::{normalize_optional, validate_required};
 use crate::application::use_cases::create_task_preset::{
     normalize_description, validate_color, validate_minutes, validate_title,
 };
+use crate::application::use_cases::set_presence::validate_day;
+use crate::application::use_cases::set_profile_settings::validate as validate_settings;
+use crate::application::use_cases::set_work_schedule::validate_start;
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::profile::Profile;
@@ -51,7 +55,9 @@ struct PreparedDay {
 /// existing one. The file is read+parsed by the [`ProfileBundleCodec`]; the whole
 /// parsed content is validated up front (so a malformed file aborts before any
 /// write); the writes then reuse the existing per-entity repository methods,
-/// preserving frozen CO₂ snapshots and timestamps verbatim.
+/// preserving frozen CO₂ snapshots and timestamps verbatim. On a merge that
+/// *replaces* an existing day, the upsert keeps that row's original `created_at`
+/// (only fresh inserts carry the bundle's `created_at` through).
 pub struct ImportProfileBundleUseCase {
     codec: Arc<dyn ProfileBundleCodec>,
     profiles: Arc<dyn ProfileRepository>,
@@ -132,6 +138,13 @@ impl ImportProfileBundleUseCase {
             Vec::new()
         };
         let prepared_settings: Option<ProfileSettings> = if selection.include_settings {
+            if let Some(s) = &bundle.settings {
+                // Untrusted: enforce the same field rules (enums/ranges) as
+                // SetProfileSettingsUseCase so a corrupt settings block aborts here,
+                // up front, with a clean Validation error — instead of an opaque
+                // Storage error mid-import after other categories were written.
+                validate_settings(&ProfileSettingsDto::from(s.clone()))?;
+            }
             bundle.settings.clone()
         } else {
             None
@@ -213,7 +226,8 @@ impl ImportProfileBundleUseCase {
             }
 
             if selection.include_work_hours {
-                // Replace-all (also clears stale entries when replacing a day).
+                // Replace-all: writes the imported entries (empty for a non-work day)
+                // and clears any stale entries when replacing a day.
                 for e in &mut pd.work_entries {
                     e.presence_id = saved.id.clone();
                 }
@@ -221,9 +235,20 @@ impl ImportProfileBundleUseCase {
                     .replace_for_presence(&saved.id, &pd.work_entries)
                     .await?;
                 summary.work_entries += pd.work_entries.len() as u32;
-                if let Some(mut schedule) = pd.schedule {
-                    schedule.presence_id = saved.id.clone();
-                    self.work_entries.set_schedule(&schedule).await?;
+                match pd.schedule.take() {
+                    Some(mut schedule) => {
+                        schedule.presence_id = saved.id.clone();
+                        // end is DERIVED (start + sum of entry minutes), never the
+                        // file's value, so the stored schedule stays self-consistent.
+                        let total: i64 = pd.work_entries.iter().map(|e| e.minutes).sum();
+                        schedule.end_minutes = schedule.start_minutes + total;
+                        self.work_entries.set_schedule(&schedule).await?;
+                    }
+                    None => {
+                        // No schedule for this day: drop any the replaced day carried,
+                        // so a "replace" can't leave the previous day's start/end.
+                        self.work_entries.clear_schedule(&saved.id).await?;
+                    }
                 }
             }
 
@@ -238,13 +263,44 @@ impl ImportProfileBundleUseCase {
             }
         }
 
+        // On a merge, skip presets/commutes whose name already exists on the target,
+        // so re-importing the same bundle doesn't accumulate duplicates. Unlike days
+        // (UNIQUE per profil), presets/commutes have no natural key, so they're
+        // deduped here by their user-facing name. The summary counts what was
+        // actually created. (Nothing pre-exists for a "new" profile.)
+        let existing_preset_titles: HashSet<String> = if is_merge {
+            self.task_presets
+                .list_by_profile(&target_profile_id)
+                .await?
+                .into_iter()
+                .map(|p| p.title)
+                .collect()
+        } else {
+            HashSet::new()
+        };
         for mut preset in prepared_presets {
+            if existing_preset_titles.contains(&preset.title) {
+                continue;
+            }
             preset.profile_id = target_profile_id.clone();
             self.task_presets.create(&preset).await?;
             summary.task_presets += 1;
         }
 
+        let existing_commute_names: HashSet<String> = if is_merge {
+            self.commutes
+                .list_by_profile(&target_profile_id)
+                .await?
+                .into_iter()
+                .map(|c| c.name)
+                .collect()
+        } else {
+            HashSet::new()
+        };
         for mut commute in prepared_commutes {
+            if existing_commute_names.contains(&commute.name) {
+                continue;
+            }
             commute.profile_id = target_profile_id.clone();
             self.commutes.create(&commute).await?;
             summary.commutes += 1;
@@ -312,10 +368,32 @@ fn prepare_days(
 ) -> Result<Vec<PreparedDay>, DomainError> {
     let mut out = Vec::with_capacity(days.len());
     for d in days {
-        let trips: Vec<Trip> = if selection.include_trips {
-            d.trips
-                .iter()
-                .map(|t| Trip {
+        // Untrusted file content: the vault has no CHECK on `day`, so enforce the
+        // same rule as the normal write path (epoch ms at UTC midnight).
+        validate_day(d.presence.day)?;
+
+        // CO2/trips/work hours are tied to presence: only office/remote days carry
+        // them, and other types keep a NULL footprint (set_presence enforces this).
+        // Mirror it here so a hand-edited bundle can't persist a state the rest of
+        // the app deems impossible (a footprint or work hours on a holiday).
+        let is_work = matches!(d.presence.kind, PresenceType::Office | PresenceType::Remote);
+
+        let co2_kg = if is_work {
+            validate_co2(d.presence.co2_kg)?
+        } else {
+            None
+        };
+
+        let trips: Vec<Trip> = if selection.include_trips && is_work {
+            let mut trips = Vec::with_capacity(d.trips.len());
+            for t in &d.trips {
+                if t.distance_km < 0.0 || !t.distance_km.is_finite() {
+                    return Err(DomainError::Validation(
+                        "trip distance must be a finite value >= 0".to_string(),
+                    ));
+                }
+                validate_co2(Some(t.co2_kg))?;
+                trips.push(Trip {
                     id: Uuid::now_v7().to_string(),
                     mode_id: t.mode_id.clone(),
                     distance_km: t.distance_km,
@@ -325,15 +403,16 @@ fn prepare_days(
                     is_estimated: t.is_estimated,
                     factor_year: t.factor_year,
                     position: t.position,
-                })
-                .collect()
+                });
+            }
+            trips
         } else {
             Vec::new()
         };
 
         let mut work_entries = Vec::new();
         let mut schedule = None;
-        if selection.include_work_hours {
+        if selection.include_work_hours && is_work {
             for e in &d.work_entries {
                 work_entries.push(WorkEntry {
                     id: Uuid::now_v7().to_string(),
@@ -345,11 +424,19 @@ fn prepare_days(
                     position: e.position,
                 });
             }
-            schedule = d.schedule.as_ref().map(|s| WorkDaySchedule {
-                presence_id: String::new(),
-                start_minutes: s.start_minutes,
-                end_minutes: s.end_minutes,
-            });
+            schedule = match d.schedule.as_ref() {
+                Some(s) => {
+                    // start is bounded like the normal path; end is DERIVED at write
+                    // time (start + sum of entry minutes), never trusted from the file.
+                    validate_start(s.start_minutes)?;
+                    Some(WorkDaySchedule {
+                        presence_id: String::new(),
+                        start_minutes: s.start_minutes,
+                        end_minutes: 0,
+                    })
+                }
+                None => None,
+            };
         }
 
         let note = if selection.include_notes {
@@ -364,7 +451,7 @@ fn prepare_days(
         out.push(PreparedDay {
             day: d.presence.day,
             kind: d.presence.kind,
-            co2_kg: d.presence.co2_kg,
+            co2_kg,
             is_estimated: d.presence.is_estimated,
             created_at: d.presence.created_at,
             updated_at: d.presence.updated_at,
@@ -375,6 +462,20 @@ fn prepare_days(
         });
     }
     Ok(out)
+}
+
+/// A presence/trip `co2_kg`, when present, must be finite and non-negative — a
+/// hand-edited bundle could carry NaN/Inf/negative and SQLite would store it,
+/// poisoning later CO2 aggregation.
+fn validate_co2(co2_kg: Option<f64>) -> Result<Option<f64>, DomainError> {
+    if let Some(c) = co2_kg {
+        if !c.is_finite() || c < 0.0 {
+            return Err(DomainError::Validation(
+                "co2 must be a finite value >= 0".to_string(),
+            ));
+        }
+    }
+    Ok(co2_kg)
 }
 
 fn prepare_presets(presets: &[TaskPreset]) -> Result<Vec<TaskPreset>, DomainError> {
@@ -442,4 +543,23 @@ fn prepare_commutes(commutes: &[Commute]) -> Result<Vec<Commute>, DomainError> {
         });
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_co2_accepts_none_and_finite_nonneg() {
+        assert!(validate_co2(None).is_ok());
+        assert!(validate_co2(Some(0.0)).is_ok());
+        assert!(validate_co2(Some(12.5)).is_ok());
+    }
+
+    #[test]
+    fn validate_co2_rejects_negative_and_non_finite() {
+        assert!(validate_co2(Some(-0.1)).is_err());
+        assert!(validate_co2(Some(f64::NAN)).is_err());
+        assert!(validate_co2(Some(f64::INFINITY)).is_err());
+    }
 }

@@ -121,7 +121,17 @@ impl ExportProfileBundleUseCase {
                 0
             },
             notes: if opts.include_days && opts.include_notes {
-                data.days.iter().filter(|d| d.note.is_some()).count() as u32
+                // "Note present" = non-blank, matching inspect_profile_bundle so the
+                // export summary and the import manifest can never disagree.
+                data.days
+                    .iter()
+                    .filter(|d| {
+                        d.note
+                            .as_deref()
+                            .map(|n| !n.trim().is_empty())
+                            .unwrap_or(false)
+                    })
+                    .count() as u32
             } else {
                 0
             },

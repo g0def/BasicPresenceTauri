@@ -147,4 +147,15 @@ impl WorkEntryRepository for LibsqlWorkEntryRepository {
             .map_err(map_storage)?;
         Ok(())
     }
+
+    async fn clear_schedule(&self, presence_id: &str) -> Result<(), DomainError> {
+        self.conn()?
+            .execute(
+                "DELETE FROM work_day_schedule WHERE presence_id = ?1",
+                params![presence_id],
+            )
+            .await
+            .map_err(map_storage)?;
+        Ok(())
+    }
 }

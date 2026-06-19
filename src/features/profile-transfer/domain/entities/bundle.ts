@@ -101,6 +101,31 @@ export function presentCategories(m: BundleManifest): ManifestCategory[] {
   return out;
 }
 
+/** Initial import selection: tick exactly the categories the file contains. */
+export function selectionFromManifest(m: BundleManifest): BundleSelection {
+  const present = new Set(presentCategories(m).map((c) => c.key));
+  return {
+    includeDays: present.has("includeDays"),
+    includeTrips: present.has("includeTrips"),
+    includeWorkHours: present.has("includeWorkHours"),
+    includeNotes: present.has("includeNotes"),
+    includeTaskPresets: present.has("includeTaskPresets"),
+    includeCommutes: present.has("includeCommutes"),
+    includeSettings: present.has("includeSettings"),
+  };
+}
+
+/** Children are dropped from the payload when the days are not imported. */
+export function effective(sel: BundleSelection): BundleSelection {
+  if (sel.includeDays) return sel;
+  return {
+    ...sel,
+    includeTrips: false,
+    includeWorkHours: false,
+    includeNotes: false,
+  };
+}
+
 export type ImportTargetKind = "new" | "existing";
 export type ConflictStrategy = "skip" | "replace";
 

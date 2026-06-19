@@ -1749,3 +1749,212 @@ fn profile_bundle_round_trips_through_export_and_import() {
         let _ = std::fs::remove_dir_all(dir);
     });
 }
+
+/// Write a (possibly hand-forged) bundle file and return its path as a string.
+/// Used to simulate corrupt / maliciously-edited bundles the codec/import must
+/// reject or sanitize.
+fn forge_bundle(dir: &std::path::Path, name: &str, json: &str) -> String {
+    let p = dir.join(name);
+    std::fs::write(&p, json).unwrap();
+    p.to_str().unwrap().to_string()
+}
+
+#[test]
+fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("profile_bundle_guard");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let _session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+
+        let selection = BundleImportSelectionDto {
+            include_days: true,
+            include_trips: true,
+            include_work_hours: true,
+            include_notes: true,
+            include_task_presets: true,
+            include_commutes: true,
+            include_settings: true,
+        };
+        let new_target = || BundleImportTargetDto {
+            kind: "new".into(),
+            profile_id: None,
+            first_name: None,
+            last_name: None,
+            enterprise: None,
+            poste: None,
+        };
+
+        // A minimal, well-formed office-day bundle reused for the target/strategy
+        // rejection cases (the file itself is valid; only the call args are bad).
+        let valid = forge_bundle(
+            &dir,
+            "valid.json",
+            r#"{"format":"basic-presence-profile","version":1,"exportedAt":0,"app":"x","profile":{"firstName":"A","lastName":"B","enterprise":"C"},"days":[{"day":1717200000000,"type":"office","isEstimated":false,"createdAt":0,"updatedAt":0}]}"#,
+        );
+
+        // --- Trust-boundary rejections (each must surface as a clean Validation). ---
+
+        // A file from a newer schema is refused rather than half-imported.
+        let too_new = forge_bundle(
+            &dir,
+            "too_new.json",
+            r#"{"format":"basic-presence-profile","version":2,"exportedAt":0,"app":"x","profile":{"firstName":"A","lastName":"B","enterprise":"C"}}"#,
+        );
+        assert!(
+            matches!(
+                state
+                    .import_profile_bundle
+                    .execute(&too_new, selection, new_target(), "skip")
+                    .await,
+                Err(DomainError::Validation(_))
+            ),
+            "a newer-version bundle is rejected"
+        );
+
+        // Unknown conflict strategy / target kind.
+        assert!(matches!(
+            state
+                .import_profile_bundle
+                .execute(&valid, selection, new_target(), "merge-maybe")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        assert!(matches!(
+            state
+                .import_profile_bundle
+                .execute(
+                    &valid,
+                    selection,
+                    BundleImportTargetDto {
+                        kind: "clone".into(),
+                        profile_id: None,
+                        first_name: None,
+                        last_name: None,
+                        enterprise: None,
+                        poste: None,
+                    },
+                    "skip",
+                )
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        // "existing" without a profileId.
+        assert!(matches!(
+            state
+                .import_profile_bundle
+                .execute(
+                    &valid,
+                    selection,
+                    BundleImportTargetDto {
+                        kind: "existing".into(),
+                        profile_id: None,
+                        first_name: None,
+                        last_name: None,
+                        enterprise: None,
+                        poste: None,
+                    },
+                    "skip",
+                )
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+
+        // --- A malformed day aborts in the validation pass, before any write: a
+        // non-midnight `day` is rejected and NO destination profile is created. ---
+        let before = state.list_profiles.execute().await.unwrap().profiles.len();
+        let bad_day = forge_bundle(
+            &dir,
+            "bad_day.json",
+            r#"{"format":"basic-presence-profile","version":1,"exportedAt":0,"app":"x","profile":{"firstName":"A","lastName":"B","enterprise":"C"},"days":[{"day":12345,"type":"office","isEstimated":false,"createdAt":0,"updatedAt":0}]}"#,
+        );
+        assert!(matches!(
+            state
+                .import_profile_bundle
+                .execute(&bad_day, selection, new_target(), "skip")
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+        let after = state.list_profiles.execute().await.unwrap().profiles.len();
+        assert_eq!(before, after, "a failed import creates no profile");
+
+        // --- Inspect flags a transport mode this device doesn't know. ---
+        let unknown_mode = forge_bundle(
+            &dir,
+            "unknown_mode.json",
+            r#"{"format":"basic-presence-profile","version":1,"exportedAt":0,"app":"x","profile":{"firstName":"A","lastName":"B","enterprise":"C"},"days":[{"day":1717200000000,"type":"office","isEstimated":false,"createdAt":0,"updatedAt":0,"trips":[{"modeId":"spaceship_xyz","distanceKm":10.0,"roundTrip":false,"occupants":1,"co2Kg":1.0,"isEstimated":false,"factorYear":2025,"position":0}]}]}"#,
+        );
+        let manifest = state
+            .inspect_profile_bundle
+            .execute(&unknown_mode)
+            .await
+            .expect("inspect");
+        assert!(
+            manifest
+                .unknown_mode_ids
+                .iter()
+                .any(|m| m == "spaceship_xyz"),
+            "unknown mode flagged: {:?}",
+            manifest.unknown_mode_ids
+        );
+
+        // --- A hand-edited bundle puts trips/CO2/work-hours on a vacation day; the
+        // import must drop them (only office/remote days carry a footprint). ---
+        let dirty_vacation = forge_bundle(
+            &dir,
+            "dirty_vacation.json",
+            r##"{"format":"basic-presence-profile","version":1,"exportedAt":0,"app":"x","profile":{"firstName":"Vac","lastName":"Day","enterprise":"E"},"days":[{"day":1717200000000,"type":"vacation","co2Kg":9.0,"isEstimated":false,"createdAt":0,"updatedAt":0,"trips":[{"modeId":"car_petrol","distanceKm":10.0,"roundTrip":true,"occupants":1,"co2Kg":9.0,"isEstimated":false,"factorYear":2025,"position":0}],"workEntries":[{"title":"X","minutes":60,"color":"#112233","position":0}],"schedule":{"startMinutes":540,"endMinutes":600}}]}"##,
+        );
+        let res = state
+            .import_profile_bundle
+            .execute(&dirty_vacation, selection, new_target(), "skip")
+            .await
+            .expect("vacation import succeeds (sanitized)");
+        assert_eq!((res.days_imported, res.trips, res.work_entries), (1, 0, 0));
+        let vac_id = res.profile_id.clone();
+        let days = state.list_presences.execute(&vac_id).await.unwrap();
+        assert_eq!(days.len(), 1);
+        let vac = &days[0];
+        assert_eq!(vac.kind, "vacation");
+        assert!(vac.co2_kg.is_none(), "no footprint on a vacation day");
+        assert!(
+            state
+                .get_presence_trips
+                .execute(&vac.id)
+                .await
+                .unwrap()
+                .is_empty(),
+            "no trips on a vacation day"
+        );
+        assert!(
+            state
+                .get_work_entries
+                .execute(&vac.id)
+                .await
+                .unwrap()
+                .is_empty(),
+            "no work entries on a vacation day"
+        );
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&vac.id)
+                .await
+                .unwrap()
+                .is_none(),
+            "no schedule on a vacation day"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}

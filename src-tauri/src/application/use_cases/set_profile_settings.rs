@@ -41,8 +41,9 @@ impl SetProfileSettingsUseCase {
 }
 
 /// Validate every typed field. Mirrors the table CHECKs so a violation surfaces
-/// as a clean `Validation` error rather than an opaque `Storage` one.
-fn validate(dto: &ProfileSettingsDto) -> Result<(), DomainError> {
+/// as a clean `Validation` error rather than an opaque `Storage` one. Shared with
+/// the bundle import path, which receives untrusted settings from a file.
+pub(crate) fn validate(dto: &ProfileSettingsDto) -> Result<(), DomainError> {
     validate_start(dto.default_start_minutes)?;
     if !NOTE_FONTS.contains(&dto.note_font.as_str()) {
         return Err(DomainError::Validation("invalid noteFont".to_string()));

@@ -26,4 +26,9 @@ pub trait WorkEntryRepository: Send + Sync {
 
     /// Create or update the day's start/end times.
     async fn set_schedule(&self, schedule: &WorkDaySchedule) -> Result<(), DomainError>;
+
+    /// Remove the day's start/end times, if any. Idempotent. Used when a write
+    /// must leave a day with no schedule (e.g. a bundle import replacing a day
+    /// that previously had one with a day that doesn't).
+    async fn clear_schedule(&self, presence_id: &str) -> Result<(), DomainError>;
 }

@@ -70,7 +70,7 @@ export function ExportProfileDialog({
     const base = profile
       ? `${profile.firstName}-${profile.lastName}`.replace(/\s+/g, "-")
       : t("transfer.export.fileBaseName");
-    const fileName = `${t("transfer.export.fileBaseName")}-${base}-${format(new Date(), "yyyy-MM-dd")}.json`;
+    const fileName = `${base}-${format(new Date(), "yyyy-MM-dd")}.json`;
     const result = await exportBundle(profileId, selection, fileName);
     if (result) {
       setSummary(result);

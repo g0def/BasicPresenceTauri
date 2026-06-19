@@ -20,6 +20,18 @@ use crate::domain::services::co2_calculator::Co2Calculator;
 /// (epoch ms at UTC midnight), matching the key the frontend sends.
 const MS_PER_DAY: i64 = 86_400_000;
 
+/// A valid presence `day` is a non-negative multiple of [`MS_PER_DAY`] (epoch ms
+/// at UTC midnight), matching the key the frontend sends. The vault has no CHECK
+/// on the column, so every write path must enforce this (here and on import).
+pub fn validate_day(day: i64) -> Result<(), DomainError> {
+    if day < 0 || day % MS_PER_DAY != 0 {
+        return Err(DomainError::Validation(
+            "day must be epoch ms at UTC midnight".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Set (create or update) the presence type for a given day of a profile, and
 /// compute + snapshot the day's commute footprint. Re-setting the same day
 /// overwrites the type/trips rather than duplicating the row. CO2 is tied to
@@ -64,11 +76,7 @@ impl SetPresenceUseCase {
         if profile_id.is_empty() {
             return Err(DomainError::Validation("profileId is required".to_string()));
         }
-        if day < 0 || day % MS_PER_DAY != 0 {
-            return Err(DomainError::Validation(
-                "day must be epoch ms at UTC midnight".to_string(),
-            ));
-        }
+        validate_day(day)?;
         let kind = PresenceType::parse(kind)?;
 
         // CO2 is computed under the profile's own config; the default start time
