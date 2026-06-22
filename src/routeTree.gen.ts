@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
+import { Route as AuthenticatedLicenceRouteImport } from './routes/_authenticated/licence'
 import { Route as AuthenticatedCommutesIndexRouteImport } from './routes/_authenticated/commutes/index'
 import { Route as AuthenticatedWorkHoursDayRouteImport } from './routes/_authenticated/work-hours/$day'
 import { Route as AuthenticatedCommutesNewRouteImport } from './routes/_authenticated/commutes/new'
@@ -44,6 +45,11 @@ const AuthenticatedMethodologyRoute =
     path: '/methodology',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedLicenceRoute = AuthenticatedLicenceRouteImport.update({
+  id: '/licence',
+  path: '/licence',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedCommutesIndexRoute =
   AuthenticatedCommutesIndexRouteImport.update({
     id: '/commutes/',
@@ -72,6 +78,7 @@ const AuthenticatedCommutesCommuteIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
+  '/licence': typeof AuthenticatedLicenceRoute
   '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/licence': typeof AuthenticatedLicenceRoute
   '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/licence': typeof AuthenticatedLicenceRoute
   '/_authenticated/methodology': typeof AuthenticatedMethodologyRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/licence'
     | '/methodology'
     | '/settings'
     | '/commutes/new'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/licence'
     | '/methodology'
     | '/settings'
     | '/'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/licence'
     | '/_authenticated/methodology'
     | '/_authenticated/settings'
     | '/_authenticated/'
@@ -177,6 +189,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMethodologyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/licence': {
+      id: '/_authenticated/licence'
+      path: '/licence'
+      fullPath: '/licence'
+      preLoaderRoute: typeof AuthenticatedLicenceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/commutes/': {
       id: '/_authenticated/commutes/'
       path: '/commutes'
@@ -209,6 +228,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedLicenceRoute: typeof AuthenticatedLicenceRoute
   AuthenticatedMethodologyRoute: typeof AuthenticatedMethodologyRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -219,6 +239,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedLicenceRoute: AuthenticatedLicenceRoute,
   AuthenticatedMethodologyRoute: AuthenticatedMethodologyRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,

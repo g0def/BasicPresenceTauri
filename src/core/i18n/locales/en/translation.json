@@ -299,6 +299,13 @@
       "distancePositive": "Distance must be greater than 0."
     }
   },
+  "licence": {
+    "menuItem": "License",
+    "title": "Software license",
+    "back": "Back to calendar",
+    "loading": "Loading the license…",
+    "error": "Could not load the license."
+  },
   "methodology": {
     "menuItem": "Methodology & sources",
     "title": "CO₂ calculation methodology & sources",

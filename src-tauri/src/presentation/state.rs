@@ -10,6 +10,7 @@ use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
 use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
+use crate::application::use_cases::get_licence::GetLicenceUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
@@ -75,6 +76,7 @@ pub struct AppState {
     pub set_work_schedule: SetWorkScheduleUseCase,
     pub get_day_note: GetDayNoteUseCase,
     pub set_day_note: SetDayNoteUseCase,
+    pub get_licence: GetLicenceUseCase,
     pub export_profile_data: ExportProfileDataUseCase,
     pub export_profile_bundle: ExportProfileBundleUseCase,
     pub inspect_profile_bundle: InspectProfileBundleUseCase,

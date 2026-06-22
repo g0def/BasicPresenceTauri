@@ -44,6 +44,7 @@ export const COMMANDS = {
   setWorkSchedule: "set_work_schedule",
   getDayNote: "get_day_note",
   setDayNote: "set_day_note",
+  getLicence: "get_licence",
   exportProfileData: "export_profile_data",
   exportProfileBundle: "export_profile_bundle",
   inspectProfileBundle: "inspect_profile_bundle",

@@ -11,6 +11,7 @@ pub mod export_profile_bundle;
 pub mod export_profile_data;
 pub(crate) mod factor_maps;
 pub mod get_day_note;
+pub mod get_licence;
 pub mod get_presence_trips;
 pub mod get_profile_settings;
 pub mod get_work_entries;

@@ -22,6 +22,7 @@ use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
 use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
+use crate::application::use_cases::get_licence::GetLicenceUseCase;
 use crate::application::use_cases::get_presence_trips::GetPresenceTripsUseCase;
 use crate::application::use_cases::get_profile_settings::GetProfileSettingsUseCase;
 use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
@@ -87,7 +88,7 @@ use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRe
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
 use crate::infrastructure::transfer::json_bundle_codec::JsonProfileBundleCodec;
 use crate::presentation::commands::{
-    auth, commute, export, presence, profile, settings, transfer, work_hours,
+    auth, commute, export, legal, presence, profile, settings, transfer, work_hours,
 };
 use crate::presentation::state::AppState;
 
@@ -160,6 +161,7 @@ pub fn run() {
             work_hours::set_work_schedule,
             work_hours::get_day_note,
             work_hours::set_day_note,
+            legal::get_licence,
             export::export_profile_data,
             transfer::export_profile_bundle,
             transfer::inspect_profile_bundle,
@@ -218,6 +220,10 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
     let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
+    // App licence: static text embedded at compile time. The path is relative to
+    // this file (src-tauri/src/lib.rs), so `../../LICENCE` is the repo-root file —
+    // the single source of truth, shown in-app rendered to sanitized HTML.
+    const LICENCE_MD: &str = include_str!("../../LICENCE");
     let exporter: Arc<dyn SpreadsheetExporter> = Arc::new(OdsSpreadsheetExporter::new());
     let bundle_codec: Arc<dyn ProfileBundleCodec> = Arc::new(JsonProfileBundleCodec::new());
 
@@ -279,6 +285,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         set_work_schedule: SetWorkScheduleUseCase::new(work_entries.clone(), presences.clone()),
         get_day_note: GetDayNoteUseCase::new(presences.clone(), markdown.clone()),
         set_day_note: SetDayNoteUseCase::new(presences.clone(), markdown.clone(), clock.clone()),
+        get_licence: GetLicenceUseCase::new(LICENCE_MD, markdown.clone()),
         export_profile_data: ExportProfileDataUseCase::new(
             presences.clone(),
             work_entries.clone(),

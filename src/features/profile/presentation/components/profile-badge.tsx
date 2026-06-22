@@ -6,6 +6,7 @@ import {
   LogOut,
   Moon,
   Route,
+  ScrollText,
   Settings,
   Sun,
 } from "lucide-react";
@@ -139,6 +140,12 @@ export function ProfileBadge({ onLogout, onOpenCommutes }: ProfileBadgeProps) {
           <Link to="/methodology">
             <BookOpen />
             {t("methodology.menuItem")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/licence">
+            <ScrollText />
+            {t("licence.menuItem")}
           </Link>
         </DropdownMenuItem>
 

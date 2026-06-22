@@ -299,6 +299,13 @@
       "distancePositive": "La distance doit être supérieure à 0."
     }
   },
+  "licence": {
+    "menuItem": "Licence",
+    "title": "Licence d'utilisation",
+    "back": "Retour au calendrier",
+    "loading": "Chargement de la licence…",
+    "error": "Impossible de charger la licence."
+  },
   "methodology": {
     "menuItem": "Méthodologie & sources",
     "title": "Méthodologie & sources du calcul CO₂",
