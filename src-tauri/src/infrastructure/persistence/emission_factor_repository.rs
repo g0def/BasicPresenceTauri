@@ -11,7 +11,7 @@ use crate::domain::repositories::emission_factor_repository::EmissionFactorRepos
 use crate::infrastructure::persistence::db::map_storage;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 
-const SELECT_COLUMNS: &str = "id, label, value, unit, category, is_param";
+const SELECT_COLUMNS: &str = "id, label, value, unit, category, is_param, scope, source";
 
 /// Read-only emission-factor referential backed by the unlocked vault connection.
 pub struct LibsqlEmissionFactorRepository {
@@ -39,6 +39,8 @@ fn row_to_factor(row: &Row) -> Result<EmissionFactor, DomainError> {
         unit: EmissionUnit::parse(&unit)?,
         category: EmissionCategory::parse(&category)?,
         is_param: is_param != 0,
+        scope: row.get(6).map_err(map_storage)?,
+        source: row.get(7).map_err(map_storage)?,
     })
 }
 

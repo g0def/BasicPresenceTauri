@@ -1,25 +1,29 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::application::dto::emission_factor_dto::{EmissionFactorDto, GridVariantDto};
+use crate::application::dto::emission_factor_dto::{
+    Co2ReferentialDto, EmissionFactorDto, GridVariantDto,
+};
 use crate::domain::entities::co2_settings::Co2Settings;
-use crate::domain::entities::emission_factor::EmissionCategory;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
+use crate::domain::services::co2_calculator::radiative_forcing_factor;
 
-/// List the emission-factor referential for the picker. The referential year is
-/// fixed (only one year is seeded) and is not user-editable, so the picker is
-/// profile-agnostic and always uses the default factor year.
-pub struct ListEmissionFactorsUseCase {
+/// List the FULL CO2 referential for the methodology page: every factor (unlike
+/// the trip picker, the `building` rows are kept), each with its scope/source and
+/// per-country grid variants, plus the active referential year and the
+/// radiative-forcing multiplier in force for that year. Profile-agnostic: it
+/// reports the default referential year, the one new days are computed against.
+pub struct ListCo2ReferentialUseCase {
     factors: Arc<dyn EmissionFactorRepository>,
 }
 
-impl ListEmissionFactorsUseCase {
+impl ListCo2ReferentialUseCase {
     pub fn new(factors: Arc<dyn EmissionFactorRepository>) -> Self {
         Self { factors }
     }
 
-    pub async fn execute(&self) -> Result<Vec<EmissionFactorDto>, DomainError> {
+    pub async fn execute(&self) -> Result<Co2ReferentialDto, DomainError> {
         let factor_year = Co2Settings::default().factor_year;
         let factors = self.factors.list(factor_year).await?;
         let variants = self.factors.list_grid_variants(factor_year).await?;
@@ -32,9 +36,8 @@ impl ListEmissionFactorsUseCase {
             });
         }
 
-        Ok(factors
+        let factors = factors
             .into_iter()
-            .filter(|f| f.category != EmissionCategory::Building)
             .map(|f| {
                 let grid_variants = by_mode.get(&f.id).cloned().unwrap_or_default();
                 EmissionFactorDto {
@@ -49,6 +52,12 @@ impl ListEmissionFactorsUseCase {
                     source: f.source,
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(Co2ReferentialDto {
+            factor_year,
+            radiative_forcing: radiative_forcing_factor(factor_year),
+            factors,
+        })
     }
 }

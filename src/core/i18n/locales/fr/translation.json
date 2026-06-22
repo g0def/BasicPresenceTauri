@@ -276,7 +276,9 @@
       "plane_domestic": "Avion — intérieur",
       "plane_short": "Avion — court-courrier",
       "plane_medium": "Avion — moyen-courrier",
-      "plane_long": "Avion — long-courrier"
+      "plane_long": "Avion — long-courrier",
+      "office_day": "Jour au bureau (énergie bâtiment)",
+      "home_day": "Jour télétravail (énergie domicile)"
     },
     "step": {
       "title": "Choisissez un mode de déplacement.",
@@ -291,6 +293,76 @@
       "minSegment": "Ajoutez au moins un segment.",
       "modeRequired": "Choisissez un transport pour chaque segment.",
       "distancePositive": "La distance doit être supérieure à 0."
+    }
+  },
+  "methodology": {
+    "menuItem": "Méthodologie & sources",
+    "title": "Méthodologie & sources du calcul CO₂",
+    "back": "Retour au calendrier",
+    "intro": "L'empreinte est calculée par jour de présence (bureau ou télétravail). Référentiel actif : {{year}} · forçage radiatif ×{{rf}}.",
+    "introGeneric": "L'empreinte est calculée par jour de présence (bureau ou télétravail), à partir d'un référentiel de facteurs d'émission versionné par année.",
+    "loading": "Chargement du référentiel…",
+    "error": "Impossible de charger le référentiel des facteurs.",
+    "noProfile": "Sélectionnez un profil pour afficher le référentiel des facteurs.",
+    "formula": {
+      "title": "Comment l'impact est calculé",
+      "tripTitle": "Par trajet (segment)",
+      "trip": "co2 = distance × facteur × (aller-retour ? 2 : 1) ÷ occupants",
+      "tripNote": "La distance est un aller simple ; l'aller-retour la double. La division par les occupants ne s'applique qu'aux facteurs « par véhicule » (covoiturage). Un mode inconnu retombe sur la voiture moyenne (résultat estimé).",
+      "dayTitle": "Total de la journée",
+      "day": "total = Σ trajets + énergie du bâtiment (si activée)",
+      "dayNote": "Les jours de congé et fériés valent toujours 0. L'énergie du bâtiment (bureau/télétravail) n'est ajoutée que si l'option est activée."
+    },
+    "params": {
+      "title": "Paramètres du calcul",
+      "radiativeForcing": "Forçage radiatif (aviation)",
+      "radiativeForcingDesc": "Les facteurs aériens incluent le forçage radiatif (×{{rf}} pour le millésime {{year}}). Le désactiver divise par ce multiplicateur pour ne garder que le CO₂ direct.",
+      "carpool": "Covoiturage",
+      "carpoolDesc": "L'empreinte d'un trajet en voiture est divisée par le nombre d'occupants.",
+      "roundTrip": "Aller-retour",
+      "roundTripDesc": "Double la distance du trajet.",
+      "building": "Énergie du bâtiment",
+      "buildingDesc": "Forfait quotidien optionnel (chauffage, électricité) ajouté aux jours bureau/télétravail, hors trajet.",
+      "gridCountry": "Pays de recharge",
+      "gridCountryDesc": "Pour la voiture électrique, l'empreinte dépend du mix électrique du pays de recharge.",
+      "year": "Millésime",
+      "yearDesc": "Le référentiel est versionné par année ; les jours déjà encodés gardent leur empreinte figée."
+    },
+    "table": {
+      "title": "Référentiel des facteurs d'émission",
+      "subtitle": "Millésime {{year}} — valeurs telles qu'utilisées par l'application.",
+      "mode": "Mode",
+      "value": "Facteur",
+      "scope": "Périmètre",
+      "source": "Source",
+      "categories": {
+        "car": "Voiture",
+        "active": "Vélo & marche",
+        "public_transport": "Transport en commun",
+        "rail": "Train",
+        "air": "Avion",
+        "building": "Énergie du bâtiment"
+      }
+    },
+    "examples": {
+      "title": "Exemples",
+      "car": "Voiture essence, {{km}} km aller-retour : {{km}} × 2 × {{factor}} = {{total}} kg",
+      "carpool": "Même trajet à 3 personnes (covoiturage) : ÷ 3 = {{total}} kg",
+      "train": "TGV, {{km}} km aller-retour : {{km}} × 2 × {{factor}} = {{total}} kg",
+      "plane": "Avion court-courrier, {{km}} km : {{km}} × {{factor}} = {{total}} kg (forçage radiatif inclus)"
+    },
+    "sources": {
+      "title": "Sources",
+      "intro": "Les facteurs proviennent de référentiels publics. Cliquez pour ouvrir la source dans votre navigateur."
+    },
+    "transparency": {
+      "title": "Transparence & limites",
+      "intro": "Choix de modélisation et écarts connus :",
+      "item1": "Les facteurs voiture thermique reprennent un millésime ADEME antérieur (l'outil 2025 actuel est plus bas) ; l'ordre de grandeur reste correct.",
+      "item2": "L'hybride rechargeable suppose un usage majoritairement électrique (estimation optimiste).",
+      "item3": "Le train SNCB reflète une donnée de traction historique ; le chiffre courant (électricité verte) est plus bas.",
+      "item4": "« Transport en commun (mix) » est une moyenne pondérée interne, pas un facteur ADEME publié.",
+      "item5": "Les facteurs aériens incluent le forçage radiatif ; le moyen-courrier est une interpolation (pas de bande DEFRA dédiée)."
     }
   },
   "updater": {

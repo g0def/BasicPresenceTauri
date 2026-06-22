@@ -17,6 +17,7 @@ pub mod get_work_entries;
 pub mod get_work_schedule;
 pub mod import_profile_bundle;
 pub mod inspect_profile_bundle;
+pub mod list_co2_referential;
 pub mod list_commutes;
 pub mod list_emission_factors;
 pub mod list_presences;

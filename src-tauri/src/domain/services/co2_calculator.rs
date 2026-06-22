@@ -5,10 +5,19 @@ use crate::domain::entities::emission_factor::{EmissionCategory, EmissionFactor,
 use crate::domain::entities::presence::PresenceType;
 use crate::domain::entities::trip::TripInput;
 
-/// Radiative-forcing multiplier baked into the aviation factors. When the user
-/// disables radiative forcing we DIVIDE by it to recover the CO2-only value
-/// (never multiply — that would double-count, R5).
-const RADIATIVE_FORCING_FACTOR: f64 = 1.9;
+/// Radiative-forcing multiplier baked into the aviation factors, resolved per
+/// referential year: DEFRA/DESNZ lowered it from 1.9 to 1.7 in the June-2023
+/// update, so the 2025 referential's air factors are baked with 1.9 and the 2026
+/// referential's with 1.7. When the user disables radiative forcing we DIVIDE by
+/// the year-matching multiplier to recover the CO2-only value (never multiply —
+/// that would double-count, R5).
+pub(crate) fn radiative_forcing_factor(factor_year: i32) -> f64 {
+    if factor_year >= 2026 {
+        1.7
+    } else {
+        1.9
+    }
+}
 
 /// Fallback mode used when a trip's `mode_id` is absent from the referential
 /// (R6). The result is flagged `is_estimated`.
@@ -125,7 +134,7 @@ impl Co2Calculator {
                 } else if factor.category == EmissionCategory::Air
                     && !settings.include_radiative_forcing
                 {
-                    ef /= RADIATIVE_FORCING_FACTOR;
+                    ef /= radiative_forcing_factor(settings.factor_year);
                 }
 
                 // 3. Distance × factor × round-trip (R1).
@@ -167,6 +176,8 @@ mod tests {
             category,
             is_param: matches!(category, EmissionCategory::Air)
                 || matches!(id, "car_ev" | "ebike" | "escooter" | "scooter_elec"),
+            scope: None,
+            source: None,
         }
     }
 
@@ -273,21 +284,38 @@ mod tests {
 
     #[test]
     fn ac6_plane_short_radiative_forcing_toggle() {
-        // RF off: divide the (RF-inclusive) factor by 1.9. Assert against the
-        // exact arithmetic, NOT the ticket's rounded 67.95 (which exceeds ±0.001).
-        let off = Co2Settings {
+        // RF off divides the (RF-inclusive) factor by the year-matching multiplier:
+        // 1.9 for the 2025 referential (legacy DEFRA), 1.7 for 2026 (DEFRA lowered
+        // it in June 2023). The fixture factor is the same; only the divisor moves.
+        let off_2025 = Co2Settings {
             include_radiative_forcing: false,
+            factor_year: 2025,
             ..Default::default()
         };
-        let res = Co2Calculator::compute_day(
+        let res_2025 = Co2Calculator::compute_day(
             &[trip("plane_short", 500.0, false, 1)],
             PresenceType::Office,
             &seed_factors(),
             &grid_variants(),
-            &off,
+            &off_2025,
         );
-        approx(res.total_kg, 500.0 * 0.2582 / 1.9);
-        // RF on: factor used as-is.
+        approx(res_2025.total_kg, 500.0 * 0.2582 / 1.9);
+
+        let off_2026 = Co2Settings {
+            include_radiative_forcing: false,
+            factor_year: 2026,
+            ..Default::default()
+        };
+        let res_2026 = Co2Calculator::compute_day(
+            &[trip("plane_short", 500.0, false, 1)],
+            PresenceType::Office,
+            &seed_factors(),
+            &grid_variants(),
+            &off_2026,
+        );
+        approx(res_2026.total_kg, 500.0 * 0.2582 / 1.7);
+
+        // RF on: factor used as-is (independent of the year).
         approx(
             day_total(
                 &[trip("plane_short", 500.0, false, 1)],

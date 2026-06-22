@@ -26,7 +26,7 @@ impl Default for Co2Settings {
             include_radiative_forcing: true,
             count_building_energy: false,
             working_days_per_year: 220,
-            factor_year: 2025,
+            factor_year: 2026,
         }
     }
 }

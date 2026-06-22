@@ -77,8 +77,8 @@ impl EmissionCategory {
 }
 
 /// One row of the versioned emission-factor referential (lives in the vault).
-/// The reference `year`, `scope` and `source` columns exist in the table for
-/// traceability but are not part of the in-memory model (not consumed yet).
+/// The reference `year` column drives versioning; `scope` and `source` are
+/// traceability metadata surfaced on the methodology page.
 #[derive(Debug, Clone)]
 pub struct EmissionFactor {
     /// The mode_id, e.g. `"car_petrol"`.
@@ -89,6 +89,10 @@ pub struct EmissionFactor {
     pub category: EmissionCategory,
     /// `true` when the value can be overridden by a parameter (the grid country).
     pub is_param: bool,
+    /// Perimeter of the factor (e.g. `"usage+fabrication"`), for traceability.
+    pub scope: Option<String>,
+    /// Source attribution (e.g. `"ADEME Base Carbone"`), for traceability.
+    pub source: Option<String>,
 }
 
 /// A per-(mode, country) override of an electric mode's factor.

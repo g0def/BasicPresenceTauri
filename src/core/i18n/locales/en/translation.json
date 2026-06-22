@@ -276,7 +276,9 @@
       "plane_domestic": "Plane — domestic",
       "plane_short": "Plane — short-haul",
       "plane_medium": "Plane — medium-haul",
-      "plane_long": "Plane — long-haul"
+      "plane_long": "Plane — long-haul",
+      "office_day": "Office day (building energy)",
+      "home_day": "Remote day (home energy)"
     },
     "step": {
       "title": "Choose a commute mode.",
@@ -291,6 +293,76 @@
       "minSegment": "Add at least one segment.",
       "modeRequired": "Choose a transport for each segment.",
       "distancePositive": "Distance must be greater than 0."
+    }
+  },
+  "methodology": {
+    "menuItem": "Methodology & sources",
+    "title": "CO₂ calculation methodology & sources",
+    "back": "Back to calendar",
+    "intro": "The footprint is computed per presence day (office or remote). Active referential: {{year}} · radiative forcing ×{{rf}}.",
+    "introGeneric": "The footprint is computed per presence day (office or remote), from a year-versioned referential of emission factors.",
+    "loading": "Loading the referential…",
+    "error": "Could not load the emission-factor referential.",
+    "noProfile": "Select a profile to display the emission-factor referential.",
+    "formula": {
+      "title": "How the impact is computed",
+      "tripTitle": "Per trip (segment)",
+      "trip": "co2 = distance × factor × (round trip ? 2 : 1) ÷ occupants",
+      "tripNote": "Distance is one-way; a round trip doubles it. The division by occupants only applies to per-vehicle factors (carpooling). An unknown mode falls back to the average car (estimated result).",
+      "dayTitle": "Day total",
+      "day": "total = Σ trips + building energy (if enabled)",
+      "dayNote": "Vacation and holiday days are always 0. Building energy (office/remote) is added only when the option is enabled."
+    },
+    "params": {
+      "title": "Calculation parameters",
+      "radiativeForcing": "Radiative forcing (aviation)",
+      "radiativeForcingDesc": "Aviation factors include radiative forcing (×{{rf}} for the {{year}} referential). Disabling it divides by this multiplier to keep direct CO₂ only.",
+      "carpool": "Carpooling",
+      "carpoolDesc": "A car trip's footprint is divided by the number of occupants.",
+      "roundTrip": "Round trip",
+      "roundTripDesc": "Doubles the trip distance.",
+      "building": "Building energy",
+      "buildingDesc": "Optional daily amount (heating, electricity) added to office/remote days, excluding the commute.",
+      "gridCountry": "Charging country",
+      "gridCountryDesc": "For electric cars, the footprint depends on the charging country's electricity mix.",
+      "year": "Referential year",
+      "yearDesc": "The referential is versioned by year; already-encoded days keep their frozen footprint."
+    },
+    "table": {
+      "title": "Emission-factor referential",
+      "subtitle": "Year {{year}} — values exactly as used by the app.",
+      "mode": "Mode",
+      "value": "Factor",
+      "scope": "Scope",
+      "source": "Source",
+      "categories": {
+        "car": "Car",
+        "active": "Bike & walking",
+        "public_transport": "Public transport",
+        "rail": "Train",
+        "air": "Plane",
+        "building": "Building energy"
+      }
+    },
+    "examples": {
+      "title": "Examples",
+      "car": "Petrol car, {{km}} km round trip: {{km}} × 2 × {{factor}} = {{total}} kg",
+      "carpool": "Same trip with 3 people (carpool): ÷ 3 = {{total}} kg",
+      "train": "High-speed train, {{km}} km round trip: {{km}} × 2 × {{factor}} = {{total}} kg",
+      "plane": "Short-haul flight, {{km}} km: {{km}} × {{factor}} = {{total}} kg (radiative forcing included)"
+    },
+    "sources": {
+      "title": "Sources",
+      "intro": "Factors come from public referentials. Click to open the source in your browser."
+    },
+    "transparency": {
+      "title": "Transparency & limitations",
+      "intro": "Modelling choices and known gaps:",
+      "item1": "Combustion-car factors use an earlier ADEME vintage (the current 2025 tool is lower); the order of magnitude remains correct.",
+      "item2": "The plug-in hybrid assumes mostly-electric usage (optimistic estimate).",
+      "item3": "The SNCB train reflects a historical traction figure; the current value (green electricity) is lower.",
+      "item4": "\"Public transport (mix)\" is an internal weighted average, not a published ADEME factor.",
+      "item5": "Aviation factors include radiative forcing; medium-haul is an interpolation (no dedicated DEFRA band)."
     }
   },
   "updater": {

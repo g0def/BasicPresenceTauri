@@ -28,6 +28,7 @@ export const COMMANDS = {
   listPresences: "list_presences",
   deletePresence: "delete_presence",
   listEmissionFactors: "list_emission_factors",
+  listCo2Referential: "list_co2_referential",
   createCommute: "create_commute",
   listCommutes: "list_commutes",
   updateCommute: "update_commute",

@@ -16,6 +16,7 @@ use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
 use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
+use crate::application::use_cases::list_co2_referential::ListCo2ReferentialUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
@@ -56,6 +57,7 @@ pub struct AppState {
     pub list_presences: ListPresencesUseCase,
     pub delete_presence: DeletePresenceUseCase,
     pub list_emission_factors: ListEmissionFactorsUseCase,
+    pub list_co2_referential: ListCo2ReferentialUseCase,
     pub create_commute: CreateCommuteUseCase,
     pub list_commutes: ListCommutesUseCase,
     pub update_commute: UpdateCommuteUseCase,

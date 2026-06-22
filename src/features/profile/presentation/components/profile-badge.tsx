@@ -1,6 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, LogOut, Moon, Route, Settings, Sun } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  LogOut,
+  Moon,
+  Route,
+  Settings,
+  Sun,
+} from "lucide-react";
 
 import profilePic from "@/assets/picture/minimal-profile-accout.png";
 import {
@@ -125,6 +133,12 @@ export function ProfileBadge({ onLogout, onOpenCommutes }: ProfileBadgeProps) {
           <Link to="/settings">
             <Settings />
             {t("settings.menuItem")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/methodology">
+            <BookOpen />
+            {t("methodology.menuItem")}
           </Link>
         </DropdownMenuItem>
 

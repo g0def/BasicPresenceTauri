@@ -677,6 +677,65 @@ fn presence_co2_is_computed_snapshotted_and_tied_to_presence() {
 }
 
 #[test]
+fn co2_referential_exposes_full_table_with_sources() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("co2_referential");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+
+        let referential = state
+            .list_co2_referential
+            .execute()
+            .await
+            .expect("referential");
+
+        // Active millésime + its radiative-forcing multiplier (1.7 for 2026).
+        assert_eq!(referential.factor_year, 2026);
+        assert!((referential.radiative_forcing - 1.7).abs() < 1e-9);
+
+        // Unlike the trip picker, building factors are included here.
+        assert!(referential
+            .factors
+            .iter()
+            .any(|f| f.category == "building" && f.mode_id == "office_day"));
+
+        // Every factor carries scope + source for traceability.
+        assert!(referential
+            .factors
+            .iter()
+            .all(|f| f.scope.is_some() && f.source.is_some()));
+
+        // car_ev still carries its 4 grid variants; BE corrected to 0.11 in 2026.
+        let ev = referential
+            .factors
+            .iter()
+            .find(|f| f.mode_id == "car_ev")
+            .expect("car_ev");
+        assert_eq!(ev.grid_variants.len(), 4);
+        let be = ev
+            .grid_variants
+            .iter()
+            .find(|v| v.country == "BE")
+            .expect("BE variant");
+        assert!((be.value - 0.11).abs() < 1e-9);
+
+        state.logout.execute(&session.token).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
 fn commute_crud_and_emission_factors() {
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("commute_crud");
@@ -706,8 +765,8 @@ fn commute_crud_and_emission_factors() {
             .await
             .expect("profile");
 
-        // The 2025 referential is seeded; building factors are hidden from the
-        // picker, and car_ev carries its 4 grid variants.
+        // The 2026 referential (the default factor_year) is seeded; building
+        // factors are hidden from the picker, and car_ev carries its 4 grid variants.
         let factors = state
             .list_emission_factors
             .execute()

@@ -40,6 +40,6 @@ export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
     includeRadiativeForcing: true,
     countBuildingEnergy: false,
     workingDaysPerYear: 220,
-    factorYear: 2025,
+    factorYear: 2026,
   },
 };

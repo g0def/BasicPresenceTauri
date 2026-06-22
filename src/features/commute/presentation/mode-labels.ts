@@ -28,6 +28,8 @@ export const MODE_LABEL_KEYS = {
   plane_short: "commute.modes.plane_short",
   plane_medium: "commute.modes.plane_medium",
   plane_long: "commute.modes.plane_long",
+  office_day: "commute.modes.office_day",
+  home_day: "commute.modes.home_day",
 } as const satisfies Record<string, string>;
 
 /** Localized label for a transport mode; falls back to `fallback` (the backend

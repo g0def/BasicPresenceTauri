@@ -28,6 +28,7 @@ use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
 use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
+use crate::application::use_cases::list_co2_referential::ListCo2ReferentialUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
 use crate::application::use_cases::list_presences::ListPresencesUseCase;
@@ -96,6 +97,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .on_window_event(|window, event| {
             // On a clean window close, lock the vault so its integrity baseline
             // is refreshed (otherwise the next launch sees an "unclean" state).
@@ -140,6 +142,7 @@ pub fn run() {
             presence::list_presences,
             presence::delete_presence,
             commute::list_emission_factors,
+            commute::list_co2_referential,
             commute::create_commute,
             commute::list_commutes,
             commute::update_commute,
@@ -254,6 +257,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
         list_emission_factors: ListEmissionFactorsUseCase::new(factors.clone()),
+        list_co2_referential: ListCo2ReferentialUseCase::new(factors.clone()),
         create_commute: CreateCommuteUseCase::new(commutes.clone(), clock.clone()),
         list_commutes: ListCommutesUseCase::new(
             commutes.clone(),

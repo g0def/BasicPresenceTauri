@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::application::dto::commute_dto::{CommuteDto, CommuteSegmentInputDto};
-use crate::application::dto::emission_factor_dto::EmissionFactorDto;
+use crate::application::dto::emission_factor_dto::{Co2ReferentialDto, EmissionFactorDto};
 use crate::application::dto::trip_dto::TripDto;
 use crate::presentation::commands::error::AppError;
 use crate::presentation::state::AppState;
@@ -17,6 +17,16 @@ pub async fn list_emission_factors(
 ) -> Result<Vec<EmissionFactorDto>, AppError> {
     state.require_session.execute()?;
     Ok(state.list_emission_factors.execute().await?)
+}
+
+/// List the full CO2 referential (every factor + scope/source + grid variants,
+/// the active year and its radiative-forcing multiplier) for the methodology page.
+#[tauri::command]
+pub async fn list_co2_referential(
+    state: State<'_, AppState>,
+) -> Result<Co2ReferentialDto, AppError> {
+    state.require_session.execute()?;
+    Ok(state.list_co2_referential.execute().await?)
 }
 
 /// Create a saved commute template for a profile.

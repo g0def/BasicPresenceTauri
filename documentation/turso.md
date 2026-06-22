@@ -74,6 +74,7 @@ Runner maison minimal : [migrations.rs](../src-tauri/src/infrastructure/persiste
   - `migrations/vault/0002_add_profiles.sql`, `0003_add_presence.sql` — tables `profile` et `presence`.
   - `0004_add_co2.sql` → `0009_add_presence_note.sql` — référentiel CO₂/trajets, heures de travail (horaire dérivé) et note Markdown du jour.
   - [migrations/vault/0010_add_profile_settings.sql](../src-tauri/migrations/vault/0010_add_profile_settings.sql) — table `profile_settings` (réglages **par profil**, colonnes typées : heure de départ par défaut, police de notes, mode d'affichage, config CO₂), avec `CHECK` sur les énums et backfill d'une ligne par profil existant.
+  - [migrations/vault/0011_add_co2_2026.sql](../src-tauri/migrations/vault/0011_add_co2_2026.sql) — référentiel CO₂ millésime **2026** (corrige sources/valeurs : aérien DEFRA 2024-25 + forçage radiatif 1,7, bus/TER/TGV/Eurostar/Thalys, variante réseau BE) et bascule le défaut `factor_year` des profils existants sur 2026. Le millésime 2025 reste intact (reproductibilité des jours déjà encodés ; cf. [calcul-impact-co2.md](calcul-impact-co2.md)).
 
 **Ajouter une migration** : déposer `000X_*.sql` dans le bon dossier, puis l'ajouter à `KEYSTORE_MIGRATIONS` ou `VAULT_MIGRATIONS` dans `migrations.rs`.
 

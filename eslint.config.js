@@ -63,6 +63,11 @@ export default tseslint.config(
               message:
                 "Only src/features/updater/data/repositories/tauri-updater.repository.ts may import @tauri-apps/plugin-process.",
             },
+            {
+              name: "@tauri-apps/plugin-opener",
+              message:
+                "Only src/core/external-link.ts may import @tauri-apps/plugin-opener.",
+            },
           ],
           patterns: ["@tauri-apps/api/*"],
         },
@@ -74,6 +79,7 @@ export default tseslint.config(
   {
     files: [
       "src/core/ipc.ts",
+      "src/core/external-link.ts",
       "src/features/updater/data/repositories/tauri-updater.repository.ts",
       "src/test/**/*.{ts,tsx}",
       "src/**/*.{test,spec}.{ts,tsx}",

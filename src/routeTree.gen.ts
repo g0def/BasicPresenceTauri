@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
 import { Route as AuthenticatedCommutesIndexRouteImport } from './routes/_authenticated/commutes/index'
 import { Route as AuthenticatedWorkHoursDayRouteImport } from './routes/_authenticated/work-hours/$day'
 import { Route as AuthenticatedCommutesNewRouteImport } from './routes/_authenticated/commutes/new'
@@ -37,6 +38,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMethodologyRoute =
+  AuthenticatedMethodologyRouteImport.update({
+    id: '/methodology',
+    path: '/methodology',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedCommutesIndexRoute =
   AuthenticatedCommutesIndexRouteImport.update({
     id: '/commutes/',
@@ -65,6 +72,7 @@ const AuthenticatedCommutesCommuteIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
+  '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
   '/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
@@ -73,6 +81,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
@@ -84,6 +93,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/methodology': typeof AuthenticatedMethodologyRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/commutes/new': typeof AuthenticatedCommutesNewRoute
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/methodology'
     | '/settings'
     | '/commutes/new'
     | '/work-hours/$day'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/methodology'
     | '/settings'
     | '/'
     | '/commutes/new'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/methodology'
     | '/_authenticated/settings'
     | '/_authenticated/'
     | '/_authenticated/commutes/new'
@@ -157,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/methodology': {
+      id: '/_authenticated/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof AuthenticatedMethodologyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/commutes/': {
       id: '/_authenticated/commutes/'
       path: '/commutes'
@@ -189,6 +209,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedMethodologyRoute: typeof AuthenticatedMethodologyRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCommutesNewRoute: typeof AuthenticatedCommutesNewRoute
@@ -198,6 +219,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedMethodologyRoute: AuthenticatedMethodologyRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCommutesNewRoute: AuthenticatedCommutesNewRoute,
