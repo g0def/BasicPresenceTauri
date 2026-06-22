@@ -97,7 +97,11 @@
       "start": "Copy a day",
       "pick": "Pick the day to copy",
       "paste": "Click days to fill — click to exit",
-      "help": "Quickly fill the calendar: pick an already-encoded day to copy it (type, commute, schedule and tasks), then click empty days to paste the same setup onto them."
+      "help": "Quickly fill the calendar: pick an already-encoded day to copy it (type, commute, schedule and tasks), then click empty days to paste the same setup onto them.",
+      "replaceTitle": "Replace this day?",
+      "replaceBody": "This day is already encoded. Replace it with the copied day? Subsequent already-filled days will then be replaced without confirmation.",
+      "replaceConfirm": "Replace",
+      "replaceCancel": "Cancel"
     },
     "types": {
       "office": "Office",

@@ -18,6 +18,14 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -46,8 +54,19 @@ export function PresenceCalendar() {
   } = usePresence();
 
   const [selected, setSelected] = useState<Date | null>(null);
+  // Target day (UTC-midnight key) awaiting overwrite confirmation, set when a
+  // filled day is clicked while pasting and approval hasn't been granted yet.
+  const [pendingPasteKey, setPendingPasteKey] = useState<number | null>(null);
   const { mode: displayMode } = useCellDisplayMode();
-  const { mode, arm, disarm, copyDay, pasteOnto } = useDayClipboard();
+  const {
+    mode,
+    overwriteApproved,
+    arm,
+    disarm,
+    approveOverwrite,
+    copyDay,
+    pasteOnto,
+  } = useDayClipboard();
 
   // Reload presences on mount (ensures work hour edits are reflected immediately
   // when navigating back from the work hours page).
@@ -59,7 +78,12 @@ export function PresenceCalendar() {
   useEffect(() => {
     if (mode === "idle") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") disarm();
+      if (e.key === "Escape") {
+        disarm();
+        // Also close any open overwrite-confirmation so it can't linger over an
+        // idle calendar (and confirm against a now-empty clipboard).
+        setPendingPasteKey(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -183,8 +207,11 @@ export function PresenceCalendar() {
                   // Copy a fully-encoded day; empty days have nothing to copy.
                   if (presence) void copyDay(presence);
                 } else if (mode === "pasting") {
-                  // Paint only empty days; existing presences are left as is.
+                  // Empty days paste immediately; the first filled day asks for
+                  // confirmation, after which the rest overwrite silently.
                   if (!presence) void pasteOnto(key);
+                  else if (overwriteApproved) void pasteOnto(key);
+                  else setPendingPasteKey(key);
                 } else {
                   setSelected(d);
                 }
@@ -200,8 +227,7 @@ export function PresenceCalendar() {
                 today && "ring-1 ring-ring",
                 mode === "picking" &&
                   (presence ? "cursor-copy" : "cursor-not-allowed"),
-                mode === "pasting" &&
-                  (presence ? "cursor-not-allowed" : "cursor-copy"),
+                mode === "pasting" && "cursor-copy",
               )}
             >
               <span className="font-medium">{d.getDate()}</span>
@@ -255,6 +281,45 @@ export function PresenceCalendar() {
           if (!o) setSelected(null);
         }}
       />
+
+      <Dialog
+        open={pendingPasteKey !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingPasteKey(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("presence.copyMode.replaceTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("presence.copyMode.replaceBody")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingPasteKey(null)}
+            >
+              {t("presence.copyMode.replaceCancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                // Capture the key before clearing state, then grant blanket
+                // approval for the rest of the session and paste.
+                const key = pendingPasteKey;
+                approveOverwrite();
+                setPendingPasteKey(null);
+                if (key !== null) void pasteOnto(key);
+              }}
+            >
+              {t("presence.copyMode.replaceConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

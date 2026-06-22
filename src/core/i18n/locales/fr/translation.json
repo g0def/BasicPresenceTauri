@@ -97,7 +97,11 @@
       "start": "Copier un jour",
       "pick": "Choisissez le jour à copier",
       "paste": "Cliquez les jours à remplir — cliquez pour quitter",
-      "help": "Remplissez vite le calendrier : choisissez un jour déjà encodé pour le copier (type, trajet, horaire et tâches), puis cliquez les jours vides pour y coller la même configuration."
+      "help": "Remplissez vite le calendrier : choisissez un jour déjà encodé pour le copier (type, trajet, horaire et tâches), puis cliquez les jours vides pour y coller la même configuration.",
+      "replaceTitle": "Remplacer ce jour ?",
+      "replaceBody": "Ce jour est déjà encodé. Le remplacer par le jour copié ? Les jours déjà remplis suivants seront ensuite remplacés sans confirmation.",
+      "replaceConfirm": "Remplacer",
+      "replaceCancel": "Annuler"
     },
     "types": {
       "office": "Bureau",

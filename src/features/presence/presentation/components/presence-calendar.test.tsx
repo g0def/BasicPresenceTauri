@@ -55,6 +55,30 @@ function renderCalendar(value: PresenceContextValue) {
   );
 }
 
+/** A context value whose `setPresence` records every call into `calls` (kept
+ * to non-work types so the work-hours IPC module is never reached). */
+function makeValue(
+  presencesByDay: Map<number, Presence>,
+  calls: Array<{ day: number; type: PresenceType }>,
+): PresenceContextValue {
+  return {
+    presencesByDay,
+    currentMonth: new Date(),
+    setCurrentMonth: () => {},
+    reload: () => Promise.resolve(),
+    isLoading: false,
+    isSubmitting: false,
+    error: null,
+    setPresence: (day, type) => {
+      calls.push({ day, type });
+      return Promise.resolve(makePresence(day, type));
+    },
+    deletePresence: () => Promise.resolve(true),
+    getPresenceTrips: () => Promise.resolve([]),
+    clearError: () => {},
+  };
+}
+
 describe("PresenceCalendar", () => {
   it("opens the day dialog and sets a non-commute presence type for the clicked day", async () => {
     const calls: Array<{ day: number; type: PresenceType }> = [];
@@ -89,28 +113,16 @@ describe("PresenceCalendar", () => {
     expect(calls[0].day % 86_400_000).toBe(0);
   });
 
-  it("copies a day with the toolbar toggle and pastes it onto empty days only", async () => {
+  it("copies a day, pastes onto empty days, and prompts before overwriting a filled day", async () => {
     const now = new Date();
     const day15 = Date.UTC(now.getFullYear(), now.getMonth(), 15);
     const day20 = Date.UTC(now.getFullYear(), now.getMonth(), 20);
 
     const calls: Array<{ day: number; type: PresenceType }> = [];
-    const value: PresenceContextValue = {
-      presencesByDay: new Map([[day15, makePresence(day15, "vacation")]]),
-      currentMonth: new Date(),
-      setCurrentMonth: () => {},
-      reload: () => Promise.resolve(),
-      isLoading: false,
-      isSubmitting: false,
-      error: null,
-      setPresence: (day, type) => {
-        calls.push({ day, type });
-        return Promise.resolve(makePresence(day, type));
-      },
-      deletePresence: () => Promise.resolve(true),
-      getPresenceTrips: () => Promise.resolve([]),
-      clearError: () => {},
-    };
+    const value = makeValue(
+      new Map([[day15, makePresence(day15, "vacation")]]),
+      calls,
+    );
 
     const user = userEvent.setup();
     renderCalendar(value);
@@ -125,13 +137,84 @@ describe("PresenceCalendar", () => {
     await screen.findByRole("button", { name: /remplir/i });
     expect(calls).toHaveLength(0);
 
-    // Painting an empty day replays the copied presence onto it.
+    // Painting an empty day replays the copied presence onto it immediately.
     await user.click(screen.getByRole("button", { name: /^20\b/ }));
     expect(calls).toHaveLength(1);
     expect(calls[0]).toEqual({ day: day20, type: "vacation" });
 
-    // Painting a day that already has a presence is a no-op.
+    // Clicking a day that already has a presence asks for confirmation first
+    // and persists nothing yet.
     await user.click(screen.getByRole("button", { name: /^15\b/ }));
+    expect(await screen.findByText("Remplacer ce jour ?")).toBeTruthy();
     expect(calls).toHaveLength(1);
+  });
+
+  it("overwrites a filled day after confirmation, then auto-approves the rest of the session", async () => {
+    const now = new Date();
+    const day10 = Date.UTC(now.getFullYear(), now.getMonth(), 10);
+    const day15 = Date.UTC(now.getFullYear(), now.getMonth(), 15);
+    const day25 = Date.UTC(now.getFullYear(), now.getMonth(), 25);
+
+    const calls: Array<{ day: number; type: PresenceType }> = [];
+    const value = makeValue(
+      new Map([
+        [day10, makePresence(day10, "vacation")],
+        [day15, makePresence(day15, "vacation")],
+        [day25, makePresence(day25, "vacation")],
+      ]),
+      calls,
+    );
+
+    const user = userEvent.setup();
+    renderCalendar(value);
+
+    await user.click(screen.getByRole("button", { name: "Copier un jour" }));
+    await user.click(screen.getByRole("button", { name: /^15\b/ }));
+    await screen.findByRole("button", { name: /remplir/i });
+
+    // First filled day → confirmation dialog; confirming overwrites it.
+    await user.click(screen.getByRole("button", { name: /^10\b/ }));
+    await user.click(await screen.findByRole("button", { name: "Remplacer" }));
+    expect(calls).toEqual([{ day: day10, type: "vacation" }]);
+
+    // A second filled day is now overwritten silently — no dialog.
+    await user.click(screen.getByRole("button", { name: /^25\b/ }));
+    expect(calls).toEqual([
+      { day: day10, type: "vacation" },
+      { day: day25, type: "vacation" },
+    ]);
+    expect(screen.queryByText("Remplacer ce jour ?")).toBeNull();
+  });
+
+  it("leaves the day unchanged and re-asks when the overwrite is cancelled", async () => {
+    const now = new Date();
+    const day10 = Date.UTC(now.getFullYear(), now.getMonth(), 10);
+    const day15 = Date.UTC(now.getFullYear(), now.getMonth(), 15);
+
+    const calls: Array<{ day: number; type: PresenceType }> = [];
+    const value = makeValue(
+      new Map([
+        [day10, makePresence(day10, "vacation")],
+        [day15, makePresence(day15, "vacation")],
+      ]),
+      calls,
+    );
+
+    const user = userEvent.setup();
+    renderCalendar(value);
+
+    await user.click(screen.getByRole("button", { name: "Copier un jour" }));
+    await user.click(screen.getByRole("button", { name: /^15\b/ }));
+    await screen.findByRole("button", { name: /remplir/i });
+
+    // Cancelling the first overwrite persists nothing.
+    await user.click(screen.getByRole("button", { name: /^10\b/ }));
+    await user.click(await screen.findByRole("button", { name: "Annuler" }));
+    expect(calls).toHaveLength(0);
+
+    // Approval was not granted, so the next filled day prompts again.
+    await user.click(screen.getByRole("button", { name: /^10\b/ }));
+    expect(await screen.findByText("Remplacer ce jour ?")).toBeTruthy();
+    expect(calls).toHaveLength(0);
   });
 });
