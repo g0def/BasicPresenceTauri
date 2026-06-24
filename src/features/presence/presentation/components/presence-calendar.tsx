@@ -12,7 +12,8 @@ import {
   subMonths,
 } from "date-fns";
 import { enUS, fr } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Copy, X } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChartColumn, ChevronLeft, ChevronRight, Copy, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -136,39 +137,52 @@ export function PresenceCalendar() {
           <ChevronRight />
         </Button>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => (mode === "idle" ? arm() : disarm())}
-              aria-pressed={mode !== "idle"}
-              aria-label={toggleLabel}
-              className={cn(
-                "absolute top-1/2 right-0 -translate-y-1/2",
-                mode === "picking" && "text-orange-500 hover:text-orange-500",
-                mode === "pasting" && "text-destructive hover:text-destructive",
-              )}
-            >
-              <span className="relative inline-flex">
-                <Copy />
-                {mode === "pasting" && (
-                  <X
-                    className="absolute -top-1.5 -right-1.5 size-3 rounded-full bg-background"
-                    aria-hidden
-                  />
+        <div className="absolute top-1/2 right-0 flex -translate-y-1/2 items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" asChild>
+                <Link to="/stats" aria-label={t("stats.open")}>
+                  <ChartColumn />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("stats.open")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => (mode === "idle" ? arm() : disarm())}
+                aria-pressed={mode !== "idle"}
+                aria-label={toggleLabel}
+                className={cn(
+                  mode === "picking" && "text-orange-500 hover:text-orange-500",
+                  mode === "pasting" &&
+                    "text-destructive hover:text-destructive",
                 )}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <p className="font-medium">{toggleLabel}</p>
-            <p className="mt-1 text-muted-foreground">
-              {t("presence.copyMode.help")}
-            </p>
-          </TooltipContent>
-        </Tooltip>
+              >
+                <span className="relative inline-flex">
+                  <Copy />
+                  {mode === "pasting" && (
+                    <X
+                      className="absolute -top-1.5 -right-1.5 size-3 rounded-full bg-background"
+                      aria-hidden
+                    />
+                  )}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="font-medium">{toggleLabel}</p>
+              <p className="mt-1 text-muted-foreground">
+                {t("presence.copyMode.help")}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-2">

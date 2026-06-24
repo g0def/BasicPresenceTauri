@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
 import { Route as AuthenticatedLicenceRouteImport } from './routes/_authenticated/licence'
@@ -32,6 +33,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/licence': typeof AuthenticatedLicenceRoute
   '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/stats': typeof AuthenticatedStatsRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
   '/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
   '/commutes/': typeof AuthenticatedCommutesIndexRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/licence': typeof AuthenticatedLicenceRoute
   '/methodology': typeof AuthenticatedMethodologyRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/stats': typeof AuthenticatedStatsRoute
   '/': typeof AuthenticatedIndexRoute
   '/commutes/new': typeof AuthenticatedCommutesNewRoute
   '/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_authenticated/licence': typeof AuthenticatedLicenceRoute
   '/_authenticated/methodology': typeof AuthenticatedMethodologyRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/stats': typeof AuthenticatedStatsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/commutes/new': typeof AuthenticatedCommutesNewRoute
   '/_authenticated/work-hours/$day': typeof AuthenticatedWorkHoursDayRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/licence'
     | '/methodology'
     | '/settings'
+    | '/stats'
     | '/commutes/new'
     | '/work-hours/$day'
     | '/commutes/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/licence'
     | '/methodology'
     | '/settings'
+    | '/stats'
     | '/'
     | '/commutes/new'
     | '/work-hours/$day'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/_authenticated/licence'
     | '/_authenticated/methodology'
     | '/_authenticated/settings'
+    | '/_authenticated/stats'
     | '/_authenticated/'
     | '/_authenticated/commutes/new'
     | '/_authenticated/work-hours/$day'
@@ -173,6 +185,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/stats': {
+      id: '/_authenticated/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof AuthenticatedStatsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/settings': {
@@ -231,6 +250,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLicenceRoute: typeof AuthenticatedLicenceRoute
   AuthenticatedMethodologyRoute: typeof AuthenticatedMethodologyRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedStatsRoute: typeof AuthenticatedStatsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCommutesNewRoute: typeof AuthenticatedCommutesNewRoute
   AuthenticatedWorkHoursDayRoute: typeof AuthenticatedWorkHoursDayRoute
@@ -242,6 +262,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLicenceRoute: AuthenticatedLicenceRoute,
   AuthenticatedMethodologyRoute: AuthenticatedMethodologyRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedStatsRoute: AuthenticatedStatsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCommutesNewRoute: AuthenticatedCommutesNewRoute,
   AuthenticatedWorkHoursDayRoute: AuthenticatedWorkHoursDayRoute,

@@ -116,6 +116,23 @@
     "hoursWorkedTooltip": "Total des heures travaillées sur le mois affiché",
     "co2EmittedTooltip": "Émissions de CO₂ estimées de vos trajets sur le mois affiché"
   },
+  "stats": {
+    "open": "Statistiques",
+    "title": "Statistiques",
+    "back": "Retour au calendrier",
+    "co2Title": "Émissions de CO₂",
+    "hoursTitle": "Heures travaillées",
+    "breakdownTitle": "Répartition des journées",
+    "average": "Moyenne",
+    "weekLabel": "S{{week}}",
+    "empty": "Pas encore de données à afficher.",
+    "from": "De",
+    "to": "à",
+    "granularity": {
+      "month": "Par mois",
+      "week": "Par semaine"
+    }
+  },
   "transfer": {
     "section": "Partage de profil (.json)",
     "sectionHint": "Exportez votre profil dans un fichier .json pour l'envoyer à quelqu'un, ou importez un profil reçu.",

@@ -1,3 +1,10 @@
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -43,16 +50,40 @@ function makePresence(day: number, type: PresenceType): Presence {
   };
 }
 
-function renderCalendar(value: PresenceContextValue) {
-  return render(
-    <CommuteContext.Provider value={commuteValue}>
-      <PresenceContext.Provider value={value}>
-        <CellDisplayContext.Provider value={{ mode: "co2", setMode: () => {} }}>
-          <PresenceCalendar />
-        </CellDisplayContext.Provider>
-      </PresenceContext.Provider>
-    </CommuteContext.Provider>,
-  );
+/** The calendar's "Stats" button is a router `<Link>`, so the component needs a
+ * router in context. Wrap it in a minimal in-memory router whose index route
+ * renders the calendar (under its feature providers); a stub `/stats` route is
+ * registered so the link target resolves. */
+async function renderCalendar(value: PresenceContextValue) {
+  const rootRoute = createRootRoute();
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => (
+      <CommuteContext.Provider value={commuteValue}>
+        <PresenceContext.Provider value={value}>
+          <CellDisplayContext.Provider
+            value={{ mode: "co2", setMode: () => {} }}
+          >
+            <PresenceCalendar />
+          </CellDisplayContext.Provider>
+        </PresenceContext.Provider>
+      </CommuteContext.Provider>
+    ),
+  });
+  const statsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/stats",
+    component: () => null,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, statsRoute]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  // Resolve the initial match before rendering, so the index route's content is
+  // present synchronously for the queries below (no pending flash).
+  await router.load();
+  return render(<RouterProvider router={router} />);
 }
 
 /** A context value whose `setPresence` records every call into `calls` (kept
@@ -100,7 +131,7 @@ describe("PresenceCalendar", () => {
     };
 
     const user = userEvent.setup();
-    renderCalendar(value);
+    await renderCalendar(value);
 
     // The 15th is unique in the 6-week grid (adjacent months only show edge days).
     await user.click(screen.getByRole("button", { name: /15/ }));
@@ -125,7 +156,7 @@ describe("PresenceCalendar", () => {
     );
 
     const user = userEvent.setup();
-    renderCalendar(value);
+    await renderCalendar(value);
 
     // Arm the toggle, then pick the encoded 15th as the source day (anchored
     // regex avoids matching the year digits in other days' labels).
@@ -166,7 +197,7 @@ describe("PresenceCalendar", () => {
     );
 
     const user = userEvent.setup();
-    renderCalendar(value);
+    await renderCalendar(value);
 
     await user.click(screen.getByRole("button", { name: "Copier un jour" }));
     await user.click(screen.getByRole("button", { name: /^15\b/ }));
@@ -201,7 +232,7 @@ describe("PresenceCalendar", () => {
     );
 
     const user = userEvent.setup();
-    renderCalendar(value);
+    await renderCalendar(value);
 
     await user.click(screen.getByRole("button", { name: "Copier un jour" }));
     await user.click(screen.getByRole("button", { name: /^15\b/ }));
