@@ -9,7 +9,9 @@
     "process:allow-restart",
     "dialog:allow-save",
     "dialog:allow-open",
-    "opener:allow-open-url",
-    "opener:allow-default-urls"
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }]
+    }
   ]
 }

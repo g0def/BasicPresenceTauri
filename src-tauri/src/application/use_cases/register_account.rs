@@ -101,7 +101,7 @@ fn validate_password(password: &str) -> Result<(), DomainError> {
     let len = password.chars().count();
     if !(MIN_PASSWORD_LEN..=MAX_PASSWORD_LEN).contains(&len) {
         return Err(DomainError::Validation(format!(
-            "password must be at least {MIN_PASSWORD_LEN} characters"
+            "password must be {MIN_PASSWORD_LEN}-{MAX_PASSWORD_LEN} characters"
         )));
     }
     Ok(())

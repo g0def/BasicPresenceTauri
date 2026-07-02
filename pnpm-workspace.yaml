@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: false
+
+# Relèvements de sécurité de dépendances transitives — à retirer quand les
+# parents (@milkdown/crepe pour dompurify, vite pour esbuild) les embarqueront.
+overrides:
+  dompurify: '>=3.4.11' # GHSA-cmwh-pvxp-8882
+  esbuild: '>=0.28.1' # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)

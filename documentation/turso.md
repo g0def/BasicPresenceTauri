@@ -52,7 +52,7 @@ Faits d'API importants (libsql 0.9) :
 Fichiers concernés :
 
 - [db.rs](../src-tauri/src/infrastructure/persistence/db.rs) — ouverture clair / chiffré (le clair ne sert plus qu'à sonder/migrer un ancien keystore).
-- [keystore_bootstrap.rs](../src-tauri/src/infrastructure/persistence/keystore_bootstrap.rs) — ouverture/scellement du keystore + migration one-time d'un keystore historique en clair.
+- [keystore_bootstrap.rs](../src-tauri/src/infrastructure/persistence/keystore_bootstrap.rs) — ouverture/scellement du keystore + migration one-time d'un keystore historique en clair (bascule récupérable après crash via une sauvegarde `keystore.db.old`, restaurée au démarrage si l'échange a été interrompu).
 - [vault.rs](../src-tauri/src/infrastructure/persistence/vault.rs) — cycle de vie du coffre (`open` au login, `close` au logout/expiration ; vérifie/écrit le HMAC d'intégrité ; expose `connection()` pour les repositories).
 - [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs) — HMAC-SHA256 du fichier + marqueur `dirty` (crash vs altération).
 - [account_repository.rs](../src-tauri/src/infrastructure/persistence/account_repository.rs) — repository du keystore (CRUD compte + compteurs + backfill clé MAC).
@@ -114,5 +114,5 @@ turso db tokens create basic-presence  # => token d'auth
 
 ## Vérification
 
-- **Test d'intégration** [integration_tests.rs](../src-tauri/src/integration_tests.rs) : prouve l'ouverture chiffrée, que `vault.db` **et** `keystore.db` sont **illisibles sans la clé**, la migration/scellement d'un keystore en clair, et la détection d'altération du coffre.
+- **Test d'intégration** [integration_tests.rs](../src-tauri/src/integration_tests.rs) : prouve l'ouverture chiffrée, que `vault.db` **et** `keystore.db` sont **illisibles sans la clé**, la migration/scellement d'un keystore en clair (y compris la reprise d'une migration interrompue par un crash), et la détection d'altération du coffre.
 - **Manuel** : après un login, `vault.db` existe ; `sqlite3 vault.db .tables` échoue (chiffré) ; `strings vault.db | grep <username>` ne renvoie rien — idem pour `keystore.db`.

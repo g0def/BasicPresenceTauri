@@ -26,6 +26,15 @@ fn sealed_marker(path: &Path) -> PathBuf {
     PathBuf::from(p)
 }
 
+/// Backup of the plaintext keystore, held during the encrypted swap. It is only
+/// deleted once the encrypted file is in place, so a crash mid-swap leaves
+/// either the original or the backup on disk — never neither.
+fn backup_path(path: &Path) -> PathBuf {
+    let mut p = path.as_os_str().to_owned();
+    p.push(".old");
+    PathBuf::from(p)
+}
+
 /// Remove a libSQL database file together with its `-wal`/`-shm` siblings.
 fn remove_db_files(path: &Path) {
     let _ = std::fs::remove_file(path);
@@ -53,11 +62,24 @@ pub async fn open_or_migrate_keystore(
     device_key: &[u8],
 ) -> Result<Database, DomainError> {
     let marker = sealed_marker(path);
+    let backup = backup_path(path);
+
+    // Crash recovery: the migration renames the plaintext keystore to `.old`
+    // before swapping the encrypted copy in. If the process died between the two
+    // renames, the keystore file is missing but the backup holds the original —
+    // restore it rather than falling through to the fresh-install branch (an
+    // empty keystore would lose the wrapped DEK, and the vault with it).
+    if !path.exists() && backup.exists() {
+        std::fs::rename(&backup, path)
+            .map_err(|e| DomainError::Storage(format!("cannot restore keystore backup: {e}")))?;
+    }
 
     if marker.exists() {
         // Already sealed: must decrypt with the current device key, or it's lost.
         let db = open_encrypted_db(path, device_key).await?;
         if probe_readable(&db).await {
+            // Drop a plaintext backup a crash may have left after the swap.
+            let _ = std::fs::remove_file(&backup);
             return Ok(db);
         }
         return Err(DomainError::KeystoreUnrecoverable);
@@ -82,6 +104,9 @@ pub async fn open_or_migrate_keystore(
     let db = open_encrypted_db(path, device_key).await?;
     if probe_readable(&db).await {
         write_marker(&marker)?;
+        // The swap completed but the crash hit before cleanup: the encrypted
+        // keystore just proved readable, so the plaintext backup can go.
+        let _ = std::fs::remove_file(&backup);
         return Ok(db);
     }
     Err(DomainError::KeystoreUnrecoverable)
@@ -193,10 +218,22 @@ async fn migrate_plaintext_to_encrypted(path: &Path, device_key: &[u8]) -> Resul
             .await;
     } // drop new_conn + new_db → flush & close before the swap.
 
-    // 3. Atomically replace the plaintext keystore with the encrypted one.
-    remove_db_files(path);
+    // 3. Swap the encrypted keystore in. The plaintext original is renamed to a
+    // `.old` backup first — never deleted before the swap — so a crash between
+    // the two renames leaves the backup for the next startup to restore,
+    // instead of a missing keystore being mistaken for a fresh install.
+    let backup = backup_path(path);
+    let _ = std::fs::remove_file(&backup); // leftover from an interrupted run
+    for suffix in ["-wal", "-shm"] {
+        let mut p = path.as_os_str().to_owned();
+        p.push(suffix);
+        let _ = std::fs::remove_file(PathBuf::from(p));
+    }
+    std::fs::rename(path, &backup)
+        .map_err(|e| DomainError::Storage(format!("cannot back up keystore file: {e}")))?;
     std::fs::rename(&tmp_path, path)
         .map_err(|e| DomainError::Storage(format!("cannot swap keystore file: {e}")))?;
+    let _ = std::fs::remove_file(&backup);
 
     Ok(())
 }

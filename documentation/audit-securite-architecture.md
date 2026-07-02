@@ -124,6 +124,8 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ### E2 — Fenêtre de perte définitive du coffre dans la migration du keystore
 
+> ✅ **Corrigé le 3 juillet 2026** — la bascule renomme désormais l'original en `.old` avant d'installer la copie chiffrée, et le démarrage restaure ce backup si le fichier principal manque. Couvert par le test d'intégration `interrupted_keystore_migration_swap_is_recovered`.
+
 - **Où** : `keystore_bootstrap.rs:196-199` (`migrate_plaintext_to_encrypted`).
 - **Constat** : la bascule finale fait `remove_db_files(path)` **puis** `std::fs::rename(tmp, path)`. Un crash (panique, coupure de courant, OOM-kill) entre les deux laisse : plus de `keystore.db`, et les données migrées orphelines dans `keystore.db.new`.
 - **Scénario** : au démarrage suivant, `open_or_migrate_keystore` prend la branche « fresh install » (`!path.exists()`, ligne 66) et crée un keystore **vide**. Le `wrapped_dek` du compte est perdu → le `vault.db` chiffré par le DEK devient **définitivement indéchiffrable**, même avec le bon mot de passe.
@@ -147,11 +149,15 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ### M3 — Dépendance vulnérable : DOMPurify ≤ 3.4.10 (modéré)
 
+> ✅ **Corrigé le 3 juillet 2026** — override pnpm `dompurify >= 3.4.11` dans `pnpm-workspace.yaml` ; `pnpm audit` ne remonte plus aucune vulnérabilité.
+
 - **Où** : `pnpm audit` → `.>@milkdown/crepe>dompurify` (GHSA-cmwh-pvxp-8882, pollution `ALLOWED_ATTR` via `setConfig()`).
 - **Impact** : réel faible — l'app n'appelle pas `setConfig`, l'éditeur Milkdown ne traite que le texte de l'utilisateur lui-même, et la sanitisation de sécurité est de toute façon côté Rust (Ammonia). Mais une dépendance de sanitisation vulnérable dans une app « niveau banque » doit être purgée.
 - **Recommandation** : mettre à jour (`pnpm update` / override pnpm vers dompurify ≥ 3.4.11), et corriger au passage esbuild (F5).
 
 ### M4 — Contrôles CI désactivés (frontend + audit de dépendances)
+
+> ✅ **Corrigé le 3 juillet 2026** — jobs frontend (lint/typecheck/test/`pnpm audit`) et `cargo audit` réactivés dans `ci.yml`. Renovate/Dependabot restent à configurer.
 
 - **Où** : `.github/workflows/ci.yml:14-38` (job frontend lint/typecheck/test/audit entièrement commenté) et `:79-89` (`cargo audit` commenté).
 - **Constat** : seule la partie Rust (fmt, clippy, test) tourne en CI. Aucune détection automatisée de vulnérabilités de dépendances (ni npm ni crates), pas de vérification TypeScript/ESLint sur PR.
@@ -165,6 +171,8 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ### F1 — Fermeture du vault incohérente quand plusieurs sessions coexistent
 
+> ✅ **Corrigé le 3 juillet 2026** — `login` purge désormais les sessions précédentes avant d'en créer une nouvelle (`login.rs`), rendant l'invariant « ≥1 session valide ⇔ vault ouvert » exact.
+
 - **Où** : `check_session.rs:37-44`, `logout.rs:19-21`, `login.rs:139`.
 - **Constat** : `login` insère une nouvelle session sans purger les précédentes ; à l'inverse, `check_session` (token expiré) et `logout` ferment le vault **même si une autre session encore valide existe**. Une commande gated passerait alors `require_session` mais trouverait le vault fermé (erreur `INTERNAL`).
 - **Impact** : incohérence d'état sans enjeu de sécurité (elle ferme trop, pas trop peu), quasi inatteignable en mono-utilisateur.
@@ -172,11 +180,15 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ### F2 — Permission `opener:allow-open-url` non restreinte
 
+> ✅ **Corrigé le 3 juillet 2026** — la capability porte désormais un scope explicite `{"url": "https://*"}` et `opener:allow-default-urls` (qui autorisait aussi `http:`, `mailto:`, `tel:`) a été retirée.
+
 - **Où** : `src-tauri/capabilities/default.json:12` ; usage réel dans `src/core/external-link.ts` (sources de la page méthodologie).
 - **Constat** : la permission autorise l'ouverture de n'importe quelle URL/chemin par l'OS. Toutes les URL légitimes sont pourtant codées en dur (`sources.ts` : ADEME, DEFRA…).
 - **Recommandation** : restreindre la capability à un allowlist (`https://*`, voire les domaines précis) via la configuration fine du plugin opener.
 
 ### F3 — Détails d'E/S dans les erreurs de lecture de bundle
+
+> ✅ **Corrigé le 3 juillet 2026** — le message ne contient plus que la catégorie d'erreur (`e.kind()` : « not found », « permission denied »…), plus le détail brut de l'OS.
 
 - **Où** : `json_bundle_codec.rs:52-57` (`Validation(format!("cannot read file: {e}"))`).
 - **Constat** : contrairement au reste du code (qui collapse en `INTERNAL`), l'erreur `Validation` remonte telle quelle à l'UI avec le détail de l'erreur système. Fuite bénigne (app locale), mais incohérente avec la politique d'erreurs.
@@ -184,11 +196,15 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ### F4 — Politique de mot de passe : message inexact, règle minimale
 
+> ✅ **Partiellement corrigé le 3 juillet 2026** — le message annonce désormais la règle exacte (8–1024 caractères). L'indicateur de force côté UI reste une amélioration future.
+
 - **Où** : `register_account.rs:100-108`.
 - **Constat** : la règle est 8–1024 caractères mais le message d'erreur ne mentionne que le minimum ; et la politique se limite à la longueur (conforme NIST 800-63B, mais 8 reste court face à un vol de keystore *avec* extraction de la clé de device).
 - **Recommandation** : corriger le message ; envisager un indicateur de force (zxcvbn-like) côté UI plutôt que des règles de composition.
 
 ### F5 — esbuild < 0.28.1 (low, dev uniquement)
+
+> ✅ **Corrigé le 3 juillet 2026** — override pnpm `esbuild >= 0.28.1` ; suite de tests frontend verte après relèvement.
 
 - **Où** : `pnpm audit` → `.>vite>esbuild` (GHSA-g7r4-m6w7-qqqr, lecture de fichier via le dev server sous Windows).
 - **Impact** : serveur de développement uniquement, pas les binaires distribués.
@@ -249,17 +265,17 @@ Sévérités : **Élevé** = à corriger en priorité · **Moyen** = à planifie
 
 ## 6. Plan d'action recommandé
 
-| Priorité | Action | Constats | Effort |
-|---|---|---|---|
-| 1 | Protéger la clé de signature : environment GitHub avec approbation requise, ou signature locale ; MFA matériel | E1 | Faible–moyen |
-| 2 | Rendre la bascule de migration keystore récupérable après crash | E2 | Faible |
-| 3 | Mettre à jour dompurify (≥ 3.4.11) et esbuild (≥ 0.28.1) | M3, F5 | Trivial |
-| 4 | Réactiver la CI frontend + `cargo audit` + `pnpm audit` ; ajouter Renovate/Dependabot | M4 | Faible |
-| 5 | Confiner les chemins d'export/import (dialogue côté Rust ou validation) | M1 | Moyen |
-| 6 | Implémenter `change_password` (re-wrap DEK/MAC) ; afficher « aucune récupération possible » à l'inscription | M5 | Moyen |
-| 7 | Purger les sessions au login ; documenter ou renforcer la sémantique de `require_session` | F1, M2 | Faible |
-| 8 | Restreindre `opener` à un allowlist ; message générique dans le codec bundle ; corriger le message de politique de mot de passe | F2, F3, F4 | Trivial |
-| 9 | Notes de design : longueur dans le HMAC, absence de logs, non-atomicité de l'import, justification `unsafe-inline` | I1, I4, I6, F6 | Documentation |
+| Priorité | Action | Constats | Effort | Statut |
+|---|---|---|---|---|
+| 1 | Protéger la clé de signature : environment GitHub avec approbation requise, ou signature locale ; MFA matériel | E1 | Faible–moyen | ⏳ À faire (réglages GitHub) |
+| 2 | Rendre la bascule de migration keystore récupérable après crash | E2 | Faible | ✅ Fait (03/07/2026) |
+| 3 | Mettre à jour dompurify (≥ 3.4.11) et esbuild (≥ 0.28.1) | M3, F5 | Trivial | ✅ Fait (03/07/2026) |
+| 4 | Réactiver la CI frontend + `cargo audit` + `pnpm audit` ; ajouter Renovate/Dependabot | M4 | Faible | ✅ Fait, sauf Renovate/Dependabot |
+| 5 | Confiner les chemins d'export/import (dialogue côté Rust ou validation) | M1 | Moyen | ⏳ À faire |
+| 6 | Implémenter `change_password` (re-wrap DEK/MAC) ; afficher « aucune récupération possible » à l'inscription | M5 | Moyen | ⏳ À faire |
+| 7 | Purger les sessions au login ; documenter ou renforcer la sémantique de `require_session` | F1, M2 | Faible | ✅ F1 fait (03/07/2026) ; M2 à traiter |
+| 8 | Restreindre `opener` à un allowlist ; message générique dans le codec bundle ; corriger le message de politique de mot de passe | F2, F3, F4 | Trivial | ✅ Fait (03/07/2026) |
+| 9 | Notes de design : longueur dans le HMAC, absence de logs, non-atomicité de l'import, justification `unsafe-inline` | I1, I4, I6, F6 | Documentation | ⏳ À faire |
 
 ---
 

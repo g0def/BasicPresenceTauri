@@ -130,10 +130,14 @@ impl LoginUseCase {
 
         self.vault.open(dek.as_slice(), mac_key.as_slice()).await?;
 
-        // Clear lockout counters and open the session.
+        // Clear lockout counters and open the session. A new login supersedes
+        // any previous session (single-owner device), keeping the invariant
+        // "a valid session exists ⇔ the vault is open" exact — check_session
+        // and logout close the vault without checking for sibling sessions.
         self.accounts
             .reset_failed_attempts(&account.id, now)
             .await?;
+        self.sessions.clear();
         let token = self.tokens.generate()?;
         let expires_at = now + self.policy.session_ttl_ms;
         self.sessions.insert(Session {

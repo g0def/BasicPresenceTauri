@@ -49,8 +49,10 @@ impl ProfileBundleCodec for JsonProfileBundleCodec {
     }
 
     fn read(&self, path: &Path) -> Result<ParsedBundle, DomainError> {
+        // Surface only the error *category* (not found, permission denied…):
+        // Validation messages reach the UI verbatim, so no raw OS error here.
         let text = std::fs::read_to_string(path)
-            .map_err(|e| DomainError::Validation(format!("cannot read file: {e}")))?;
+            .map_err(|e| DomainError::Validation(format!("cannot read file: {}", e.kind())))?;
         // Strip a leading UTF-8 BOM if present (some editors add one).
         let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
         let file: BundleFile = serde_json::from_str(text)

@@ -482,6 +482,84 @@ fn legacy_plaintext_keystore_is_migrated_and_sealed() {
 }
 
 #[test]
+fn interrupted_keystore_migration_swap_is_recovered() {
+    use crate::infrastructure::persistence::db::connect;
+    use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
+    use crate::infrastructure::persistence::migrations::{run, KEYSTORE_MIGRATIONS};
+
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("interrupted_migration");
+        let keystore_path = config.keystore_path.clone();
+
+        // Legacy plaintext keystore with one account row, as in the migration test.
+        {
+            let db = open_plain_db(&keystore_path).await.unwrap();
+            let conn = connect(&db).await.unwrap();
+            run(&conn, KEYSTORE_MIGRATIONS).await.unwrap();
+            conn.execute(
+                "INSERT INTO account \
+                 (id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
+                  failed_attempts, locked_until, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                libsql::params![
+                    "id-1",
+                    "legacy-user",
+                    "$argon2id$dummy",
+                    vec![1u8; 48],
+                    vec![2u8; 16],
+                    vec![3u8; 24],
+                    0_i64,
+                    None::<i64>,
+                    1_700_000_000_000_i64,
+                    1_700_000_000_000_i64,
+                ],
+            )
+            .await
+            .unwrap();
+        }
+
+        // Simulate a crash between the migration's two renames: the plaintext
+        // original sits in the `.old` backup, the keystore file is gone, and a
+        // half-built `.new` may linger.
+        let mut backup = keystore_path.as_os_str().to_owned();
+        backup.push(".old");
+        let backup = std::path::PathBuf::from(backup);
+        std::fs::rename(&keystore_path, &backup).unwrap();
+        let mut stale_tmp = keystore_path.as_os_str().to_owned();
+        stale_tmp.push(".new");
+        std::fs::write(std::path::PathBuf::from(stale_tmp), b"garbage").unwrap();
+
+        // Startup must restore the backup and finish the migration — NOT treat
+        // the missing file as a fresh install (which would create an empty
+        // keystore and leave the vault's wrapped DEK unrecoverable).
+        let sealed = open_or_migrate_keystore(&keystore_path, &TEST_DEVICE_KEY)
+            .await
+            .expect("recovery + migration");
+        let sconn = connect(&sealed).await.unwrap();
+        let mut rows = sconn
+            .query("SELECT username FROM account", ())
+            .await
+            .expect("read recovered account");
+        let row = rows.next().await.unwrap().expect("one account row");
+        let username: String = row.get(0).unwrap();
+        assert_eq!(
+            username, "legacy-user",
+            "account row survived the interrupted swap"
+        );
+        drop(rows);
+        drop(sconn);
+        drop(sealed);
+
+        assert!(
+            !backup.exists(),
+            "plaintext backup cleaned up after a successful migration"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
 fn require_session_gates_data_access() {
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("require_session");
