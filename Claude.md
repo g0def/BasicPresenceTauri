@@ -185,10 +185,18 @@ src/
                                  #    WorkEntryList, DayScheduleEditor + page WorkHoursPage
 ```
 
-> **Dépendance dirigée assumée `presence → commute`** : l'empreinte CO₂ étant attachée à un
-> jour de présence, le dialog de présence consomme `SegmentEditor`/`useCommute`/helpers de
-> `commute` (jamais l'inverse — pas de cycle). Dérogation **délibérée** à l'isolation des
-> features, justifiée par le couplage métier (détail dans [documentation/auth.md](documentation/auth.md)).
+> **Dépendances dirigées assumées vers `commute`** — deux niveaux, la règle commune étant
+> l'**absence de cycle** (rien dans `commute` n'importe un de ses consommateurs) :
+>
+> - **Vocabulaire de présentation, ouvert à toutes les features.** Deux modules feuilles, sans état
+>   ni dépendance (hors le type `TFunction`) : `commute-format.ts` (`formatCo2`, `summarizeSegments`),
+>   consommé par `presence`, `stats` et le shell `routes/_authenticated.tsx` ; et `mode-labels.ts`
+>   (`MODE_LABEL_KEYS`, `modeLabel`), consommé par `methodology` et `export`. Les importer ne demande
+>   pas de justification particulière.
+> - **Dépendance lourde, réservée à `presence`.** L'empreinte CO₂ étant attachée à un jour de présence,
+>   le dialog de présence consomme `SegmentEditor`/`useCommute`. Dérogation **délibérée** à l'isolation
+>   des features, justifiée par le couplage métier (détail dans [documentation/auth.md](documentation/auth.md))
+>   — à ne pas étendre à d'autres features sans le même niveau de justification.
 
 > Le header authentifié contient : le timer de session, les **badges de résumé mensuel**
 > (heures travaillées + CO₂ émis pour le mois en cours — affichés uniquement sur `/` via

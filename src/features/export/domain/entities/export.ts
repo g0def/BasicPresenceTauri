@@ -29,7 +29,8 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
 
 /** Every human-visible string written into the file, already translated to the
  *  user's language (matches the backend `ExportLabelsDto`, camelCase). Built
- *  from i18n by {@link buildExportLabels} so the file matches the UI language. */
+ *  from i18n by {@link buildExportLabels} so the file matches the UI language.
+ *  All fields are strings except {@link ExportLabels.modeNames}. */
 export interface ExportLabels {
   sheetPresences: string;
   sheetTasks: string;
@@ -41,6 +42,8 @@ export interface ExportLabels {
   co2: string;
   presenceType: string;
   estimated: string;
+  /** Header of the one-line commute recap column on Présences. */
+  tripSummary: string;
   hours: string;
   created: string;
   updated: string;
@@ -53,12 +56,39 @@ export interface ExportLabels {
   minutes: string;
   color: string;
   order: string;
+  /** Header of the raw `mode_id` column, kept for machine reversibility. */
   mode: string;
-  distance: string;
+  /** Header of the localized mode column sitting next to the raw id. */
+  modeLabel: string;
+  distanceOneWay: string;
   roundTrip: string;
+  /** Header of the `distance × (round trip ? 2 : 1)` column. Shared by Trajets
+   *  (per leg) and Présences (day total) so the two can be cross-footed. */
+  distanceCounted: string;
   occupants: string;
   factorYear: string;
+
+  // Prose fragments the backend assembles into the recap text cell.
+  /** Separator between legs, e.g. `" + "` — the surrounding spaces matter. */
+  tripJoin: string;
+  /** Distance unit inside the recap, e.g. `"km"`. */
+  unitKm: string;
+  /** Round-trip marker inside the recap, e.g. `"(A/R)"`. */
+  roundTripSuffix: string;
+  /** One-way marker, e.g. `"(aller simple)"`. Only used when a day's legs
+   *  disagree, where every leg must be qualified to stay unambiguous. */
+  oneWaySuffix: string;
+  /** Decimal mark for numbers rendered *inside* the recap text. Derived from
+   *  Intl rather than translated — numeric cells stay real numbers and are
+   *  formatted by the reader's own spreadsheet. */
+  decimalSeparator: string;
+
   note: string;
+
+  /** Localized transport-mode names keyed by the backend `mode_id`
+   *  (`train_sncb`, `bike`, …). Unknown ids fall back to the raw id
+   *  backend-side. */
+  modeNames: Record<string, string>;
 }
 
 /** Outcome of an export run (matches the backend `ExportSummaryDto`). */

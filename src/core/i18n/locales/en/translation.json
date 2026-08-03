@@ -193,7 +193,7 @@
       "includeCarbon": "Carbon footprint (CO₂ and estimation)",
       "includeHours": "Worked hours",
       "includeTasks": "Daily tasks",
-      "includeTrips": "Trips (commute details)",
+      "includeTrips": "Trips (daily summary + commute details)",
       "includeNotes": "Notes",
       "includeTimestamps": "Created and updated dates"
     },
@@ -204,11 +204,18 @@
       "notes": "Notes",
       "yes": "Yes",
       "no": "No",
+      "trip": {
+        "join": " + ",
+        "unitKm": "km",
+        "roundTripSuffix": "(round trip)",
+        "oneWaySuffix": "(one way)"
+      },
       "cols": {
         "date": "Date",
         "type": "Type",
         "co2": "CO₂ (kg)",
         "estimated": "Estimated",
+        "tripSummary": "Commute",
         "hours": "Hours",
         "created": "Created",
         "updated": "Updated",
@@ -217,9 +224,11 @@
         "minutes": "Minutes",
         "color": "Color",
         "order": "Order",
-        "mode": "Mode",
-        "distance": "Distance (km)",
+        "mode": "Mode (code)",
+        "modeLabel": "Mode (label)",
+        "distanceOneWay": "One-way distance (km)",
         "roundTrip": "Round trip",
+        "distanceCounted": "Counted distance (km)",
         "occupants": "Occupants",
         "factorYear": "Factor year",
         "note": "Note"

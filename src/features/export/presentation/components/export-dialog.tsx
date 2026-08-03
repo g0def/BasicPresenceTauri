@@ -49,7 +49,7 @@ export function ExportDialog({
   onOpenChange,
   profileId,
 }: ExportDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { exportData, isExporting, error, clearError } = useExport();
 
   const [stage, setStage] = useState<Stage>("idle");
@@ -71,7 +71,7 @@ export function ExportDialog({
   const runExport = async () => {
     const fileName = `${t("export.fileBaseName")}-${format(new Date(), "yyyy-MM-dd")}.ods`;
     // Labels are translated to the current language so the file matches the UI.
-    const labels = buildExportLabels(t);
+    const labels = buildExportLabels(t, i18n.resolvedLanguage ?? "fr");
     const result = await exportData(profileId, options, labels, fileName);
     if (result) {
       setSummary(result);
