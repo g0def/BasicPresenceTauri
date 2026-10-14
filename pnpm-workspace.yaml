@@ -2,7 +2,9 @@ allowBuilds:
   esbuild: false
 
 # Relèvements de sécurité de dépendances transitives — à retirer quand les
-# parents (@milkdown/crepe pour dompurify, vite pour esbuild) les embarqueront.
+# parents les embarqueront (vérifier avec `pnpm why <paquet>`).
 overrides:
-  dompurify: '>=3.4.11' # GHSA-cmwh-pvxp-8882
+  dompurify: '>=3.4.16' # GHSA-cmwh-pvxp-8882, GHSA-c2j3-45gr-mqc4, GHSA-6688-9rhm-gjv2 (via @milkdown/crepe)
   esbuild: '>=0.28.1' # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)
+  katex: '>=0.18.2' # GHSA-238p-pmpm-9mq7 (via @milkdown/crepe > remark-math)
+  postcss-selector-parser: '>=7.1.6' # CPU DoS (via @tailwindcss/typography, build uniquement)

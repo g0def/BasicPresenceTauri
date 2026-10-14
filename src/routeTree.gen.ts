@@ -9,25 +9,25 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
 import { Route as AuthenticatedLicenceRouteImport } from './routes/_authenticated/licence'
+import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
 import { Route as AuthenticatedCommutesIndexRouteImport } from './routes/_authenticated/commutes/index'
-import { Route as AuthenticatedWorkHoursDayRouteImport } from './routes/_authenticated/work-hours/$day'
 import { Route as AuthenticatedCommutesNewRouteImport } from './routes/_authenticated/commutes/new'
+import { Route as AuthenticatedWorkHoursDayRouteImport } from './routes/_authenticated/work-hours/$day'
 import { Route as AuthenticatedCommutesCommuteIdEditRouteImport } from './routes/_authenticated/commutes/$commuteId.edit'
 
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -35,14 +35,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AuthenticatedLicenceRoute = AuthenticatedLicenceRouteImport.update({
+  id: '/licence',
+  path: '/licence',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMethodologyRoute =
@@ -51,9 +46,14 @@ const AuthenticatedMethodologyRoute =
     path: '/methodology',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedLicenceRoute = AuthenticatedLicenceRouteImport.update({
-  id: '/licence',
-  path: '/licence',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedCommutesIndexRoute =
@@ -62,16 +62,16 @@ const AuthenticatedCommutesIndexRoute =
     path: '/commutes/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedWorkHoursDayRoute =
-  AuthenticatedWorkHoursDayRouteImport.update({
-    id: '/work-hours/$day',
-    path: '/work-hours/$day',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedCommutesNewRoute =
   AuthenticatedCommutesNewRouteImport.update({
     id: '/commutes/new',
     path: '/commutes/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWorkHoursDayRoute =
+  AuthenticatedWorkHoursDayRouteImport.update({
+    id: '/work-hours/$day',
+    path: '/work-hours/$day',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedCommutesCommuteIdEditRoute =
@@ -166,18 +166,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -187,18 +187,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/stats': {
-      id: '/_authenticated/stats'
-      path: '/stats'
-      fullPath: '/stats'
-      preLoaderRoute: typeof AuthenticatedStatsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+    '/_authenticated/licence': {
+      id: '/_authenticated/licence'
+      path: '/licence'
+      fullPath: '/licence'
+      preLoaderRoute: typeof AuthenticatedLicenceRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/methodology': {
@@ -208,11 +201,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMethodologyRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/licence': {
-      id: '/_authenticated/licence'
-      path: '/licence'
-      fullPath: '/licence'
-      preLoaderRoute: typeof AuthenticatedLicenceRouteImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/stats': {
+      id: '/_authenticated/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof AuthenticatedStatsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/commutes/': {
@@ -222,18 +222,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCommutesIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/work-hours/$day': {
-      id: '/_authenticated/work-hours/$day'
-      path: '/work-hours/$day'
-      fullPath: '/work-hours/$day'
-      preLoaderRoute: typeof AuthenticatedWorkHoursDayRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/commutes/new': {
       id: '/_authenticated/commutes/new'
       path: '/commutes/new'
       fullPath: '/commutes/new'
       preLoaderRoute: typeof AuthenticatedCommutesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/work-hours/$day': {
+      id: '/_authenticated/work-hours/$day'
+      path: '/work-hours/$day'
+      fullPath: '/work-hours/$day'
+      preLoaderRoute: typeof AuthenticatedWorkHoursDayRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/commutes/$commuteId/edit': {

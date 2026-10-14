@@ -1,5 +1,6 @@
 pub mod account_repository;
 pub mod commute_repository;
+pub mod data_dir;
 pub mod db;
 pub mod emission_factor_repository;
 pub mod keystore_bootstrap;

@@ -26,11 +26,11 @@ const { exportProfileBundle, pickAndInspect, importProfileBundle } = vi.hoisted(
 vi.mock(
   "@/features/profile-transfer/data/repositories/tauri-transfer.repository",
   () => ({
-    TauriTransferRepository: vi.fn(() => ({
-      exportProfileBundle,
-      pickAndInspect,
-      importProfileBundle,
-    })),
+    // A `function` (not an arrow): Vitest 4 calls the implementation with
+    // `new`, and arrow functions are not constructible.
+    TauriTransferRepository: vi.fn(function () {
+      return { exportProfileBundle, pickAndInspect, importProfileBundle };
+    }),
   }),
 );
 

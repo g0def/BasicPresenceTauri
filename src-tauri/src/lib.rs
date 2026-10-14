@@ -110,13 +110,14 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // Resolve (and create) the per-app data directory for the DB files.
+            // Resolve (and create) the per-app data directory for the DB files,
+            // restricted to the current user (0700 on Unix).
             let data_dir = app
                 .path()
                 .app_data_dir()
                 .map_err(|e| format!("cannot resolve app data dir: {e}"))?;
-            std::fs::create_dir_all(&data_dir)
-                .map_err(|e| format!("cannot create app data dir: {e}"))?;
+            crate::infrastructure::persistence::data_dir::prepare_private_data_dir(&data_dir)
+                .map_err(|e| format!("cannot prepare app data dir: {e}"))?;
 
             // Per-device key that seals the keystore at rest (from the OS keychain).
             let device_key = crate::infrastructure::crypto::device_key::resolve_device_key()

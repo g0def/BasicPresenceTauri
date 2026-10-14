@@ -67,7 +67,7 @@ async-trait = "0.1"
 # syntect en `default-fancy` (moteur regex pur-Rust `fancy-regex`, donc PAS de dep C).
 # Le HTML est ensuite assaini par Ammonia (whitelist html5ever) avant la WebView.
 comrak = { version = "0.52.0", default-features = false }
-ammonia = "4.1.2"
+ammonia = "4.1.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 spreadsheet-ods = "1.0.4"
 tauri-plugin-dialog = "2.7.1"

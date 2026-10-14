@@ -3,6 +3,7 @@
 //! to disk. The serde wire structs are private to this adapter — they are the
 //! file format, not a frontend contract (the commands return separate DTOs).
 
+use std::io::Read;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,11 @@ use crate::domain::services::profile_bundle::{
 
 /// Format tag stamped into every file; a file with a different tag is rejected.
 const BUNDLE_FORMAT: &str = "basic-presence-profile";
+
+/// Upper bound on a bundle file read into memory. A decade of daily presences,
+/// trips, tasks and notes stays well under 10 MiB; anything far larger is not
+/// a genuine export and would only exhaust memory.
+const MAX_BUNDLE_BYTES: u64 = 50 * 1024 * 1024;
 
 /// Reads/writes profile bundles as JSON files.
 pub struct JsonProfileBundleCodec;
@@ -51,8 +57,19 @@ impl ProfileBundleCodec for JsonProfileBundleCodec {
     fn read(&self, path: &Path) -> Result<ParsedBundle, DomainError> {
         // Surface only the error *category* (not found, permission denied…):
         // Validation messages reach the UI verbatim, so no raw OS error here.
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| DomainError::Validation(format!("cannot read file: {}", e.kind())))?;
+        let read_error =
+            |e: std::io::Error| DomainError::Validation(format!("cannot read file: {}", e.kind()));
+        // Read at most one byte past the cap (`take`, not a metadata check, so a
+        // file growing after the check cannot slip through).
+        let mut text = String::new();
+        std::fs::File::open(path)
+            .map_err(read_error)?
+            .take(MAX_BUNDLE_BYTES + 1)
+            .read_to_string(&mut text)
+            .map_err(read_error)?;
+        if text.len() as u64 > MAX_BUNDLE_BYTES {
+            return Err(DomainError::Validation("file too large".to_string()));
+        }
         // Strip a leading UTF-8 BOM if present (some editors add one).
         let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
         let file: BundleFile = serde_json::from_str(text)
@@ -668,6 +685,17 @@ mod tests {
         let res = JsonProfileBundleCodec::new().read(&path);
         let _ = std::fs::remove_file(&path);
         assert!(matches!(res, Err(DomainError::Validation(_))));
+    }
+
+    #[test]
+    fn rejects_a_file_over_the_size_cap() {
+        let path = temp_path("too_large");
+        let file = std::fs::File::create(&path).unwrap();
+        // Sparse file: no real disk usage for the test.
+        file.set_len(MAX_BUNDLE_BYTES + 1).unwrap();
+        let res = JsonProfileBundleCodec::new().read(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(matches!(res, Err(DomainError::Validation(m)) if m == "file too large"));
     }
 
     #[test]

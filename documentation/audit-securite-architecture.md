@@ -7,6 +7,8 @@
 | **Périmètre** | Backend Rust (`src-tauri/`), frontend React (`src/`), configuration Tauri, capabilities, CI/CD, dépendances, documentation |
 | **Méthode** | Revue manuelle du cœur cryptographique et des flux d'authentification + trois passes d'analyse parallèles (frontend, architecture backend, configuration/supply chain), affirmations croisées et re-vérifiées sur le code |
 
+> **Suivi :** un second audit a été réalisé le 14 octobre 2026 — voir [audit-securite-2026-10.md](audit-securite-2026-10.md) pour l'état à jour des constats.
+
 > Voir aussi [auth.md](auth.md) (modèle de sécurité documenté) et [turso.md](turso.md) (persistance). Cet audit vérifie notamment que ces documents correspondent au code réel — c'est le cas.
 
 ---
