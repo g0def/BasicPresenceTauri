@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::application::dto::day_note_dto::DayNoteDto;
+use crate::application::use_cases::limits::{validate_len, MAX_NOTE_LEN};
 use crate::domain::error::DomainError;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::services::clock::Clock;
@@ -40,6 +41,9 @@ impl SetDayNoteUseCase {
         }
         // A blank / whitespace-only note clears the column (stored as NULL).
         let trimmed = markdown.as_deref().map(str::trim).unwrap_or("");
+        // Bounded: the note is free text reaching the vault, the Markdown
+        // renderer and the .ods export, and can also arrive from a bundle.
+        validate_len("note", trimmed, MAX_NOTE_LEN)?;
         let stored = if trimmed.is_empty() {
             None
         } else {

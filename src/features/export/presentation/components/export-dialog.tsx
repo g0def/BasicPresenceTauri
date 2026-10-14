@@ -24,6 +24,8 @@ interface ExportDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Profile whose activity is exported (Settings only renders this with one). */
   profileId: string;
+  /** Called when the backend reports a locked vault (SESSION_EXPIRED). */
+  onSessionExpired?: () => void;
 }
 
 type Stage = "idle" | "result";
@@ -48,9 +50,12 @@ export function ExportDialog({
   open,
   onOpenChange,
   profileId,
+  onSessionExpired,
 }: ExportDialogProps) {
-  const { t, i18n } = useTranslation();
-  const { exportData, isExporting, error, clearError } = useExport();
+
+    const { t, i18n } = useTranslation();
+  const { exportData, isExporting, error, clearError } =
+    useExport(onSessionExpired);
 
   const [stage, setStage] = useState<Stage>("idle");
   const [options, setOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);

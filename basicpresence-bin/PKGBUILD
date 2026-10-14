@@ -5,13 +5,30 @@ pkgrel=1
 pkgdesc="A presence tracking application"
 arch=('x86_64')
 url="https://github.com/g0def/BasicPresenceTauri"
-license=('MIT')
+# NOT MIT: proprietary licence — free below 30 active users per organisation,
+# commercial above. Arch convention for a non-standard licence is `custom:<name>`
+# with the text installed under /usr/share/licenses/ (see package()).
+license=('custom:BasicPresence')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
 provides=('basic-presence')
 conflicts=('basic-presence')
 
 source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/g0def/BasicPresenceTauri/releases/download/v${pkgver}/basic-presence_${pkgver}_amd64.deb")
+source=("LICENCE-${pkgver}::https://raw.githubusercontent.com/g0def/BasicPresenceTauri/v${pkgver}/LICENCE")
+
+# TODO(release): replace both SKIPs with real digests on every version bump.
+#
+# AUR is the only distribution channel with no integrity check of its own: the
+# in-app updater verifies a minisign signature against the public key pinned in
+# tauri.conf.json, but makepkg does not. With `SKIP`, whatever is served at that
+# URL is unpacked and installed as-is — a swapped release asset, or the GitHub
+# namespace being taken over, reaches `install` with nothing in the way.
+#
+# Generate after publishing the release:
+#   curl -sL <deb-url> | sha256sum
+#   curl -sL <licence-url> | sha256sum
 sha256sums_x86_64=('SKIP')
+sha256sums=('SKIP')
 
 package() {
     cd "${srcdir}"
@@ -26,4 +43,9 @@ package() {
         install -Dm644 "usr/share/icons/hicolor/${size}/apps/basic-presence.png" \
             "${pkgdir}/usr/share/icons/hicolor/${size}/apps/basic-presence.png"
     done
+
+    # Required for a `custom:` licence: users must be able to read the terms
+    # they are bound by without visiting the repository.
+    install -Dm644 "${srcdir}/LICENCE-${pkgver}" \
+        "${pkgdir}/usr/share/licenses/${pkgname}/LICENCE"
 }

@@ -11,4 +11,11 @@ pub trait EmissionFactorRepository: Send + Sync {
 
     /// All per-country electric grid overrides for a reference year.
     async fn list_grid_variants(&self, year: i32) -> Result<Vec<GridVariant>, DomainError>;
+
+    /// Reference years actually present in the referential, ascending.
+    ///
+    /// Used to validate a profile's chosen vintage against what is really
+    /// seeded, rather than against a constant that would drift every time a new
+    /// year ships.
+    async fn available_years(&self) -> Result<Vec<i32>, DomainError>;
 }

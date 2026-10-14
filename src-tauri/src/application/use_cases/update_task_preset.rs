@@ -39,7 +39,7 @@ impl UpdateTaskPresetUseCase {
             .ok_or_else(|| DomainError::Validation("task preset not found".to_string()))?;
 
         preset.title = validate_title(title)?;
-        preset.description = normalize_description(description);
+        preset.description = normalize_description(description)?;
         preset.default_minutes = validate_minutes(default_minutes)?;
         preset.color = validate_color(color)?;
         preset.updated_at = self.clock.now_ms();

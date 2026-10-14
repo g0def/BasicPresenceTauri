@@ -198,6 +198,17 @@ src/
 >   des features, justifiée par le couplage métier (détail dans [documentation/auth.md](documentation/auth.md))
 >   — à ne pas étendre à d'autres features sans le même niveau de justification.
 
+> **Couplage bidirectionnel assumé `presence ↔ work-hours`** : les heures travaillées sont
+> attachées à un jour de présence, ce qui crée une dépendance dans les deux sens —
+> `presence` importe `work-hours` (helpers de durée et d'actions de journée, pour afficher
+> les heures dans le calendrier et le presse-papier de jour) et `work-hours` importe
+> `presence` (type `Presence` et palette de couleurs de la page d'un jour). Contrairement à
+> `presence → commute`, ce n'est donc **pas** une dépendance dirigée. C'est toléré parce que
+> les deux features décrivent le même objet métier (« une journée ») et que les imports
+> croisés portent sur des types et des helpers purs, jamais sur de l'état. À surveiller : si
+> un provider venait à traverser la frontière dans les deux sens, il faudrait extraire un
+> module `work-day` partagé plutôt que laisser le cycle s'épaissir.
+
 > Le header authentifié contient : le timer de session, les **badges de résumé mensuel**
 > (heures travaillées + CO₂ émis pour le mois en cours — affichés uniquement sur `/` via
 > `useLocation()`) et le **badge de profil** (tout à droite) qui ouvre le menu compte
@@ -236,7 +247,10 @@ src/
 - **Mot de passe** : haché en **Argon2id** (jamais stocké en clair, jamais envoyé au front).
 - **Chiffrement au repos** : _envelope encryption_ à clé dérivée du mot de passe. Un DEK aléatoire chiffre le coffre `vault.db` ; le DEK est enveloppé (XChaCha20-Poly1305) par un KEK dérivé du mot de passe. Le coffre ne s'ouvre qu'après login.
 - **Deux bases, toutes deux chiffrées au repos** : `keystore.db` (hash + DEK/clé MAC enveloppés) **scellé par une clé de device du trousseau OS** (libsecret/Keychain/Credential Manager) → fichier volé inutilisable hors de l'appareil ; `vault.db` chiffré par le DEK, avec **évidence d'altération** (HMAC-SHA256 sidecar, libSQL CBC n'étant pas authentifié) — politique **`HardFail` par défaut** (un mismatch après arrêt propre refuse l'ouverture).
-- **Session** : 15 min **absolue** + **timeout d'inactivité**, en mémoire uniquement (jamais persistée, tokens stockés **hachés SHA-256**) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** (verrouillage après échecs répétés). L'expiration est **appliquée côté Rust** : chaque commande touchant au coffre passe par `require_session` (révocation + verrouillage du coffre à l'expiration), sans dépendre du frontend.
+- **Session** : 15 min **absolue** + **timeout d'inactivité**, en mémoire uniquement (jamais persistée, tokens stockés **hachés SHA-256**) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** (verrouillage après échecs répétés). L'expiration est **appliquée côté Rust** : chaque commande touchant au coffre passe par `require_session` (révocation + verrouillage du coffre à l'expiration), sans dépendre du frontend. L'horloge backend est **à cliquet** (`infrastructure/clock.rs`) : reculer l'heure système ne prolonge ni une session ni un verrouillage. Le compte à rebours du front n'est qu'un affichage.
+- **Intégrité du coffre** : l'état (empreinte + drapeau « session ouverte » + compteur de session) vit dans un **sidecar authentifié** par HMAC ; le compteur est ancré dans le keystore scellé, ce qui rend détectable la restauration d'un couple `vault.db`/sidecar plus ancien. Aucun fichier témoin en clair n'influence le verdict.
+- **Navigation** : un garde `on_navigation` refuse toute navigation de la WebView hors de l'origine de l'app. Les liens des contenus rendus (notes, licence) partent dans le navigateur système via `openExternal`.
+- **Récupération** : un verdict d'altération n'est pas une impasse — `recover_vault` rouvre le coffre après confirmation explicite de l'utilisateur, en conservant une copie du fichier suspect (un arrêt brutal produit le même verdict qu'une falsification).
 - **Aucun secret** (token Turso, clés) commité ni exposé au frontend — ils restent côté Rust.
 - ⚠️ **Contrainte runtime (Linux)** : un Secret Service (GNOME Keyring/KWallet) doit tourner pour ouvrir le keystore ; sinon le démarrage échoue explicitement.
 

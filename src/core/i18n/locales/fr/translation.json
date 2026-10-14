@@ -12,7 +12,12 @@
     "submitLogin": "Se connecter",
     "tagline": "Suivez vos présences, mesurez votre empreinte carbone.",
     "carbon": "CO₂",
-    "local": "100% local · chiffré"
+    "local": "100% local · chiffré",
+    "integrity": {
+      "title": "Contrôle d'intégrité",
+      "explain": "Le contenu du coffre ne correspond plus à sa dernière empreinte. Cela arrive aussi après une coupure de courant ou un arrêt brutal pendant une écriture. Si vous n'avez pas connaissance d'une modification du fichier, vous pouvez forcer l'ouverture : une copie de sauvegarde du fichier actuel sera conservée.",
+      "recover": "Ouvrir malgré l'avertissement"
+    }
   },
   "home": {
     "logout": "Se déconnecter"

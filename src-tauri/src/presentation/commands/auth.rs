@@ -42,6 +42,26 @@ pub async fn login(
     Ok(state.login.execute(&username, password.as_str()).await?)
 }
 
+/// Authenticate and open a vault that failed its integrity check, after the
+/// user has acknowledged the warning shown by the login screen.
+///
+/// Same credential path as `login` (lockout included): a wrong password gets
+/// nowhere. Only reachable once `login` has returned `VAULT_TAMPERED`, which is
+/// the state a power cut mid-migration can also produce — without this route,
+/// such an accident would lock the owner out of their own data for good.
+#[tauri::command]
+pub async fn recover_vault(
+    username: String,
+    password: String,
+    state: State<'_, AppState>,
+) -> Result<LoginResultDto, AppError> {
+    let password = Zeroizing::new(password);
+    Ok(state
+        .login
+        .execute_recovering(&username, password.as_str())
+        .await?)
+}
+
 /// Report whether the given session token is still valid.
 #[tauri::command]
 pub async fn check_session(

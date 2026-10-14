@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{params, Row};
 
 use crate::domain::entities::emission_factor::{
     EmissionCategory, EmissionFactor, EmissionUnit, GridVariant,
@@ -9,7 +9,7 @@ use crate::domain::entities::emission_factor::{
 use crate::domain::error::DomainError;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const SELECT_COLUMNS: &str = "id, label, value, unit, category, is_param, scope, source";
 
@@ -23,7 +23,7 @@ impl LibsqlEmissionFactorRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }
@@ -83,6 +83,23 @@ impl EmissionFactorRepository for LibsqlEmissionFactorRepository {
         let mut out = Vec::new();
         while let Some(row) = rows.next().await.map_err(map_storage)? {
             out.push(row_to_variant(&row)?);
+        }
+        Ok(out)
+    }
+
+    async fn available_years(&self) -> Result<Vec<i32>, DomainError> {
+        let mut rows = self
+            .conn()?
+            .query(
+                "SELECT DISTINCT year FROM emission_factor ORDER BY year",
+                (),
+            )
+            .await
+            .map_err(map_storage)?;
+        let mut out = Vec::new();
+        while let Some(row) = rows.next().await.map_err(map_storage)? {
+            let year: i64 = row.get(0).map_err(map_storage)?;
+            out.push(year as i32);
         }
         Ok(out)
     }

@@ -3,7 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    # Tagged commits are what actually gets built, signed and shipped, so they
+    # must clear the same gates as main — a tag pushed from a side branch used
+    # to reach release.yml without any check having run on it.
+    tags: ["v*"]
   pull_request:
+
+# Least privilege: these jobs only ever read the repository. Without this block
+# the token defaults to the repository-wide setting, which may grant write.
+permissions:
+  contents: read
 
 # Cancel superseded runs on the same ref.
 concurrency:
@@ -28,14 +37,38 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Cargo.toml's version is not cosmetic: exported profile bundles are
+      # stamped with CARGO_PKG_VERSION, so drift silently mislabels every shared
+      # file. tauri.conf.json takes its version from package.json.
+      - name: Check Cargo.toml and package.json versions agree
+        shell: bash
+        run: |
+          js=$(node -p "require('./package.json').version")
+          rs=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "package.json=$js  Cargo.toml=$rs"
+          if [ "$js" != "$rs" ]; then
+            echo "::error::Version mismatch: package.json=$js but Cargo.toml=$rs"
+            exit 1
+          fi
+
       - run: pnpm lint
 
       - run: pnpm typecheck
 
       - run: pnpm test
 
-      # Fail the build only on high/critical advisories.
-      - run: pnpm audit --audit-level=high
+      # Two tiers, because "dev-only" and "ships to users" are not the same risk.
+      # What reaches the binary is held to zero known advisories, at any
+      # severity: a single sanitiser bug in production is worth more attention
+      # than a DoS in a linter.
+      - name: Audit production dependencies (blocking, any severity)
+        run: pnpm audit --prod --audit-level=low
+
+      # Build/lint tooling: visible, and blocking from moderate up. A previous
+      # `high` threshold hid a moderate advisory affecting the exact dompurify
+      # version an override had pinned to.
+      - name: Audit all dependencies (blocking from moderate)
+        run: pnpm audit --audit-level=moderate
 
   backend:
     name: Backend (fmt, clippy, test, audit)

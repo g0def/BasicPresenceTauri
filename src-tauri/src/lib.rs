@@ -58,6 +58,7 @@ use crate::domain::repositories::profile_settings_repository::ProfileSettingsRep
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 use crate::domain::services::clock::Clock;
+use crate::domain::services::integrity_anchor::IntegrityAnchor;
 use crate::domain::services::key_service::KeyService;
 use crate::domain::services::markdown::MarkdownRenderer;
 use crate::domain::services::password_hasher::PasswordHasher;
@@ -77,6 +78,7 @@ use crate::infrastructure::persistence::account_repository::LibsqlAccountReposit
 use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
 use crate::infrastructure::persistence::db::connect;
 use crate::infrastructure::persistence::emission_factor_repository::LibsqlEmissionFactorRepository;
+use crate::infrastructure::persistence::integrity_anchor::LibsqlIntegrityAnchor;
 use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
@@ -92,6 +94,32 @@ use crate::presentation::commands::{
 };
 use crate::presentation::state::AppState;
 
+/// Engine-level guard: nothing may drive the top-level WebView away from the
+/// app's own origin.
+///
+/// Rendered Markdown notes contain real `<a href>` anchors — comrak's autolink
+/// turns a pasted URL into one, and Ammonia's default whitelist keeps
+/// http/https/mailto — and a note can arrive from a bundle sent by someone else.
+/// Without this, clicking such a link replaces the window with a remote page
+/// inside a chrome that has no address bar or back button, which is a ready-made
+/// credential-phishing surface. It would also be the app's first network access,
+/// contradicting the offline-only claim.
+///
+/// Legitimate external links go through `openExternal` (opener plugin), which
+/// hands the URL to the OS browser instead.
+fn navigation_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("navigation-guard")
+        .on_navigation(|_webview, url| {
+            let host = url.host_str();
+            matches!(url.scheme(), "tauri" | "asset")
+                || host == Some("tauri.localhost")
+                // Vite dev server (`devUrl`) and the Linux asset origin.
+                || host == Some("localhost")
+                || host == Some("127.0.0.1")
+        })
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -99,6 +127,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(navigation_guard())
         .on_window_event(|window, event| {
             // On a clean window close, lock the vault so its integrity baseline
             // is refreshed (otherwise the next launch sees an "unclean" state).
@@ -132,6 +161,7 @@ pub fn run() {
             auth::account_exists,
             auth::register,
             auth::login,
+            auth::recover_vault,
             auth::check_session,
             auth::logout,
             profile::create_profile,
@@ -181,6 +211,9 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let keystore_db = open_or_migrate_keystore(&config.keystore_path, device_key).await?;
     let keystore_conn = connect(&keystore_db).await?;
     migrations::run(&keystore_conn, KEYSTORE_MIGRATIONS).await?;
+    // Second connection on the same keystore for the integrity anchor, so it
+    // does not contend with the account repository's.
+    let anchor_conn = connect(&keystore_db).await?;
 
     // Infrastructure implementations (behind domain ports).
     let accounts: Arc<dyn AccountRepository> =
@@ -199,9 +232,15 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
     // Keep a concrete handle so the profile repository can read the live vault
     // connection, while the auth use cases depend on the `VaultManager` port.
+    // The integrity anchor lives in the keystore (sealed by the device key), so
+    // the vault's session counter cannot be rewritten by someone holding only
+    // the data directory — that is what makes a rolled-back vault detectable.
+    let integrity_anchor: Arc<dyn IntegrityAnchor> =
+        Arc::new(LibsqlIntegrityAnchor::new(anchor_conn));
     let vault_impl = Arc::new(LibsqlVaultManager::new(
         config.vault_path.clone(),
         config.integrity,
+        integrity_anchor,
     ));
     let vault: Arc<dyn VaultManager> = vault_impl.clone();
     let profiles: Arc<dyn ProfileRepository> =
@@ -218,7 +257,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlTaskPresetRepository::new(vault_impl.clone()));
     let work_entries: Arc<dyn WorkEntryRepository> =
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
     // App licence: static text embedded at compile time. The path is relative to
     // this file (src-tauri/src/lib.rs), so `../../LICENCE` is the repo-root file —
@@ -274,7 +313,10 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         delete_commute: DeleteCommuteUseCase::new(commutes.clone()),
         get_presence_trips: GetPresenceTripsUseCase::new(presences.clone()),
         get_profile_settings: GetProfileSettingsUseCase::new(profile_settings.clone()),
-        set_profile_settings: SetProfileSettingsUseCase::new(profile_settings.clone()),
+        set_profile_settings: SetProfileSettingsUseCase::new(
+            profile_settings.clone(),
+            factors.clone(),
+        ),
         create_task_preset: CreateTaskPresetUseCase::new(task_presets.clone(), clock.clone()),
         list_task_presets: ListTaskPresetsUseCase::new(task_presets.clone()),
         update_task_preset: UpdateTaskPresetUseCase::new(task_presets.clone(), clock.clone()),
@@ -313,6 +355,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             task_presets.clone(),
             commutes.clone(),
             profile_settings.clone(),
+            factors.clone(),
             clock.clone(),
         ),
         vault: vault.clone(),

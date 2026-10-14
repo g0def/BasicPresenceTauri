@@ -58,7 +58,7 @@ impl SetWorkEntriesUseCase {
                 id: Uuid::now_v7().to_string(),
                 presence_id: presence_id.to_string(),
                 title: validate_title(&input.title)?,
-                description: normalize_description(input.description),
+                description: normalize_description(input.description)?,
                 minutes: validate_minutes(input.minutes)?,
                 color: validate_color(&input.color)?,
                 position: i as i64,

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { startOfMonth } from "date-fns";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriPresenceRepository } from "@/features/presence/data/repositories/tauri-presence.repository";
 import type {
   Presence,
@@ -51,7 +52,7 @@ export function PresenceProvider({
 
   const handleError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+      if (isSessionExpired(e)) {
         onSessionExpired?.();
         return;
       }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriDayNoteRepository } from "@/features/work-hours/data/repositories/tauri-day-note.repository";
 import { makeGetDayNoteUseCase } from "@/features/work-hours/domain/use-cases/get-day-note";
 import { makeSetDayNoteUseCase } from "@/features/work-hours/domain/use-cases/set-day-note";
@@ -54,7 +55,7 @@ export function useDayNote(
   onSessionExpiredRef.current = onSessionExpired;
 
   const handleError = useCallback((e: unknown) => {
-    if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+    if (isSessionExpired(e)) {
       onSessionExpiredRef.current?.();
       return;
     }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import {
   toWorkEntryInput,
   type WorkDaySchedule,
@@ -64,7 +65,7 @@ export function useWorkDay(
   onSessionExpiredRef.current = onSessionExpired;
 
   const handleError = useCallback((e: unknown) => {
-    if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+    if (isSessionExpired(e)) {
       onSessionExpiredRef.current?.();
       return;
     }

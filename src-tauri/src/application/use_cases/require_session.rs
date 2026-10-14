@@ -68,6 +68,9 @@ mod tests {
         async fn open(&self, _dek: &[u8], _mac_key: &[u8]) -> Result<(), DomainError> {
             Ok(())
         }
+        async fn open_recovering(&self, _dek: &[u8], _mac_key: &[u8]) -> Result<(), DomainError> {
+            Ok(())
+        }
         fn close(&self) {
             self.closed.store(true, Ordering::SeqCst);
         }

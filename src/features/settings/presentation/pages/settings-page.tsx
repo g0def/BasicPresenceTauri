@@ -4,6 +4,7 @@ import { ChevronLeft, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,6 +31,9 @@ const CELL_DISPLAY_MODES: CellDisplayMode[] = ["co2", "hours"];
 const GRID_COUNTRIES = ["FR", "BE", "DE", "EU"] as const;
 
 export function SettingsPage() {
+  // Routed page: reads auth directly, like WorkHoursPage. Reusable components
+  // below get the callback instead, so features stay router/auth agnostic.
+  const { logout } = useAuth();
   const { t } = useTranslation();
   const { profiles, activeProfile, deleteProfile } = useProfile();
   const { settings, update } = useProfileSettings();
@@ -334,6 +338,7 @@ export function SettingsPage() {
           open={exportOpen}
           onOpenChange={setExportOpen}
           profileId={activeProfile.id}
+          onSessionExpired={logout}
         />
       )}
 
@@ -342,12 +347,14 @@ export function SettingsPage() {
           open={exportBundleOpen}
           onOpenChange={setExportBundleOpen}
           profileId={activeProfile.id}
+          onSessionExpired={logout}
         />
       )}
 
       <ImportProfileDialog
         open={importBundleOpen}
         onOpenChange={setImportBundleOpen}
+        onSessionExpired={logout}
       />
 
       <Dialog

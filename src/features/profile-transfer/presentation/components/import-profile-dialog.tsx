@@ -38,6 +38,8 @@ import { usePresence } from "@/features/presence/presentation/hooks/use-presence
 interface ImportProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called when the backend reports a locked vault (SESSION_EXPIRED). */
+  onSessionExpired?: () => void;
 }
 
 type Stage = "idle" | "review" | "result";
@@ -58,6 +60,7 @@ interface NewProfileForm {
 export function ImportProfileDialog({
   open,
   onOpenChange,
+  onSessionExpired,
 }: ImportProfileDialogProps) {
   const { t } = useTranslation();
   const { profiles, activeProfile, refresh } = useProfile();
@@ -69,7 +72,7 @@ export function ImportProfileDialog({
     isImporting,
     error,
     clearError,
-  } = useProfileTransfer();
+  } = useProfileTransfer(onSessionExpired);
 
   const [stage, setStage] = useState<Stage>("idle");
   const [localError, setLocalError] = useState<string | null>(null);

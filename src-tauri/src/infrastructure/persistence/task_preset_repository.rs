@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{params, Row};
 
 use crate::domain::entities::task_preset::TaskPreset;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const PRESET_COLUMNS: &str =
     "id, profile_id, title, description, default_minutes, color, created_at, updated_at";
@@ -22,7 +22,7 @@ impl LibsqlTaskPresetRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }

@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{params, Row};
 
 use crate::domain::entities::profile::Profile;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const SELECT_COLUMNS: &str = "id, first_name, last_name, enterprise, poste, created_at, updated_at";
 
@@ -25,7 +25,7 @@ impl LibsqlProfileRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }

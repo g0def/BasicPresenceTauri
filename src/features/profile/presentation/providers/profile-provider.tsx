@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriProfileRepository } from "@/features/profile/data/repositories/tauri-profile.repository";
 import type {
   CreateProfileInput,
@@ -47,7 +48,7 @@ export function ProfileProvider({
   // A locked vault surfaces as SESSION_EXPIRED — drop the (now stale) session.
   const handleError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+      if (isSessionExpired(e)) {
         onSessionExpired?.();
         return;
       }
@@ -56,11 +57,18 @@ export function ProfileProvider({
     [onSessionExpired],
   );
 
+  // The only context method that used to let its rejection escape. Callers use
+  // it fire-and-forget (`void refresh()` after an import), so a failure became
+  // an unhandled rejection and left the caller's dialog stuck mid-flow.
   const refresh = useCallback(async () => {
-    const list = await listProfilesUseCase();
-    setProfiles(list.profiles);
-    setActiveProfileId(list.activeProfileId);
-  }, []);
+    try {
+      const list = await listProfilesUseCase();
+      setProfiles(list.profiles);
+      setActiveProfileId(list.activeProfileId);
+    } catch (e) {
+      handleError(e);
+    }
+  }, [handleError]);
 
   useEffect(() => {
     let cancelled = false;

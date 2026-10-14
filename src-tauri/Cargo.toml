@@ -1,6 +1,10 @@
 [package]
 name = "basic-presence"
-version = "0.1.1"
+# Kept in step with package.json, which is the version Tauri actually ships
+# (tauri.conf.json reads `../package.json`). This one is not cosmetic: exported
+# profile bundles are stamped with CARGO_PKG_VERSION, so a stale value here
+# mislabels every shared file.
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"

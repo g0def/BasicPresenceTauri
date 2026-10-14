@@ -7,6 +7,9 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::application::use_cases::limits::{
+    validate_count, MAX_BUNDLE_BYTES, MAX_BUNDLE_DAYS, MAX_BUNDLE_ITEMS,
+};
 use crate::domain::entities::co2_settings::Co2Settings;
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::entities::presence::{Presence, PresenceType};
@@ -49,6 +52,20 @@ impl ProfileBundleCodec for JsonProfileBundleCodec {
     }
 
     fn read(&self, path: &Path) -> Result<ParsedBundle, DomainError> {
+        // Check the size *before* reading: this file comes from outside (the
+        // whole point of the feature is that a colleague sends you one), and
+        // `read_to_string` on a multi-gigabyte file would happily try to hold it
+        // all in memory before any validation gets a say.
+        let size = std::fs::metadata(path)
+            .map_err(|e| DomainError::Validation(format!("cannot read file: {}", e.kind())))?
+            .len();
+        if size > MAX_BUNDLE_BYTES {
+            return Err(DomainError::Validation(format!(
+                "this file is too large to be a profile bundle ({} MB, limit {} MB)",
+                size / (1024 * 1024),
+                MAX_BUNDLE_BYTES / (1024 * 1024)
+            )));
+        }
         // Surface only the error *category* (not found, permission denied…):
         // Validation messages reach the UI verbatim, so no raw OS error here.
         let text = std::fs::read_to_string(path)
@@ -335,8 +352,18 @@ impl BundleFile {
     // --- Wire → domain (read). Entity ids/owner-ids are left as placeholders
     // (the import use case assigns fresh ones); `kind` is validated here. ---
     fn into_domain(self) -> Result<ParsedBundle, DomainError> {
+        // Bound the collections before allocating per-item domain objects. The
+        // file-size check upstream caps the raw bytes, but compact JSON packs a
+        // lot of array entries into a few megabytes, and each one becomes a row
+        // written to the vault and re-read on every load.
+        validate_count("days", self.days.len(), MAX_BUNDLE_DAYS)?;
+        validate_count("taskPresets", self.task_presets.len(), MAX_BUNDLE_ITEMS)?;
+        validate_count("commutes", self.commutes.len(), MAX_BUNDLE_ITEMS)?;
+
         let mut days = Vec::with_capacity(self.days.len());
         for d in self.days {
+            validate_count("trips", d.trips.len(), MAX_BUNDLE_ITEMS)?;
+            validate_count("workEntries", d.work_entries.len(), MAX_BUNDLE_ITEMS)?;
             let kind = PresenceType::parse(&d.kind)?;
             let trips = d
                 .trips

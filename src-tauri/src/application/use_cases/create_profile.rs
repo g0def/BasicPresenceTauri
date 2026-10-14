@@ -8,7 +8,7 @@ use crate::domain::error::DomainError;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::services::clock::Clock;
 
-const MAX_FIELD_LEN: usize = 120;
+use crate::application::use_cases::limits::MAX_FIELD_LEN;
 
 /// Create a presence profile. The first profile created becomes the active one.
 pub struct CreateProfileUseCase {

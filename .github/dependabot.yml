@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  # GitHub Actions. Once the `uses:` refs are pinned to full commit SHAs (see the
+  # TODO at the top of release.yml), Dependabot keeps those SHAs current and
+  # rewrites the trailing `# vX.Y.Z` comment — you get supply-chain pinning
+  # without hand-tracking digests.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+
+  # Frontend dependencies. Grouped so a routine bump is one PR, while security
+  # advisories still arrive on their own.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      dev-dependencies:
+        dependency-type: development
+      production-dependencies:
+        dependency-type: production
+
+  # Rust crates. The crypto and persistence stack lives here, so these matter
+  # most; keep them ungrouped to review each on its own.
+  - package-ecosystem: cargo
+    directory: "/src-tauri"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"

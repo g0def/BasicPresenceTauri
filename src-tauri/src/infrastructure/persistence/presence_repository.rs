@@ -8,8 +8,8 @@ use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::trip::Trip;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::presence_repository::PresenceRepository;
-use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::db::{commit_or_rollback, map_storage};
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const SELECT_COLUMNS: &str =
     "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at, (SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = presence.id) AS work_minutes";
@@ -36,7 +36,7 @@ impl LibsqlPresenceRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }
@@ -103,7 +103,7 @@ impl PresenceRepository for LibsqlPresenceRepository {
         conn.execute("BEGIN", ()).await.map_err(map_storage)?;
         match set_for_day_in_tx(&conn, presence, trips).await {
             Ok(saved) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
+                commit_or_rollback(&conn).await?;
                 Ok(saved)
             }
             Err(e) => {
@@ -186,13 +186,21 @@ impl PresenceRepository for LibsqlPresenceRepository {
         note: Option<&str>,
         updated_at: i64,
     ) -> Result<(), DomainError> {
-        self.conn()?
+        let affected = self
+            .conn()?
             .execute(
                 "UPDATE presence SET note = ?2, updated_at = ?3 WHERE id = ?1",
                 params![presence_id, note.map(|s| s.to_string()), updated_at],
             )
             .await
             .map_err(map_storage)?;
+        // An UPDATE matching no row is not an error to SQLite, so an unknown
+        // presence id used to return Ok — the note editor would report the note
+        // as saved and the text would be gone on the next load. Every other
+        // per-presence writer either upserts or is guarded; this one was not.
+        if affected == 0 {
+            return Err(DomainError::ProfileNotFound);
+        }
         Ok(())
     }
 }

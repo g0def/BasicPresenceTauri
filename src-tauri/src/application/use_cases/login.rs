@@ -57,6 +57,29 @@ impl LoginUseCase {
         username: &str,
         password: &str,
     ) -> Result<LoginResultDto, DomainError> {
+        self.authenticate(username, password, false).await
+    }
+
+    /// Same as [`Self::execute`], but opens a vault whose at-rest integrity
+    /// check failed, after the user has explicitly acknowledged the risk.
+    ///
+    /// Credentials are verified through the exact same path — including the
+    /// lockout counters — so this is a recovery route, never a bypass. The vault
+    /// manager keeps a copy of the suspect file before re-baselining it.
+    pub async fn execute_recovering(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<LoginResultDto, DomainError> {
+        self.authenticate(username, password, true).await
+    }
+
+    async fn authenticate(
+        &self,
+        username: &str,
+        password: &str,
+        recovering: bool,
+    ) -> Result<LoginResultDto, DomainError> {
         let username = username.trim();
         let now = self.clock.now_ms();
         let pw = Zeroizing::new(password.as_bytes().to_vec());
@@ -91,9 +114,13 @@ impl LoginUseCase {
         }
 
         // Success: derive the KEK, unwrap the DEK, unlock the vault.
-        let kek = self
-            .keys
-            .derive_kek(pw.as_slice(), &account.key_material.kek_salt)?;
+        // Derive with the parameters this account was created under, not the
+        // ones the running build happens to be configured with.
+        let kek = self.keys.derive_kek(
+            pw.as_slice(),
+            &account.key_material.kek_salt,
+            account.key_material.kdf,
+        )?;
         let wrapped = WrappedKey {
             ciphertext: account.key_material.wrapped_dek.clone(),
             nonce: account.key_material.dek_nonce.clone(),
@@ -128,7 +155,13 @@ impl LoginUseCase {
             }
         };
 
-        self.vault.open(dek.as_slice(), mac_key.as_slice()).await?;
+        if recovering {
+            self.vault
+                .open_recovering(dek.as_slice(), mac_key.as_slice())
+                .await?;
+        } else {
+            self.vault.open(dek.as_slice(), mac_key.as_slice()).await?;
+        }
 
         // Clear lockout counters and open the session. A new login supersedes
         // any previous session (single-owner device), keeping the invariant

@@ -49,6 +49,11 @@ impl From<DomainError> for AppError {
                 "VAULT_TAMPERED",
                 "L'intégrité du stockage chiffré a échoué : le fichier a été modifié.",
             ),
+            DomainError::SchemaTooNew { .. } => AppError::new(
+                "SCHEMA_TOO_NEW",
+                "Ces données ont été créées par une version plus récente de \
+                 l'application. Mettez à jour pour les ouvrir.",
+            ),
             DomainError::Export(_) => AppError::new(
                 "EXPORT_FAILED",
                 "Échec de l'export : le fichier n'a pas pu être écrit.",
