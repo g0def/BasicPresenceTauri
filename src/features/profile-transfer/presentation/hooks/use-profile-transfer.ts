@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriTransferRepository } from "@/features/profile-transfer/data/repositories/tauri-transfer.repository";
 import type {
   BundleExportSummary,
@@ -19,14 +20,21 @@ const repo = new TauriTransferRepository();
  * backend, exposing per-action loading flags + a shared `error` for the dialogs.
  * Each action returns `null` on cancel/failure (an error is set on failure only).
  */
-export function useProfileTransfer() {
+export function useProfileTransfer(onSessionExpired?: () => void) {
   const [isExporting, setIsExporting] = useState(false);
   const [isInspecting, setIsInspecting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toMessage = (e: unknown) =>
-    isAppError(e) ? e.message : "Une erreur est survenue";
+  // A locked vault must drop the session, not just fail the action in hand.
+  // Memoised so the actions below keep stable identities.
+  const toMessage = useCallback(
+    (e: unknown) => {
+      if (isSessionExpired(e)) onSessionExpired?.();
+      return isAppError(e) ? e.message : "Une erreur est survenue";
+    },
+    [onSessionExpired],
+  );
 
   const exportBundle = useCallback(
     async (
@@ -49,7 +57,7 @@ export function useProfileTransfer() {
         setIsExporting(false);
       }
     },
-    [],
+    [toMessage],
   );
 
   const inspectBundle = useCallback(async (): Promise<{
@@ -66,7 +74,7 @@ export function useProfileTransfer() {
     } finally {
       setIsInspecting(false);
     }
-  }, []);
+  }, [toMessage]);
 
   const importBundle = useCallback(
     async (
@@ -91,7 +99,7 @@ export function useProfileTransfer() {
         setIsImporting(false);
       }
     },
-    [],
+    [toMessage],
   );
 
   const clearError = useCallback(() => setError(null), []);

@@ -7,8 +7,15 @@ import { SESSION_TICK_MS } from "@/core/config";
  * Calls `onExpire` once the deadline passes. Pass `expiresAt = null` when
  * unauthenticated (the timer is inert).
  *
- * Driven by the absolute `expiresAt` (not a decrementing counter) so OS sleep
- * or clock changes can never grant extra session time.
+ * Driven by the absolute `expiresAt` rather than a decrementing counter, so
+ * waking from sleep past the deadline logs out immediately instead of resuming
+ * where it left off.
+ *
+ * This countdown is **display and convenience only**. It reads `Date.now()`,
+ * the wall clock, which the user can move — so it is not, on its own, a control.
+ * The deadline that counts is enforced in Rust: every vault-touching command
+ * goes through `require_session`, against a clock that cannot be wound back
+ * (see `infrastructure/clock.rs`). If the two ever disagree, the backend wins.
  */
 export function useSessionTimer(
   expiresAt: number | null,

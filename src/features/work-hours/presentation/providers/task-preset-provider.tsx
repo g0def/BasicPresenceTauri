@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriTaskPresetRepository } from "@/features/work-hours/data/repositories/tauri-task-preset.repository";
 import type {
   TaskPreset,
@@ -48,7 +49,7 @@ export function TaskPresetProvider({
 
   const handleError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+      if (isSessionExpired(e)) {
         onSessionExpired?.();
         return;
       }

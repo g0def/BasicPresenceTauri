@@ -2095,3 +2095,77 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
         let _ = std::fs::remove_dir_all(dir);
     });
 }
+
+/// Raising the Argon2 cost — the normal response to faster hardware — must not
+/// strand existing vaults.
+///
+/// The KEK parameters used to come from the running configuration, so a bumped
+/// `m_cost` derived a different KEK from the same password, failed to unwrap the
+/// DEK, and made the vault permanently unreadable. They are now stored with the
+/// account, so an existing login keeps deriving with the values it was created
+/// under while new accounts get the new cost.
+#[test]
+fn changing_the_argon2_cost_does_not_orphan_existing_vaults() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("kdf_params");
+        let keystore_path = config.keystore_path.clone();
+        let vault_path = config.vault_path.clone();
+
+        // Register under the original cost, and write something to the vault.
+        {
+            let state = build_state(config, &TEST_DEVICE_KEY).await.expect("build");
+            state
+                .register_account
+                .execute("owner", "correct horse battery")
+                .await
+                .expect("register");
+            state
+                .login
+                .execute("owner", "correct horse battery")
+                .await
+                .expect("login");
+            state
+                .create_profile
+                .execute("Ada", "Lovelace", "Analytical", None)
+                .await
+                .expect("profile");
+            state.vault.close();
+        }
+
+        // Same store, a build configured with a higher Argon2 cost.
+        let bumped = AppConfig {
+            keystore_path,
+            vault_path,
+            argon2: Argon2Params {
+                m_cost: 256,
+                t_cost: 2,
+                p_cost: 1,
+            },
+            auth: AuthPolicy {
+                session_ttl_ms: 15 * 60 * 1000,
+                max_attempts: 3,
+                lockout_ms: 60_000,
+            },
+            integrity: IntegrityPolicy::WarnAndAllow,
+        };
+        let state = build_state(bumped, &TEST_DEVICE_KEY)
+            .await
+            .expect("build with new cost");
+
+        state
+            .login
+            .execute("owner", "correct horse battery")
+            .await
+            .expect("the existing account must still unlock its vault");
+
+        let profiles = state.list_profiles.execute().await.expect("profiles");
+        assert_eq!(
+            profiles.profiles.len(),
+            1,
+            "the vault contents must still be readable"
+        );
+
+        state.vault.close();
+        let _ = std::fs::remove_dir_all(&dir);
+    });
+}

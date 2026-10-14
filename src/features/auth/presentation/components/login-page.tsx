@@ -18,8 +18,16 @@ import { LanguageSwitcher } from "@/shared/components/language-switcher";
 import { AuthBackdrop } from "@/features/auth/presentation/components/auth-backdrop";
 
 export function LoginPage() {
-  const { login, register, accountExists, error, isSubmitting, clearError } =
-    useAuth();
+  const {
+    login,
+    recoverVault,
+    register,
+    accountExists,
+    error,
+    isSubmitting,
+    integrityBlocked,
+    clearError,
+  } = useAuth();
   const { t } = useTranslation();
   const isRegister = accountExists === false;
 
@@ -108,6 +116,30 @@ export function LoginPage() {
                 <p className="text-sm text-destructive" role="alert">
                   {error}
                 </p>
+              )}
+
+              {/* Integrity refusal is a dead end otherwise: the same verdict
+                  covers real tampering and a crash mid-write, so the owner of a
+                  vault hit by a power cut needs a way back in. */}
+              {integrityBlocked && (
+                <div
+                  className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3"
+                  role="group"
+                  aria-label={t("auth.integrity.title")}
+                >
+                  <p className="text-xs text-muted-foreground">
+                    {t("auth.integrity.explain")}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled}
+                    onClick={() => void recoverVault({ username, password })}
+                  >
+                    {t("auth.integrity.recover")}
+                  </Button>
+                </div>
               )}
 
               <Button type="submit" className="w-full" disabled={disabled}>

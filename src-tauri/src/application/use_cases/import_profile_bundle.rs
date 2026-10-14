@@ -13,7 +13,9 @@ use crate::application::use_cases::create_task_preset::{
     normalize_description, validate_color, validate_minutes, validate_title,
 };
 use crate::application::use_cases::set_presence::validate_day;
-use crate::application::use_cases::set_profile_settings::validate as validate_settings;
+use crate::application::use_cases::set_profile_settings::{
+    validate as validate_settings, validate_factor_year,
+};
 use crate::application::use_cases::set_work_schedule::validate_start;
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::entities::presence::{Presence, PresenceType};
@@ -25,6 +27,7 @@ use crate::domain::entities::work_day_schedule::WorkDaySchedule;
 use crate::domain::entities::work_entry::WorkEntry;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::commute_repository::CommuteRepository;
+use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
@@ -66,6 +69,7 @@ pub struct ImportProfileBundleUseCase {
     task_presets: Arc<dyn TaskPresetRepository>,
     commutes: Arc<dyn CommuteRepository>,
     profile_settings: Arc<dyn ProfileSettingsRepository>,
+    factors: Arc<dyn EmissionFactorRepository>,
     clock: Arc<dyn Clock>,
 }
 
@@ -79,6 +83,7 @@ impl ImportProfileBundleUseCase {
         task_presets: Arc<dyn TaskPresetRepository>,
         commutes: Arc<dyn CommuteRepository>,
         profile_settings: Arc<dyn ProfileSettingsRepository>,
+        factors: Arc<dyn EmissionFactorRepository>,
         clock: Arc<dyn Clock>,
     ) -> Self {
         Self {
@@ -89,6 +94,7 @@ impl ImportProfileBundleUseCase {
             task_presets,
             commutes,
             profile_settings,
+            factors,
             clock,
         }
     }
@@ -143,7 +149,12 @@ impl ImportProfileBundleUseCase {
                 // SetProfileSettingsUseCase so a corrupt settings block aborts here,
                 // up front, with a clean Validation error — instead of an opaque
                 // Storage error mid-import after other categories were written.
-                validate_settings(&ProfileSettingsDto::from(s.clone()))?;
+                let dto = ProfileSettingsDto::from(s.clone());
+                validate_settings(&dto)?;
+                // The vintage matters most on this path: a bundle pointing at an
+                // unseeded year would zero out every footprint computed
+                // afterwards, silently and per-day-snapshotted.
+                validate_factor_year(&self.factors, dto.factor_year).await?;
             }
             bundle.settings.clone()
         } else {
@@ -367,10 +378,21 @@ fn prepare_days(
     selection: BundleImportSelectionDto,
 ) -> Result<Vec<PreparedDay>, DomainError> {
     let mut out = Vec::with_capacity(days.len());
+    // One row per day is an invariant of the store (the presence upsert is keyed
+    // on it). A file listing the same day twice used to pass validation, get
+    // written twice — the second silently overwriting the first — and still be
+    // counted twice in the summary, so the report claimed more days than exist.
+    let mut seen_days: HashSet<i64> = HashSet::with_capacity(days.len());
+
     for d in days {
         // Untrusted file content: the vault has no CHECK on `day`, so enforce the
         // same rule as the normal write path (epoch ms at UTC midnight).
         validate_day(d.presence.day)?;
+        if !seen_days.insert(d.presence.day) {
+            return Err(DomainError::Validation(
+                "this file lists the same day more than once".to_string(),
+            ));
+        }
 
         // CO2/trips/work hours are tied to presence: only office/remote days carry
         // them, and other types keep a NULL footprint (set_presence enforces this).
@@ -378,7 +400,12 @@ fn prepare_days(
         // the app deems impossible (a footprint or work hours on a holiday).
         let is_work = matches!(d.presence.kind, PresenceType::Office | PresenceType::Remote);
 
-        let co2_kg = if is_work {
+        // The day total is a snapshot of its trip breakdown, so keeping it while
+        // dropping the trips would leave a footprint nothing accounts for: the
+        // day would show N kg with an empty detail, and the methodology page
+        // could not retrace it. Importing without trips means importing without
+        // a footprint.
+        let co2_kg = if is_work && selection.include_trips {
             validate_co2(d.presence.co2_kg)?
         } else {
             None
@@ -418,7 +445,7 @@ fn prepare_days(
                     id: Uuid::now_v7().to_string(),
                     presence_id: String::new(),
                     title: validate_title(&e.title)?,
-                    description: normalize_description(e.description.clone()),
+                    description: normalize_description(e.description.clone())?,
                     minutes: validate_minutes(e.minutes)?,
                     color: validate_color(&e.color)?,
                     position: e.position,
@@ -485,7 +512,7 @@ fn prepare_presets(presets: &[TaskPreset]) -> Result<Vec<TaskPreset>, DomainErro
             id: Uuid::now_v7().to_string(),
             profile_id: String::new(),
             title: validate_title(&p.title)?,
-            description: normalize_description(p.description.clone()),
+            description: normalize_description(p.description.clone())?,
             default_minutes: validate_minutes(p.default_minutes)?,
             color: validate_color(&p.color)?,
             created_at: p.created_at,

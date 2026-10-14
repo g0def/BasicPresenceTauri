@@ -3,6 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::application::dto::commute_dto::{CommuteDto, CommuteSegmentInputDto};
+use crate::application::use_cases::limits::{validate_len, MAX_TITLE_LEN};
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::error::DomainError;
 use crate::domain::repositories::commute_repository::CommuteRepository;
@@ -59,6 +60,7 @@ pub fn build_commute(
     if name.is_empty() {
         return Err(DomainError::Validation("name is required".to_string()));
     }
+    validate_len("name", name, MAX_TITLE_LEN)?;
     if segments.is_empty() {
         return Err(DomainError::Validation(
             "at least one segment is required".to_string(),

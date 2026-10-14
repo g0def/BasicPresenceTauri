@@ -20,6 +20,16 @@ pub(crate) async fn load_factor_maps(
         .into_iter()
         .map(|f| (f.id.clone(), f))
         .collect();
+    // An unseeded vintage must not silently resolve every trip to 0.0 kgCO2e:
+    // `Co2Calculator` finds neither the mode nor the `car_average` fallback and
+    // returns zero, which then gets snapshotted per day. A null carbon report is
+    // the worst possible output for this tool, so fail loudly instead.
+    if factor_map.is_empty() {
+        return Err(DomainError::Validation(format!(
+            "no emission factors are seeded for reference year {year}"
+        )));
+    }
+
     let variant_map: GridVariantMap = factors
         .list_grid_variants(year)
         .await?

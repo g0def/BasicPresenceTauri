@@ -68,6 +68,13 @@ export default tseslint.config(
               message:
                 "Only src/core/external-link.ts may import @tauri-apps/plugin-opener.",
             },
+            {
+              // The one that produces the file path handed to the backend, so
+              // the guard matters more here than for the others, not less.
+              name: "@tauri-apps/plugin-dialog",
+              message:
+                "Only the export/transfer data repositories may import @tauri-apps/plugin-dialog.",
+            },
           ],
           patterns: ["@tauri-apps/api/*"],
         },
@@ -81,6 +88,8 @@ export default tseslint.config(
       "src/core/ipc.ts",
       "src/core/external-link.ts",
       "src/features/updater/data/repositories/tauri-updater.repository.ts",
+      "src/features/export/data/repositories/tauri-export.repository.ts",
+      "src/features/profile-transfer/data/repositories/tauri-transfer.repository.ts",
       "src/test/**/*.{ts,tsx}",
       "src/**/*.{test,spec}.{ts,tsx}",
     ],

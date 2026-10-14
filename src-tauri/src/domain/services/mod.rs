@@ -1,5 +1,6 @@
 pub mod clock;
 pub mod co2_calculator;
+pub mod integrity_anchor;
 pub mod key_service;
 pub mod markdown;
 pub mod password_hasher;

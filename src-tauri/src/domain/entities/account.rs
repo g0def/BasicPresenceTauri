@@ -1,4 +1,5 @@
 use super::user::User;
+use crate::domain::services::key_service::KdfParams;
 
 /// Cryptographic material that protects the encrypted vault, stored alongside
 /// the auth credentials in the (unencrypted) keystore.
@@ -18,6 +19,9 @@ pub struct KeyMaterial {
     pub wrapped_mac_key: Option<Vec<u8>>,
     /// AEAD nonce used when wrapping the MAC key.
     pub mac_key_nonce: Option<Vec<u8>>,
+    /// Argon2id costs this account's KEK was derived with. Persisted so that
+    /// changing the build's configuration cannot orphan an existing vault.
+    pub kdf: KdfParams,
 }
 
 /// The single device-owner account: auth credentials + key material + lockout state.

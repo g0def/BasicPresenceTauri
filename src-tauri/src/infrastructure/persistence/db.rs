@@ -9,6 +9,24 @@ pub(crate) fn map_storage(e: libsql::Error) -> DomainError {
     DomainError::Storage(e.to_string())
 }
 
+/// Commit the current transaction, rolling back if the commit itself fails.
+///
+/// Every repository shares one connection to the open vault. A `COMMIT` that
+/// errors leaves the transaction *open* on that shared connection, so the next
+/// write — from any repository — silently joins a doomed transaction and is
+/// lost when it eventually rolls back. Propagating the error without cleaning up
+/// turns one failed save into an unbounded stretch of writes that report success
+/// and never land.
+pub(crate) async fn commit_or_rollback(conn: &Connection) -> Result<(), DomainError> {
+    match conn.execute("COMMIT", ()).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", ()).await;
+            Err(map_storage(e))
+        }
+    }
+}
+
 /// Open a plaintext local libSQL database (used for the keystore).
 pub async fn open_plain_db(path: &Path) -> Result<Database, DomainError> {
     Builder::new_local(path).build().await.map_err(map_storage)

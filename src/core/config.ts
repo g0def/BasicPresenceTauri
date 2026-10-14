@@ -15,6 +15,7 @@ export const COMMANDS = {
   accountExists: "account_exists",
   register: "register",
   login: "login",
+  recoverVault: "recover_vault",
   checkSession: "check_session",
   logout: "logout",
   createProfile: "create_profile",

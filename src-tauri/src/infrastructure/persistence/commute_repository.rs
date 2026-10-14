@@ -7,8 +7,8 @@ use libsql::{params, Connection, Row};
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::error::DomainError;
 use crate::domain::repositories::commute_repository::CommuteRepository;
-use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::db::{commit_or_rollback, map_storage};
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const COMMUTE_COLUMNS: &str = "id, profile_id, name, round_trip, created_at, updated_at";
 const SEGMENT_COLUMNS: &str = "id, commute_id, mode_id, distance_km, occupants, position";
@@ -24,7 +24,7 @@ impl LibsqlCommuteRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }
@@ -98,7 +98,7 @@ impl CommuteRepository for LibsqlCommuteRepository {
         .await;
         match result {
             Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
+                commit_or_rollback(&conn).await?;
                 Ok(())
             }
             Err(e) => {
@@ -201,7 +201,7 @@ impl CommuteRepository for LibsqlCommuteRepository {
         .await;
         match result {
             Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
+                commit_or_rollback(&conn).await?;
                 Ok(())
             }
             Err(e) => {

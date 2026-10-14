@@ -12,7 +12,12 @@
     "submitLogin": "Sign in",
     "tagline": "Track your presence, measure your carbon footprint.",
     "carbon": "CO₂",
-    "local": "100% local · encrypted"
+    "local": "100% local · encrypted",
+    "integrity": {
+      "title": "Integrity check",
+      "explain": "The vault's contents no longer match its last recorded fingerprint. This also happens after a power cut or a hard shutdown during a write. If you are not aware of the file being modified, you can force it open: a backup copy of the current file will be kept.",
+      "recover": "Open despite the warning"
+    }
   },
   "home": {
     "logout": "Log out"

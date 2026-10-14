@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriExportRepository } from "@/features/export/data/repositories/tauri-export.repository";
 import type {
   ExportLabels,
@@ -16,7 +17,7 @@ const repo = new TauriExportRepository();
  * exposing `isExporting`/`error` for the dialog UI. Returns the run summary, or
  * `null` when the user cancelled the dialog (no error in that case).
  */
-export function useExport() {
+export function useExport(onSessionExpired?: () => void) {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,13 +38,16 @@ export function useExport() {
           defaultFileName,
         );
       } catch (e) {
+        // A locked vault must drop the session, not just fail this one action:
+        // the shell would otherwise stay "authenticated" over unreachable data.
+        if (isSessionExpired(e)) onSessionExpired?.();
         setError(isAppError(e) ? e.message : "Une erreur est survenue");
         return null;
       } finally {
         setIsExporting(false);
       }
     },
-    [],
+    [onSessionExpired],
   );
 
   const clearError = useCallback(() => setError(null), []);

@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{params, Row};
 
 use crate::domain::entities::co2_settings::Co2Settings;
 use crate::domain::entities::profile_settings::ProfileSettings;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
 use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 /// Column order shared by the SELECT and [`row_to_settings`].
 const COLUMNS: &str = "default_start_minutes, note_font, cell_display_mode, \
@@ -26,7 +26,7 @@ impl LibsqlProfileSettingsRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }

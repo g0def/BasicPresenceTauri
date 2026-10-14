@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
+import { isSessionExpired } from "@/core/session-expiry";
 import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
 
 interface UseLicenceResult {
@@ -14,7 +15,7 @@ interface UseLicenceResult {
 /** Load the app licence as sanitized HTML. The text is static and embedded in
  * the backend, but the command is session-gated, so we (re)load once a
  * profile/session is available. */
-export function useLicence(): UseLicenceResult {
+export function useLicence(onSessionExpired?: () => void): UseLicenceResult {
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? null;
 
@@ -34,7 +35,10 @@ export function useLicence(): UseLicenceResult {
       .then((value) => {
         if (!cancelled) setHtml(value);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
+        // Session-gated like every other command: a locked vault here means the
+        // session is over, not that the licence failed to render.
+        if (isSessionExpired(e)) onSessionExpired?.();
         if (!cancelled) setIsError(true);
       })
       .finally(() => {
@@ -43,7 +47,7 @@ export function useLicence(): UseLicenceResult {
     return () => {
       cancelled = true;
     };
-  }, [profileId]);
+  }, [profileId, onSessionExpired]);
 
   return { html, isLoading, isError };
 }

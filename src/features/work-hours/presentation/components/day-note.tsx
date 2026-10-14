@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useDayNote } from "@/features/work-hours/presentation/hooks/use-day-note";
 import { cn } from "@/lib/utils";
+import { useExternalAnchors } from "@/shared/rendered-html/use-external-anchors";
 
 interface DayNoteProps {
   presenceId: string;
@@ -33,6 +34,7 @@ export function DayNote({ presenceId, onSessionExpired }: DayNoteProps) {
   const { markdown, html, isLoading, isSaving, error, setMarkdown, flush } =
     useDayNote(presenceId, onSessionExpired);
   const [editing, setEditing] = useState(false);
+  const handleAnchorClick = useExternalAnchors();
 
   const startEditing = () => setEditing(true);
   const stopEditing = () => void flush().finally(() => setEditing(false));
@@ -94,7 +96,13 @@ export function DayNote({ presenceId, onSessionExpired }: DayNoteProps) {
         <div
           role="button"
           tabIndex={0}
-          onClick={startEditing}
+          onClick={(e) => {
+            // A click on a link is not a request to edit: route it to the
+            // browser and leave the note as it is.
+            handleAnchorClick(e);
+            if (e.defaultPrevented) return;
+            startEditing();
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") startEditing();
           }}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriCommuteRepository } from "@/features/commute/data/repositories/tauri-commute.repository";
 import { TauriEmissionFactorRepository } from "@/features/commute/data/repositories/tauri-emission-factor.repository";
 import type {
@@ -52,7 +53,7 @@ export function CommuteProvider({
 
   const handleError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+      if (isSessionExpired(e)) {
         onSessionExpired?.();
         return;
       }

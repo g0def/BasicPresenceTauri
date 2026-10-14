@@ -4,32 +4,52 @@ use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::domain::error::DomainError;
-use crate::domain::services::key_service::{KeyService, WrappedKey};
+use crate::domain::services::key_service::{KdfParams, KeyService, WrappedKey};
 
 /// Envelope-encryption key service:
 /// - KEK derived from the password via Argon2id,
 /// - DEK wrapped with the KEK via XChaCha20-Poly1305 (authenticated AEAD).
 pub struct Argon2KeyService {
-    params: Params,
+    /// Costs applied to accounts created from now on. Existing accounts derive
+    /// with whatever they stored (see `KdfParams`).
+    defaults: KdfParams,
 }
 
 impl Argon2KeyService {
     pub fn new(m_cost: u32, t_cost: u32, p_cost: u32) -> Result<Self, DomainError> {
-        // 32-byte output = the KEK length.
-        let params = Params::new(m_cost, t_cost, p_cost, Some(32))
+        // Validate eagerly so a bad configuration fails at startup, not at login.
+        Params::new(m_cost, t_cost, p_cost, Some(32))
             .map_err(|e| DomainError::Crypto(e.to_string()))?;
-        Ok(Self { params })
+        Ok(Self {
+            defaults: KdfParams {
+                m_cost,
+                t_cost,
+                p_cost,
+            },
+        })
     }
 }
 
 impl KeyService for Argon2KeyService {
-    fn derive_kek(&self, password: &[u8], salt: &[u8]) -> Result<Zeroizing<[u8; 32]>, DomainError> {
-        let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, self.params.clone());
+    fn derive_kek(
+        &self,
+        password: &[u8],
+        salt: &[u8],
+        kdf: KdfParams,
+    ) -> Result<Zeroizing<[u8; 32]>, DomainError> {
+        // 32-byte output = the KEK length.
+        let params = Params::new(kdf.m_cost, kdf.t_cost, kdf.p_cost, Some(32))
+            .map_err(|e| DomainError::Crypto(e.to_string()))?;
+        let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let mut out = Zeroizing::new([0u8; 32]);
         argon
             .hash_password_into(password, salt, out.as_mut_slice())
             .map_err(|e| DomainError::Crypto(e.to_string()))?;
         Ok(out)
+    }
+
+    fn default_params(&self) -> KdfParams {
+        self.defaults
     }
 
     fn generate_dek(&self) -> Result<Zeroizing<[u8; 32]>, DomainError> {
@@ -102,7 +122,9 @@ mod tests {
         let ks = service();
         let dek = ks.generate_dek().unwrap();
         let salt = ks.generate_salt().unwrap();
-        let kek = ks.derive_kek(b"hunter2", &salt).unwrap();
+        let kek = ks
+            .derive_kek(b"hunter2", &salt, ks.default_params())
+            .unwrap();
 
         let wrapped = ks.wrap_dek(dek.as_slice(), kek.as_slice()).unwrap();
         let unwrapped = ks.unwrap_dek(&wrapped, kek.as_slice()).unwrap();
@@ -115,10 +137,14 @@ mod tests {
         let ks = service();
         let dek = ks.generate_dek().unwrap();
         let salt = ks.generate_salt().unwrap();
-        let kek = ks.derive_kek(b"hunter2", &salt).unwrap();
+        let kek = ks
+            .derive_kek(b"hunter2", &salt, ks.default_params())
+            .unwrap();
         let wrapped = ks.wrap_dek(dek.as_slice(), kek.as_slice()).unwrap();
 
-        let bad_kek = ks.derive_kek(b"not-the-password", &salt).unwrap();
+        let bad_kek = ks
+            .derive_kek(b"not-the-password", &salt, ks.default_params())
+            .unwrap();
         assert!(ks.unwrap_dek(&wrapped, bad_kek.as_slice()).is_err());
     }
 
@@ -127,8 +153,8 @@ mod tests {
         let ks = service();
         let s1 = ks.generate_salt().unwrap();
         let s2 = ks.generate_salt().unwrap();
-        let k1 = ks.derive_kek(b"pw", &s1).unwrap();
-        let k2 = ks.derive_kek(b"pw", &s2).unwrap();
+        let k1 = ks.derive_kek(b"pw", &s1, ks.default_params()).unwrap();
+        let k2 = ks.derive_kek(b"pw", &s2, ks.default_params()).unwrap();
         assert_ne!(k1.as_slice(), k2.as_slice());
     }
 }

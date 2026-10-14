@@ -57,7 +57,10 @@ impl RegisterAccountUseCase {
         // Generate the DEK, derive the password-KEK, wrap the DEK.
         let dek = self.keys.generate_dek()?;
         let kek_salt = self.keys.generate_salt()?;
-        let kek = self.keys.derive_kek(pw.as_slice(), &kek_salt)?;
+        // Costs of *this* build, recorded with the account so a later change of
+        // configuration cannot make the vault underivable.
+        let kdf = self.keys.default_params();
+        let kek = self.keys.derive_kek(pw.as_slice(), &kek_salt, kdf)?;
         let wrapped = self.keys.wrap_dek(dek.as_slice(), kek.as_slice())?;
 
         // Generate the vault MAC key (tamper-evidence) and wrap it with the same KEK.
@@ -75,6 +78,7 @@ impl RegisterAccountUseCase {
                 dek_nonce: wrapped.nonce,
                 wrapped_mac_key: Some(wrapped_mac.ciphertext),
                 mac_key_nonce: Some(wrapped_mac.nonce),
+                kdf,
             },
             failed_attempts: 0,
             locked_until: None,

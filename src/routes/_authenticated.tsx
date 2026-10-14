@@ -24,6 +24,7 @@ import { ProfileProvider } from "@/features/profile/presentation/providers/profi
 import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
 import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
 import { VersionBadge } from "@/features/updater/presentation/components/version-badge";
+import { civilDate } from "@/shared/civil-date";
 import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
 import { Logo } from "@/shared/components/logo";
 import {
@@ -83,8 +84,9 @@ function AppShell() {
     let totalCo2 = 0;
 
     for (const presence of presencesByDay.values()) {
-      const presenceDate = new Date(presence.day);
-      if (isSameMonth(presenceDate, currentMonth)) {
+      // `presence.day` is UTC midnight: compare it as a civil date, or a
+      // runtime west of UTC files boundary days under the previous month.
+      if (isSameMonth(civilDate(presence.day), currentMonth)) {
         totalMinutes += presence.workMinutes || 0;
         if (presence.co2Kg != null) {
           totalCo2 += presence.co2Kg;

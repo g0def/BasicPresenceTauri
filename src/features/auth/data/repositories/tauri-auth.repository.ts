@@ -40,6 +40,14 @@ export class TauriAuthRepository implements AuthRepository {
     return toAuthSession(dto);
   }
 
+  async recoverVault({ username, password }: Credentials): Promise<AuthSession> {
+    const dto = await invoke<LoginResponseDto>(COMMANDS.recoverVault, {
+      username,
+      password,
+    });
+    return toAuthSession(dto);
+  }
+
   async checkSession(token: string): Promise<SessionStatus> {
     const dto = await invoke<SessionStatusDto>(COMMANDS.checkSession, {
       token,

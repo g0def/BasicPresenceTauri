@@ -4,10 +4,12 @@ use libsql::{params, Connection, Row};
 use crate::domain::entities::account::{Account, KeyMaterial};
 use crate::domain::error::DomainError;
 use crate::domain::repositories::account_repository::AccountRepository;
+use crate::domain::services::key_service::KdfParams;
 use crate::infrastructure::persistence::db::map_storage;
 
 const SELECT_COLUMNS: &str = "id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
-     failed_attempts, locked_until, created_at, updated_at, wrapped_mac_key, mac_key_nonce";
+     failed_attempts, locked_until, created_at, updated_at, wrapped_mac_key, mac_key_nonce, \
+     kek_m_cost, kek_t_cost, kek_p_cost";
 
 /// libSQL-backed account repository (over the keystore connection).
 pub struct LibsqlAccountRepository {
@@ -31,6 +33,11 @@ fn row_to_account(row: &Row) -> Result<Account, DomainError> {
             dek_nonce: row.get(5).map_err(map_storage)?,
             wrapped_mac_key: row.get(10).map_err(map_storage)?,
             mac_key_nonce: row.get(11).map_err(map_storage)?,
+            kdf: KdfParams {
+                m_cost: row.get::<i64>(12).map_err(map_storage)? as u32,
+                t_cost: row.get::<i64>(13).map_err(map_storage)? as u32,
+                p_cost: row.get::<i64>(14).map_err(map_storage)? as u32,
+            },
         },
         failed_attempts: row.get(6).map_err(map_storage)?,
         locked_until: row.get(7).map_err(map_storage)?,
@@ -75,8 +82,8 @@ impl AccountRepository for LibsqlAccountRepository {
                 "INSERT INTO account \
                  (id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
                   failed_attempts, locked_until, created_at, updated_at, \
-                  wrapped_mac_key, mac_key_nonce) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                  wrapped_mac_key, mac_key_nonce, kek_m_cost, kek_t_cost, kek_p_cost) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                 params![
                     account.id.clone(),
                     account.username.clone(),
@@ -90,6 +97,9 @@ impl AccountRepository for LibsqlAccountRepository {
                     account.updated_at,
                     account.key_material.wrapped_mac_key.clone(),
                     account.key_material.mac_key_nonce.clone(),
+                    i64::from(account.key_material.kdf.m_cost),
+                    i64::from(account.key_material.kdf.t_cost),
+                    i64::from(account.key_material.kdf.p_cost),
                 ],
             )
             .await

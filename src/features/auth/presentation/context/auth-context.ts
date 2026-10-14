@@ -15,7 +15,14 @@ export interface AuthContextValue {
   accountExists: boolean | null;
   error: string | null;
   isSubmitting: boolean;
+  /**
+   * The last login was refused because the vault failed its at-rest integrity
+   * check. The UI offers the recovery path only in that state.
+   */
+  integrityBlocked: boolean;
   login: (credentials: Credentials) => Promise<void>;
+  /** Retry the login accepting the integrity warning (keeps a backup). */
+  recoverVault: (credentials: Credentials) => Promise<void>;
   register: (credentials: Credentials) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;

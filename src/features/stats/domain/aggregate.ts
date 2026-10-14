@@ -12,6 +12,7 @@ import type {
   PresenceType,
 } from "@/features/presence/domain/entities/presence";
 import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
+import { civilDate } from "@/shared/civil-date";
 
 /** Time resolution for the period charts. */
 export type Granularity = "month" | "week";
@@ -35,16 +36,6 @@ export interface PeriodBucket {
 export interface BreakdownSlice {
   type: PresenceType;
   days: number;
-}
-
-/**
- * A presence's `day` is epoch-ms at UTC midnight (see `Presence.day`). Rebuild a
- * local-midnight Date carrying the SAME calendar Y/M/D so date-fns buckets it on
- * the day the user actually picked, regardless of the runtime timezone.
- */
-function civilDate(dayMs: number): Date {
-  const d = new Date(dayMs);
-  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 function monthKey(d: Date): number {

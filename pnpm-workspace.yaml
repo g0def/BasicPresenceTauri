@@ -4,5 +4,15 @@ allowBuilds:
 # Relèvements de sécurité de dépendances transitives — à retirer quand les
 # parents (@milkdown/crepe pour dompurify, vite pour esbuild) les embarqueront.
 overrides:
-  dompurify: '>=3.4.11' # GHSA-cmwh-pvxp-8882
+  # Seule dépendance de PRODUCTION de cette liste (via @milkdown/crepe), donc la
+  # seule qui atteigne le binaire distribué. Le relèvement précédent (>=3.4.11)
+  # résolvait sur 3.4.11 pile, elle-même visée par GHSA-c2j3-45gr-mqc4 :
+  # un seuil « >= dernière version vulnérable + 1 » n'immunise que jusqu'à la
+  # prochaine advisory, d'où l'audit prod bloquant dès `low` en CI.
+  dompurify: '>=3.4.12' # GHSA-cmwh-pvxp-8882 + GHSA-c2j3-45gr-mqc4
   esbuild: '>=0.28.1' # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)
+  # Outillage de build/lint uniquement (eslint, typescript-eslint, vite) : rien
+  # de tout cela n'entre dans le binaire distribué. Relevés quand même pour que
+  # `pnpm audit` reste vert et garde sa valeur de signal.
+  js-yaml: '>=4.3.0' # chaînes de merge-keys -> CPU quadratique
+  postcss: '>=8.5.18' # GHSA-r28c-9q8g-f849 (path traversal source map)

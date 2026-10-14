@@ -3,6 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::application::dto::task_preset_dto::TaskPresetDto;
+use crate::application::use_cases::limits::{validate_len, MAX_DESCRIPTION_LEN, MAX_TITLE_LEN};
 use crate::domain::entities::task_preset::TaskPreset;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
@@ -36,7 +37,7 @@ impl CreateTaskPresetUseCase {
             id: Uuid::now_v7().to_string(),
             profile_id: profile_id.to_string(),
             title: validate_title(title)?,
-            description: normalize_description(description),
+            description: normalize_description(description)?,
             default_minutes: validate_minutes(default_minutes)?,
             color: validate_color(color)?,
             created_at: now,
@@ -53,13 +54,19 @@ pub fn validate_title(title: &str) -> Result<String, DomainError> {
     if title.is_empty() {
         return Err(DomainError::Validation("title is required".to_string()));
     }
+    validate_len("title", title, MAX_TITLE_LEN)?;
     Ok(title.to_string())
 }
 
-pub fn normalize_description(description: Option<String>) -> Option<String> {
-    description
+pub fn normalize_description(description: Option<String>) -> Result<Option<String>, DomainError> {
+    let Some(d) = description
         .map(|d| d.trim().to_string())
         .filter(|d| !d.is_empty())
+    else {
+        return Ok(None);
+    };
+    validate_len("description", &d, MAX_DESCRIPTION_LEN)?;
+    Ok(Some(d))
 }
 
 pub fn validate_minutes(minutes: i64) -> Result<i64, DomainError> {
@@ -115,11 +122,22 @@ mod tests {
 
     #[test]
     fn blank_descriptions_collapse_to_none() {
-        assert_eq!(normalize_description(Some("  ".to_string())), None);
+        assert_eq!(normalize_description(Some("  ".to_string())).unwrap(), None);
         assert_eq!(
-            normalize_description(Some(" notes ".to_string())),
+            normalize_description(Some(" notes ".to_string())).unwrap(),
             Some("notes".to_string())
         );
-        assert_eq!(normalize_description(None), None);
+        assert_eq!(normalize_description(None).unwrap(), None);
+    }
+
+    /// Free-text fields reach the vault, the .ods export and the bundle format,
+    /// and can arrive from a file someone else wrote.
+    #[test]
+    fn oversized_free_text_is_refused() {
+        assert!(validate_title(&"a".repeat(MAX_TITLE_LEN)).is_ok());
+        assert!(validate_title(&"a".repeat(MAX_TITLE_LEN + 1)).is_err());
+
+        let long = "a".repeat(MAX_DESCRIPTION_LEN + 1);
+        assert!(normalize_description(Some(long)).is_err());
     }
 }

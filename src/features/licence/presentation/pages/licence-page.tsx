@@ -3,11 +3,15 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 import { useLicence } from "@/features/licence/presentation/hooks/use-licence";
+import { useExternalAnchors } from "@/shared/rendered-html/use-external-anchors";
 
 export function LicencePage() {
   const { t } = useTranslation();
-  const { html, isLoading, isError } = useLicence();
+  const { logout } = useAuth();
+  const { html, isLoading, isError } = useLicence(logout);
+  const handleAnchorClick = useExternalAnchors();
 
   return (
     <section className="mt-6 mx-auto w-full max-w-3xl flex flex-col gap-8 pb-12">
@@ -29,6 +33,9 @@ export function LicencePage() {
       {!isLoading && !isError && html && (
         <div
           className="prose dark:prose-invert max-w-none"
+          // Links inside rendered HTML must open in the browser, never navigate
+          // this window (see use-external-anchors).
+          onClick={handleAnchorClick}
           // Rendered + sanitized backend-side (comrak unsafe_=false + ammonia).
           dangerouslySetInnerHTML={{ __html: html }}
         />

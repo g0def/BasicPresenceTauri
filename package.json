@@ -17,7 +17,14 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit": "pnpm audit --audit-level=high"
+    "audit": "pnpm audit --prod --audit-level=low && pnpm audit --audit-level=moderate"
+  },
+  "pnpm": {
+    "auditConfig": {
+      "//": "Advisories with no applicable fix, reviewed one by one. Keep this list empty whenever possible: each entry is a check that no longer runs. Re-verify on every dependency bump.",
+      "//GHSA-mh99-v99m-4gvg": "brace-expansion DoS, reached only via eslint>minimatch@3. Fixed in brace-expansion >=5.0.8, but minimatch@3 uses the 1.x API (5.x dropped the `expand` export), so forcing it breaks eslint outright with 'TypeError: expand is not a function'. Not backported to 1.x. Dev-only: eslint is not in the shipped binary, and the input is our own config globs. Drop this entry once eslint ships minimatch >=10.",
+      "ignoreGhsas": ["GHSA-mh99-v99m-4gvg"]
+    }
   },
   "dependencies": {
     "@milkdown/crepe": "^7.21.2",

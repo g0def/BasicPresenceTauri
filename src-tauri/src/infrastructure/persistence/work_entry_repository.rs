@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{params, Row};
 
 use crate::domain::entities::work_day_schedule::WorkDaySchedule;
 use crate::domain::entities::work_entry::WorkEntry;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
-use crate::infrastructure::persistence::db::map_storage;
-use crate::infrastructure::persistence::vault::LibsqlVaultManager;
+use crate::infrastructure::persistence::db::{commit_or_rollback, map_storage};
+use crate::infrastructure::persistence::vault::{LibsqlVaultManager, VaultConnection};
 
 const ENTRY_COLUMNS: &str = "id, presence_id, title, description, minutes, color, position";
 
@@ -23,7 +23,7 @@ impl LibsqlWorkEntryRepository {
         Self { vault }
     }
 
-    fn conn(&self) -> Result<Connection, DomainError> {
+    fn conn(&self) -> Result<VaultConnection, DomainError> {
         self.vault.connection().ok_or(DomainError::Unauthorized)
     }
 }
@@ -96,7 +96,7 @@ impl WorkEntryRepository for LibsqlWorkEntryRepository {
         .await;
         match result {
             Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
+                commit_or_rollback(&conn).await?;
                 Ok(())
             }
             Err(e) => {

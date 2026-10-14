@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { isAppError } from "@/core/errors";
+import { isSessionExpired } from "@/core/session-expiry";
 import { TauriProfileSettingsRepository } from "@/features/profile-settings/data/repositories/tauri-profile-settings.repository";
 import {
   DEFAULT_PROFILE_SETTINGS,
@@ -32,6 +33,14 @@ const setUseCase = makeSetProfileSettingsUseCase(repo);
 // the user had chosen into the first active profile so the preference isn't lost
 // when these settings become per-profile. Guarded by a flag so it runs once.
 const LEGACY_MIGRATED_KEY = "profile-settings-legacy-migrated";
+
+/** Record that the one-shot legacy migration is done. Only ever called once the
+ *  backend has actually accepted the merged settings. */
+function markLegacyMigrated(): void {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(LEGACY_MIGRATED_KEY, "1");
+  }
+}
 
 type LegacyPrefs = Partial<
   Pick<ProfileSettings, "noteFont" | "cellDisplayMode">
@@ -73,7 +82,7 @@ export function ProfileSettingsProvider({
 
   const handleError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
+      if (isSessionExpired(e)) {
         onSessionExpired?.();
         return;
       }
@@ -95,17 +104,23 @@ export function ProfileSettingsProvider({
       .then((loaded) => {
         if (cancelled) return;
         const legacy = readLegacyPrefs();
-        if (legacy) {
-          // Fold the legacy device prefs into this profile, once.
-          const merged: ProfileSettings = { ...loaded, ...legacy };
-          setSettings(merged);
-          void setUseCase(profileId, merged).catch(() => {});
-        } else {
+        if (!legacy) {
           setSettings(loaded);
+          markLegacyMigrated();
+          return;
         }
-        if (typeof localStorage !== "undefined") {
-          localStorage.setItem(LEGACY_MIGRATED_KEY, "1");
-        }
+        // Fold the legacy device prefs into this profile, once. The "already
+        // migrated" flag must wait for the write to land: setting it first, and
+        // swallowing the failure, silently discarded the user's old preferences
+        // whenever the save did not go through (a locked vault, typically).
+        const merged: ProfileSettings = { ...loaded, ...legacy };
+        setSettings(merged);
+        void setUseCase(profileId, merged)
+          .then(markLegacyMigrated)
+          .catch((e: unknown) => {
+            // Leave the flag unset so the next load retries the migration.
+            if (!cancelled) handleError(e);
+          });
       })
       .catch((e) => {
         if (!cancelled) handleError(e);
