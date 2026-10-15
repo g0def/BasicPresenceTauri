@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use libsql::{params, Database};
+use libsql::{Database, params};
 
 use crate::domain::error::DomainError;
 use crate::infrastructure::persistence::db::{
@@ -12,8 +12,7 @@ use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 /// migration. Migration of a legacy plaintext keystore copies exactly these;
 /// any later columns (added by subsequent migrations, nullable) are recreated
 /// empty and backfilled by the app.
-const ACCOUNT_BASE_COLUMNS: &str =
-    "id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
+const ACCOUNT_BASE_COLUMNS: &str = "id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
      failed_attempts, locked_until, created_at, updated_at";
 
 /// Sidecar marker proving the keystore at `path` is the sealed (encrypted) form.
@@ -110,6 +109,11 @@ pub async fn open_or_migrate_keystore(
         return Ok(db);
     }
     Err(DomainError::KeystoreUnrecoverable)
+}
+
+/// Whether a sealed (device-key encrypted) keystore exists at `path`.
+pub fn is_sealed(path: &Path) -> bool {
+    sealed_marker(path).exists()
 }
 
 fn write_marker(marker: &Path) -> Result<(), DomainError> {

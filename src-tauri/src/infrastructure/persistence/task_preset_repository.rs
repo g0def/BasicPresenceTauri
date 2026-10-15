@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 
 use crate::domain::entities::task_preset::TaskPreset;
 use crate::domain::error::DomainError;
@@ -43,8 +43,8 @@ fn row_to_preset(row: &Row) -> Result<TaskPreset, DomainError> {
 #[async_trait]
 impl TaskPresetRepository for LibsqlTaskPresetRepository {
     async fn create(&self, preset: &TaskPreset) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 &format!(
                     "INSERT INTO task_preset ({PRESET_COLUMNS}) \
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"
@@ -60,8 +60,7 @@ impl TaskPresetRepository for LibsqlTaskPresetRepository {
                     preset.updated_at,
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 
@@ -95,8 +94,8 @@ impl TaskPresetRepository for LibsqlTaskPresetRepository {
     }
 
     async fn update(&self, preset: &TaskPreset) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "UPDATE task_preset SET title = ?1, description = ?2, default_minutes = ?3, \
                  color = ?4, updated_at = ?5 WHERE id = ?6",
                 params![
@@ -108,16 +107,14 @@ impl TaskPresetRepository for LibsqlTaskPresetRepository {
                     preset.id.clone(),
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
-        self.conn()?
-            .execute("DELETE FROM task_preset WHERE id = ?1", params![id])
-            .await
-            .map_err(map_storage)?;
+        self.vault
+            .execute_write("DELETE FROM task_preset WHERE id = ?1", params![id])
+            .await?;
         Ok(())
     }
 }

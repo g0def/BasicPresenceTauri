@@ -10,7 +10,9 @@ use std::sync::Arc;
 
 use tauri::Manager;
 
+use crate::application::services::credentials::CredentialGate;
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
+use crate::application::use_cases::change_password::ChangePasswordUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_commute::CreateCommuteUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
@@ -55,6 +57,7 @@ use crate::domain::repositories::emission_factor_repository::EmissionFactorRepos
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
+use crate::domain::repositories::security_log::SecurityLog;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 use crate::domain::services::clock::Clock;
@@ -65,6 +68,7 @@ use crate::domain::services::profile_bundle::ProfileBundleCodec;
 use crate::domain::services::session_store::SessionStore;
 use crate::domain::services::spreadsheet_exporter::SpreadsheetExporter;
 use crate::domain::services::token_generator::TokenGenerator;
+use crate::domain::services::unit_of_work::UnitOfWork;
 use crate::domain::services::vault::VaultManager;
 use crate::infrastructure::clock::SystemClock;
 use crate::infrastructure::config::AppConfig;
@@ -77,11 +81,13 @@ use crate::infrastructure::persistence::account_repository::LibsqlAccountReposit
 use crate::infrastructure::persistence::commute_repository::LibsqlCommuteRepository;
 use crate::infrastructure::persistence::db::connect;
 use crate::infrastructure::persistence::emission_factor_repository::LibsqlEmissionFactorRepository;
+use crate::infrastructure::persistence::integrity_store::KeystoreIntegrityStore;
 use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
 use crate::infrastructure::persistence::migrations::{self, KEYSTORE_MIGRATIONS};
 use crate::infrastructure::persistence::presence_repository::LibsqlPresenceRepository;
 use crate::infrastructure::persistence::profile_repository::LibsqlProfileRepository;
 use crate::infrastructure::persistence::profile_settings_repository::LibsqlProfileSettingsRepository;
+use crate::infrastructure::persistence::security_log_repository::LibsqlSecurityLog;
 use crate::infrastructure::persistence::task_preset_repository::LibsqlTaskPresetRepository;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRepository;
@@ -90,11 +96,12 @@ use crate::infrastructure::transfer::json_bundle_codec::JsonProfileBundleCodec;
 use crate::presentation::commands::{
     auth, commute, export, legal, presence, profile, settings, transfer, work_hours,
 };
+use crate::presentation::file_dialogs::PendingImports;
 use crate::presentation::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
@@ -106,27 +113,20 @@ pub fn run() {
                 event,
                 tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
             ) {
-                window.state::<AppState>().vault.close();
+                lock_vault(window.app_handle());
             }
         })
         .setup(|app| {
-            // Resolve (and create) the per-app data directory for the DB files,
-            // restricted to the current user (0700 on Unix).
-            let data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| format!("cannot resolve app data dir: {e}"))?;
-            crate::infrastructure::persistence::data_dir::prepare_private_data_dir(&data_dir)
-                .map_err(|e| format!("cannot prepare app data dir: {e}"))?;
-
-            // Per-device key that seals the keystore at rest (from the OS keychain).
-            let device_key = crate::infrastructure::crypto::device_key::resolve_device_key()
-                .map_err(|e| format!("cannot access OS secure storage: {e:?}"))?;
-
-            let config = AppConfig::new(&data_dir);
-            let state = tauri::async_runtime::block_on(build_state(config, device_key.as_slice()))
-                .map_err(|e| format!("failed to initialize backend: {e:?}"))?;
-            app.manage(state);
+            match init_backend(app.handle()) {
+                Ok(state) => {
+                    app.manage(state);
+                }
+                // A startup failure (no OS keychain, lost device key, unreadable
+                // data dir…) must reach the user as a readable message — not as a
+                // panic that, on Windows release builds, leaves no trace at all.
+                // The main window never shows: without a backend it is useless.
+                Err(e) => report_startup_failure(app.handle(), &e),
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -135,6 +135,7 @@ pub fn run() {
             auth::login,
             auth::check_session,
             auth::logout,
+            auth::change_password,
             profile::create_profile,
             profile::list_profiles,
             profile::update_profile,
@@ -168,8 +169,87 @@ pub fn run() {
             transfer::inspect_profile_bundle,
             transfer::import_profile_bundle
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!());
+
+    let app = match app {
+        Ok(app) => app,
+        Err(e) => {
+            eprintln!("BasicPresence could not start: {e}");
+            std::process::exit(1);
+        }
+    };
+    app.run(|handle, event| {
+        // Last chance to lock the vault on any exit path (including a restart
+        // after an update), so the integrity baseline is recorded and the
+        // session state is wiped.
+        if let tauri::RunEvent::Exit = event {
+            lock_vault(handle);
+        }
+    });
+}
+
+/// Revoke every session and lock the vault, if the backend is up.
+fn lock_vault(handle: &tauri::AppHandle) {
+    if let Some(state) = handle.try_state::<AppState>() {
+        let vault = state.vault.clone();
+        let sessions = state.sessions.clone();
+        sessions.clear();
+        state.pending_imports.clear();
+        tauri::async_runtime::block_on(vault.close());
+    }
+}
+
+/// Resolve the data directory and the device key, then build the backend.
+fn init_backend(handle: &tauri::AppHandle) -> Result<AppState, DomainError> {
+    // Resolve (and create) the per-app data directory for the DB files,
+    // restricted to the current user (0700 on Unix).
+    let data_dir = handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| DomainError::Storage(format!("cannot resolve app data dir: {e}")))?;
+    crate::infrastructure::persistence::data_dir::prepare_private_data_dir(&data_dir)
+        .map_err(|e| DomainError::Storage(format!("cannot prepare app data dir: {e}")))?;
+
+    let config = AppConfig::new(&data_dir);
+    // Per-device key that seals the keystore at rest (from the OS keychain).
+    // Only minted when no sealed keystore exists yet.
+    let allow_new_device_key =
+        !crate::infrastructure::persistence::keystore_bootstrap::is_sealed(&config.keystore_path);
+    let device_key =
+        crate::infrastructure::crypto::device_key::resolve_device_key(allow_new_device_key)?;
+
+    tauri::async_runtime::block_on(build_state(config, device_key.as_slice()))
+}
+
+/// Hide the main window, explain the failure in a native dialog, then exit.
+fn report_startup_failure(handle: &tauri::AppHandle, error: &DomainError) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+
+    if let Some(window) = handle.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    let reason = match error {
+        DomainError::Keychain(_) => {
+            "Le trousseau sécurisé du système est indisponible.\n\n\
+             Sous Linux, un service Secret Service (GNOME Keyring ou KWallet) \
+             doit être démarré et déverrouillé. Démarrez-le, puis relancez BasicPresence."
+        }
+        DomainError::KeystoreUnrecoverable => {
+            "La clé de cet appareil est introuvable ou a changé dans le trousseau \
+             du système : les données ne peuvent pas être déverrouillées.\n\n\
+             Restaurez l'entrée « com.godef.basic-presence » du trousseau, \
+             puis relancez BasicPresence. Vos fichiers n'ont pas été modifiés."
+        }
+        _ => "Les données locales de BasicPresence sont inaccessibles.",
+    };
+    let message = format!("{reason}\n\nDétail technique : {error}");
+    let exit_handle = handle.clone();
+    handle
+        .dialog()
+        .message(message)
+        .title("BasicPresence ne peut pas démarrer")
+        .kind(MessageDialogKind::Error)
+        .show(move |_| exit_handle.exit(1));
 }
 
 /// Composition root: build the infrastructure implementations, inject them into
@@ -182,20 +262,16 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let keystore_db = open_or_migrate_keystore(&config.keystore_path, device_key).await?;
     let keystore_conn = connect(&keystore_db).await?;
     migrations::run(&keystore_conn, KEYSTORE_MIGRATIONS).await?;
+    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
 
     // Infrastructure implementations (behind domain ports).
     let accounts: Arc<dyn AccountRepository> =
-        Arc::new(LibsqlAccountRepository::new(keystore_conn));
-    let hasher: Arc<dyn PasswordHasher> = Arc::new(Argon2PasswordHasher::new(
-        config.argon2.m_cost,
-        config.argon2.t_cost,
-        config.argon2.p_cost,
-    )?);
-    let keys: Arc<dyn KeyService> = Arc::new(Argon2KeyService::new(
-        config.argon2.m_cost,
-        config.argon2.t_cost,
-        config.argon2.p_cost,
-    )?);
+        Arc::new(LibsqlAccountRepository::new(keystore_conn.clone()));
+    let hasher: Arc<dyn PasswordHasher> = Arc::new(Argon2PasswordHasher::new(config.argon2)?);
+    let keys: Arc<dyn KeyService> = Arc::new(Argon2KeyService);
+    let credential_gate: CredentialGate = Arc::new(tokio::sync::Mutex::new(()));
+    let security_log: Arc<dyn SecurityLog> =
+        Arc::new(LibsqlSecurityLog::new(keystore_conn.clone()));
     let tokens: Arc<dyn TokenGenerator> = Arc::new(RandomTokenGenerator);
     let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
     // Keep a concrete handle so the profile repository can read the live vault
@@ -203,8 +279,11 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     let vault_impl = Arc::new(LibsqlVaultManager::new(
         config.vault_path.clone(),
         config.integrity,
+        KeystoreIntegrityStore::new(keystore_conn),
+        clock.clone(),
     ));
     let vault: Arc<dyn VaultManager> = vault_impl.clone();
+    let uow: Arc<dyn UnitOfWork> = vault_impl.clone();
     let profiles: Arc<dyn ProfileRepository> =
         Arc::new(LibsqlProfileRepository::new(vault_impl.clone()));
     let presences: Arc<dyn PresenceRepository> =
@@ -219,7 +298,6 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlTaskPresetRepository::new(vault_impl.clone()));
     let work_entries: Arc<dyn WorkEntryRepository> =
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
-    let clock: Arc<dyn Clock> = Arc::new(SystemClock);
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
     // App licence: static text embedded at compile time. The path is relative to
     // this file (src-tauri/src/lib.rs), so `../../LICENCE` is the repo-root file —
@@ -234,6 +312,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             hasher.clone(),
             keys.clone(),
             clock.clone(),
+            config.auth.clone(),
         ),
         login: LoginUseCase::new(
             accounts.clone(),
@@ -244,12 +323,23 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             vault.clone(),
             clock.clone(),
             config.auth.clone(),
+            credential_gate.clone(),
+            security_log.clone(),
+        ),
+        change_password: ChangePasswordUseCase::new(
+            accounts.clone(),
+            hasher.clone(),
+            keys.clone(),
+            clock.clone(),
+            config.auth.clone(),
+            credential_gate.clone(),
+            security_log.clone(),
         ),
         logout: LogoutUseCase::new(sessions.clone(), vault.clone()),
         check_session: CheckSessionUseCase::new(sessions.clone(), vault.clone(), clock.clone()),
         require_session: RequireSessionUseCase::new(sessions.clone(), vault.clone(), clock.clone()),
         account_exists: AccountExistsUseCase::new(accounts.clone()),
-        create_profile: CreateProfileUseCase::new(profiles.clone(), clock.clone()),
+        create_profile: CreateProfileUseCase::new(profiles.clone(), clock.clone(), uow.clone()),
         list_profiles: ListProfilesUseCase::new(profiles.clone()),
         update_profile: UpdateProfileUseCase::new(profiles.clone(), clock.clone()),
         delete_profile: DeleteProfileUseCase::new(profiles.clone()),
@@ -260,6 +350,7 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             profile_settings.clone(),
             work_entries.clone(),
             clock.clone(),
+            uow.clone(),
         ),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
@@ -281,7 +372,11 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         update_task_preset: UpdateTaskPresetUseCase::new(task_presets.clone(), clock.clone()),
         delete_task_preset: DeleteTaskPresetUseCase::new(task_presets.clone()),
         get_work_entries: GetWorkEntriesUseCase::new(work_entries.clone()),
-        set_work_entries: SetWorkEntriesUseCase::new(work_entries.clone(), presences.clone()),
+        set_work_entries: SetWorkEntriesUseCase::new(
+            work_entries.clone(),
+            presences.clone(),
+            uow.clone(),
+        ),
         get_work_schedule: GetWorkScheduleUseCase::new(work_entries.clone()),
         set_work_schedule: SetWorkScheduleUseCase::new(work_entries.clone(), presences.clone()),
         get_day_note: GetDayNoteUseCase::new(presences.clone(), markdown.clone()),
@@ -315,8 +410,44 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             commutes.clone(),
             profile_settings.clone(),
             clock.clone(),
+            uow.clone(),
         ),
         vault: vault.clone(),
+        sessions: sessions.clone(),
+        pending_imports: PendingImports::default(),
         keystore_db,
     })
+}
+
+#[cfg(test)]
+mod isolation_tests {
+    use std::collections::BTreeSet;
+
+    /// The isolation app (`isolation/index.js`) only lets through the app
+    /// commands it knows: it must list exactly the commands registered in
+    /// `invoke_handler`, or a new command would be silently blocked (or a
+    /// removed one left allowed).
+    #[test]
+    fn isolation_allowlist_matches_registered_commands() {
+        let lib = include_str!("lib.rs");
+        let start = lib
+            .find("generate_handler![")
+            .expect("invoke_handler block");
+        let block = &lib[start..start + lib[start..].find(']').expect("end of handler")];
+        let registered: BTreeSet<&str> = block
+            .lines()
+            .filter_map(|l| l.trim().trim_end_matches(',').split("::").nth(1))
+            .collect();
+
+        let js = include_str!("../isolation/index.js");
+        let start = js.find("var APP_COMMANDS = [").expect("allowlist");
+        let list = &js[start..start + js[start..].find("];").expect("end of allowlist")];
+        let allowed: BTreeSet<&str> = list
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix('"')?.split('"').next())
+            .collect();
+
+        assert!(!registered.is_empty());
+        assert_eq!(registered, allowed);
+    }
 }

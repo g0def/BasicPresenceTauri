@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 
 use crate::domain::entities::commute::{Commute, CommuteSegment};
 use crate::domain::error::DomainError;
@@ -77,35 +77,26 @@ async fn insert_segments(conn: &Connection, commute: &Commute) -> Result<(), Dom
 #[async_trait]
 impl CommuteRepository for LibsqlCommuteRepository {
     async fn create(&self, commute: &Commute) -> Result<(), DomainError> {
-        let conn = self.conn()?;
-        conn.execute("BEGIN", ()).await.map_err(map_storage)?;
-        let result = async {
-            conn.execute(
-                &format!("INSERT INTO commute ({COMMUTE_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"),
-                params![
-                    commute.id.clone(),
-                    commute.profile_id.clone(),
-                    commute.name.clone(),
-                    commute.round_trip as i64,
-                    commute.created_at,
-                    commute.updated_at,
-                ],
-            )
+        self.vault
+            .write(|conn| async move {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO commute ({COMMUTE_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)"
+                    ),
+                    params![
+                        commute.id.clone(),
+                        commute.profile_id.clone(),
+                        commute.name.clone(),
+                        commute.round_trip as i64,
+                        commute.created_at,
+                        commute.updated_at,
+                    ],
+                )
+                .await
+                .map_err(map_storage)?;
+                insert_segments(&conn, commute).await
+            })
             .await
-            .map_err(map_storage)?;
-            insert_segments(&conn, commute).await
-        }
-        .await;
-        match result {
-            Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
-                Ok(())
-            }
-            Err(e) => {
-                let _ = conn.execute("ROLLBACK", ()).await;
-                Err(e)
-            }
-        }
     }
 
     async fn list_by_profile(&self, profile_id: &str) -> Result<Vec<Commute>, DomainError> {
@@ -128,8 +119,7 @@ impl CommuteRepository for LibsqlCommuteRepository {
         // Load every segment of the profile's commutes in one query, then group.
         let mut by_commute: HashMap<String, Vec<CommuteSegment>> = HashMap::new();
         {
-            let sql =
-                "SELECT s.id, s.commute_id, s.mode_id, s.distance_km, s.occupants, s.position \
+            let sql = "SELECT s.id, s.commute_id, s.mode_id, s.distance_km, s.occupants, s.position \
                  FROM commute_segment s JOIN commute c ON c.id = s.commute_id \
                  WHERE c.profile_id = ?1 ORDER BY s.commute_id, s.position";
             let mut rows = conn
@@ -175,48 +165,36 @@ impl CommuteRepository for LibsqlCommuteRepository {
     }
 
     async fn update(&self, commute: &Commute) -> Result<(), DomainError> {
-        let conn = self.conn()?;
-        conn.execute("BEGIN", ()).await.map_err(map_storage)?;
-        let result = async {
-            conn.execute(
-                "UPDATE commute SET name = ?1, round_trip = ?2, updated_at = ?3 WHERE id = ?4",
-                params![
-                    commute.name.clone(),
-                    commute.round_trip as i64,
-                    commute.updated_at,
-                    commute.id.clone(),
-                ],
-            )
+        self.vault
+            .write(|conn| async move {
+                conn.execute(
+                    "UPDATE commute SET name = ?1, round_trip = ?2, updated_at = ?3 WHERE id = ?4",
+                    params![
+                        commute.name.clone(),
+                        commute.round_trip as i64,
+                        commute.updated_at,
+                        commute.id.clone(),
+                    ],
+                )
+                .await
+                .map_err(map_storage)?;
+                // Replace-all: segment ids are not surfaced as stable handles.
+                conn.execute(
+                    "DELETE FROM commute_segment WHERE commute_id = ?1",
+                    params![commute.id.clone()],
+                )
+                .await
+                .map_err(map_storage)?;
+                insert_segments(&conn, commute).await
+            })
             .await
-            .map_err(map_storage)?;
-            // Replace-all: segment ids are not surfaced as stable handles.
-            conn.execute(
-                "DELETE FROM commute_segment WHERE commute_id = ?1",
-                params![commute.id.clone()],
-            )
-            .await
-            .map_err(map_storage)?;
-            insert_segments(&conn, commute).await
-        }
-        .await;
-        match result {
-            Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
-                Ok(())
-            }
-            Err(e) => {
-                let _ = conn.execute("ROLLBACK", ()).await;
-                Err(e)
-            }
-        }
     }
 
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
         // Segments cascade via the FK (PRAGMA foreign_keys = ON per connection).
-        self.conn()?
-            .execute("DELETE FROM commute WHERE id = ?1", params![id])
-            .await
-            .map_err(map_storage)?;
+        self.vault
+            .execute_write("DELETE FROM commute WHERE id = ?1", params![id])
+            .await?;
         Ok(())
     }
 }

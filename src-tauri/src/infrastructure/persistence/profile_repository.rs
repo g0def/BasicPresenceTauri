@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 
 use crate::domain::entities::profile::Profile;
 use crate::domain::error::DomainError;
@@ -45,8 +45,8 @@ fn row_to_profile(row: &Row) -> Result<Profile, DomainError> {
 #[async_trait]
 impl ProfileRepository for LibsqlProfileRepository {
     async fn create(&self, profile: &Profile) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "INSERT INTO profile \
                  (id, first_name, last_name, enterprise, poste, created_at, updated_at) \
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -60,8 +60,7 @@ impl ProfileRepository for LibsqlProfileRepository {
                     profile.updated_at,
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 
@@ -89,8 +88,8 @@ impl ProfileRepository for LibsqlProfileRepository {
     }
 
     async fn update(&self, profile: &Profile) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "UPDATE profile SET first_name = ?1, last_name = ?2, enterprise = ?3, \
                  poste = ?4, updated_at = ?5 WHERE id = ?6",
                 params![
@@ -102,16 +101,14 @@ impl ProfileRepository for LibsqlProfileRepository {
                     profile.id.clone(),
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
-        self.conn()?
-            .execute("DELETE FROM profile WHERE id = ?1", params![id])
-            .await
-            .map_err(map_storage)?;
+        self.vault
+            .execute_write("DELETE FROM profile WHERE id = ?1", params![id])
+            .await?;
         Ok(())
     }
 
@@ -131,21 +128,20 @@ impl ProfileRepository for LibsqlProfileRepository {
     }
 
     async fn set_active(&self, id: Option<&str>) -> Result<(), DomainError> {
-        let conn = self.conn()?;
         match id {
             Some(id) => {
-                conn.execute(
-                    "INSERT INTO vault_meta (key, value) VALUES (?1, ?2) \
-                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                    params![ACTIVE_KEY, id],
-                )
-                .await
-                .map_err(map_storage)?;
+                self.vault
+                    .execute_write(
+                        "INSERT INTO vault_meta (key, value) VALUES (?1, ?2) \
+                         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                        params![ACTIVE_KEY, id],
+                    )
+                    .await?;
             }
             None => {
-                conn.execute("DELETE FROM vault_meta WHERE key = ?1", params![ACTIVE_KEY])
-                    .await
-                    .map_err(map_storage)?;
+                self.vault
+                    .execute_write("DELETE FROM vault_meta WHERE key = ?1", params![ACTIVE_KEY])
+                    .await?;
             }
         }
         Ok(())
