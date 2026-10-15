@@ -7,4 +7,5 @@ pub mod profile_bundle;
 pub mod session_store;
 pub mod spreadsheet_exporter;
 pub mod token_generator;
+pub mod unit_of_work;
 pub mod vault;

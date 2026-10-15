@@ -133,11 +133,7 @@ impl ExportLabels {
 
     /// The label for a boolean flag.
     pub fn yes_no(&self, value: bool) -> &str {
-        if value {
-            &self.yes
-        } else {
-            &self.no
-        }
+        if value { &self.yes } else { &self.no }
     }
 
     /// The localized name of a transport mode, falling back to the raw `mode_id`

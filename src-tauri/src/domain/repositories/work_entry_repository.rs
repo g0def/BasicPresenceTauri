@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 
 use crate::domain::entities::work_day_schedule::WorkDaySchedule;
@@ -12,6 +14,18 @@ pub trait WorkEntryRepository: Send + Sync {
     /// The entries recorded for a presence day, ordered by position.
     async fn list_by_presence(&self, presence_id: &str) -> Result<Vec<WorkEntry>, DomainError>;
 
+    /// Every work entry of a profile, grouped by presence id (one query — exports).
+    async fn list_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, Vec<WorkEntry>>, DomainError>;
+
+    /// Every schedule of a profile, by presence id (one query — exports).
+    async fn list_schedules_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, WorkDaySchedule>, DomainError>;
+
     /// Atomically replace the full entry set of a presence day. Passing an
     /// empty slice clears the day.
     async fn replace_for_presence(
@@ -22,7 +36,7 @@ pub trait WorkEntryRepository: Send + Sync {
 
     /// The day's start/end times, if the user set them.
     async fn get_schedule(&self, presence_id: &str)
-        -> Result<Option<WorkDaySchedule>, DomainError>;
+    -> Result<Option<WorkDaySchedule>, DomainError>;
 
     /// Create or update the day's start/end times.
     async fn set_schedule(&self, schedule: &WorkDaySchedule) -> Result<(), DomainError>;
