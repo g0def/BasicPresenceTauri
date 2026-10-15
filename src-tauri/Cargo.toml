@@ -38,7 +38,7 @@ argon2 = "0.5"
 password-hash = { version = "0.5", features = ["std"] }
 
 # Envelope encryption du DEK (AEAD authentifié, nonce 192 bits)
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.11"
 
 # Évidence d'altération du vault au repos (HMAC-SHA256 sur le fichier + comparaison
 # constant-time). libSQL 0.9 ne chiffre qu'en AES-256-CBC non authentifié.
