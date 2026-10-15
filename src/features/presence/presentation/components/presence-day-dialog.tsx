@@ -17,21 +17,21 @@ import {
 import {
   commuteToTrips,
   type CommuteSegment,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 import { SegmentEditor } from "@/features/commute/presentation/components/segment-editor";
 import {
   formatCo2,
   summarizeSegments,
-} from "@/features/commute/presentation/commute-format";
+} from "@/entities/commute/lib/commute-format";
 import { useCommute } from "@/features/commute/presentation/hooks/use-commute";
 import {
   PRESENCE_TYPES,
   type PresenceTrip,
   type PresenceType,
-} from "@/features/presence/domain/entities/presence";
-import { dayKey } from "@/features/presence/presentation/day-key";
-import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+} from "@/entities/presence/model/presence";
+import { dayKey } from "@/entities/presence/lib/day-key";
+import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
+import { usePresence } from "@/entities/presence/model/use-presence";
 import { cn } from "@/lib/utils";
 
 interface PresenceDayDialogProps {
@@ -78,7 +78,9 @@ export function PresenceDayDialog({
   const [selectedType, setSelectedType] = useState<PresenceType>("office");
   // A saved commute id, "custom" (inline trip), "none" (no trip, 0 kgCO2e), or
   // null (nothing chosen yet).
-  const [choice, setChoice] = useState<string | "custom" | "none" | null>(null);
+  const [choice, setChoice] = useState<string | null>(
+    null,
+  ); /* commute id, "custom" or "none" */
   const [customSegments, setCustomSegments] = useState<CommuteSegment[]>([
     emptySegment(),
   ]);

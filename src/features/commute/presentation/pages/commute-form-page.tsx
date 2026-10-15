@@ -6,10 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type {
-  Commute,
-  CommuteSegment,
-} from "@/features/commute/domain/entities/commute";
+import type { Commute, CommuteSegment } from "@/entities/commute/model/commute";
 import { SegmentEditor } from "@/features/commute/presentation/components/segment-editor";
 import { useCommute } from "@/features/commute/presentation/hooks/use-commute";
 
@@ -98,7 +95,7 @@ export function CommuteFormPage({ commute, onDone }: CommuteFormPageProps) {
         {t("commute.form.subtitle")}
       </p>
 
-      <form onSubmit={onSubmit} className="grid gap-4">
+      <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor="commute-name">{t("commute.form.name")}</Label>
           <Input

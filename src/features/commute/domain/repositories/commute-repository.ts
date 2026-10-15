@@ -2,7 +2,7 @@ import type {
   Commute,
   CreateCommuteInput,
   UpdateCommuteInput,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 
 /** Contract the presentation layer depends on; implemented in the data layer. */
 export interface CommuteRepository {

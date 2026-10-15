@@ -1,3 +1,4 @@
+use crate::application::services::commute_builder::SegmentInput;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::entities::commute::Commute;
@@ -62,4 +63,14 @@ pub struct CommuteSegmentInputDto {
     pub mode_id: String,
     pub distance_km: f64,
     pub occupants: Option<i64>,
+}
+
+impl CommuteSegmentInputDto {
+    pub fn as_segment_input(&self) -> SegmentInput<'_> {
+        SegmentInput {
+            mode_id: &self.mode_id,
+            distance_km: self.distance_km,
+            occupants: self.occupants,
+        }
+    }
 }

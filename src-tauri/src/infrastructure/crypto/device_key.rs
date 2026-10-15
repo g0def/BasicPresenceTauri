@@ -20,12 +20,19 @@ const KEYRING_ACCOUNT: &str = "keystore-device-key";
 /// On Linux a Secret Service provider must be running; if it is unavailable the
 /// call returns [`DomainError::Keychain`] (surfaced as a startup error rather
 /// than silently downgrading to a plaintext keystore).
-pub fn resolve_device_key() -> Result<Zeroizing<[u8; 32]>, DomainError> {
+///
+/// `allow_create` must be `false` once a sealed keystore exists: a missing entry
+/// then means the key was lost (keychain reset, profile restored elsewhere…).
+/// Minting a fresh key would not help — the keystore stays undecryptable — and
+/// would overwrite any chance of restoring the original entry, so this returns
+/// [`DomainError::KeystoreUnrecoverable`] instead.
+pub fn resolve_device_key(allow_create: bool) -> Result<Zeroizing<[u8; 32]>, DomainError> {
     let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
         .map_err(|e| DomainError::Keychain(e.to_string()))?;
 
     match entry.get_secret() {
         Ok(bytes) => {
+            let bytes = Zeroizing::new(bytes);
             if bytes.len() != 32 {
                 return Err(DomainError::Keychain(
                     "stored device key has unexpected length".into(),
@@ -35,6 +42,7 @@ pub fn resolve_device_key() -> Result<Zeroizing<[u8; 32]>, DomainError> {
             key.as_mut_slice().copy_from_slice(&bytes);
             Ok(key)
         }
+        Err(KeyringError::NoEntry) if !allow_create => Err(DomainError::KeystoreUnrecoverable),
         Err(KeyringError::NoEntry) => {
             // First run on this device: mint and persist a new key.
             let mut key = Zeroizing::new([0u8; 32]);

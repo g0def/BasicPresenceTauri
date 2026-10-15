@@ -98,7 +98,7 @@ pub struct BundleImportSelectionDto {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BundleImportTargetDto {
-    pub kind: String,
+    pub kind: ImportTargetKind,
     #[serde(default)]
     pub profile_id: Option<String>,
     #[serde(default)]
@@ -125,4 +125,32 @@ pub struct BundleImportSummaryDto {
     pub task_presets: u32,
     pub commutes: u32,
     pub settings: bool,
+}
+
+/// Where an import goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImportTargetKind {
+    /// A fresh profile created from the bundle's identity.
+    New,
+    /// Merged into an existing profile.
+    Existing,
+}
+
+/// What to do with a bundle day that already exists on the target profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConflictStrategy {
+    Skip,
+    Replace,
+}
+
+/// A picked bundle, ready to import: the opaque handle the backend keeps the
+/// chosen file under (the WebView never sees or sends a file path), and what
+/// the file contains.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InspectedBundleDto {
+    pub handle: String,
+    pub manifest: BundleManifestDto,
 }

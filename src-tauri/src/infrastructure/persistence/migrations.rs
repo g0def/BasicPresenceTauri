@@ -17,6 +17,18 @@ pub const KEYSTORE_MIGRATIONS: &[Migration] = &[
         version: 2,
         sql: include_str!("../../../migrations/keystore/0002_add_mac_key.sql"),
     },
+    Migration {
+        version: 3,
+        sql: include_str!("../../../migrations/keystore/0003_vault_integrity.sql"),
+    },
+    Migration {
+        version: 4,
+        sql: include_str!("../../../migrations/keystore/0004_key_material_versioning.sql"),
+    },
+    Migration {
+        version: 5,
+        sql: include_str!("../../../migrations/keystore/0005_security_events.sql"),
+    },
 ];
 
 pub const VAULT_MIGRATIONS: &[Migration] = &[
@@ -92,15 +104,41 @@ pub async fn run(conn: &Connection, migrations: &[Migration]) -> Result<(), Doma
 
     for m in migrations {
         if m.version > current {
-            conn.execute_batch(m.sql).await.map_err(map_storage)?;
-            conn.execute(
-                "INSERT INTO _migrations (version, applied_at) \
-                 VALUES (?1, CAST(strftime('%s','now') AS INTEGER) * 1000)",
-                libsql::params![m.version],
-            )
-            .await
-            .map_err(map_storage)?;
+            apply(conn, m).await?;
         }
     }
     Ok(())
+}
+
+/// Apply one migration atomically: its DDL/DML and the `_migrations` bookkeeping
+/// row commit together, so a crash mid-migration leaves the schema at the
+/// previous version (and the migration is simply re-run on the next start)
+/// instead of a half-applied schema that the bookkeeping does not know about.
+async fn apply(conn: &Connection, m: &Migration) -> Result<(), DomainError> {
+    conn.execute("BEGIN IMMEDIATE", ())
+        .await
+        .map_err(map_storage)?;
+    let result = async {
+        conn.execute_batch(m.sql).await.map_err(map_storage)?;
+        conn.execute(
+            "INSERT INTO _migrations (version, applied_at) \
+             VALUES (?1, CAST(strftime('%s','now') AS INTEGER) * 1000)",
+            libsql::params![m.version],
+        )
+        .await
+        .map_err(map_storage)?;
+        Ok::<(), DomainError>(())
+    }
+    .await;
+    match result {
+        Ok(()) => conn
+            .execute("COMMIT", ())
+            .await
+            .map(|_| ())
+            .map_err(map_storage),
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", ()).await;
+            Err(e)
+        }
+    }
 }

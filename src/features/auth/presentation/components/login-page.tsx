@@ -104,6 +104,12 @@ export function LoginPage() {
                 />
               </div>
 
+              {isRegister && (
+                <p className="text-xs text-muted-foreground">
+                  {t("auth.noRecoveryWarning")}
+                </p>
+              )}
+
               {error && (
                 <p className="text-sm text-destructive" role="alert">
                   {error}

@@ -1,0 +1,17 @@
+# Advisories acknowledged after review (audit du 14/10/2026, voir
+# documentation/audit-securite-2026-10.md). Each entry must state why it is not
+# reachable; re-check them whenever the parent crate is bumped.
+[advisories]
+ignore = [
+    # --- quick-xml 0.38 / 0.39 parsing DoS. spreadsheet-ods only *writes* our
+    # own .ods (never parses user input); plist (via syntect) only loads the
+    # themes embedded at compile time; calamine is a dev-dependency (tests).
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+
+    # --- Unmaintained / unsound transitive crates with no fix upstream,
+    # pulled by tauri (gtk/glib), syntect (bincode, yaml-rust) and macros.
+    "RUSTSEC-2025-0141", # bincode unmaintained (syntect dumps, trusted data)
+    "RUSTSEC-2024-0370", # proc-macro-error unmaintained (build time only)
+    "RUSTSEC-2024-0320", # yaml-rust unmaintained (syntect, trusted data)
+]

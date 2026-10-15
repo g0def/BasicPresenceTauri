@@ -20,7 +20,7 @@ pub async fn set_presence(
     trips: Option<Vec<TripInputDto>>,
     state: State<'_, AppState>,
 ) -> Result<PresenceDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .set_presence
         .execute(&profile_id, day, &r#type, trips.unwrap_or_default())
@@ -33,14 +33,14 @@ pub async fn list_presences(
     profile_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<PresenceDto>, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.list_presences.execute(&profile_id).await?)
 }
 
 /// Delete a single presence by id.
 #[tauri::command]
 pub async fn delete_presence(id: String, state: State<'_, AppState>) -> Result<(), AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     state.delete_presence.execute(&id).await?;
     Ok(())
 }

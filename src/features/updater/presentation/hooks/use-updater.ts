@@ -1,6 +1,6 @@
 import { useContext } from "react";
 
-import { UpdaterContext } from "../context/updater-context";
+import { UpdaterContext } from "@/features/updater/presentation/context/updater-context";
 
 export function useUpdater() {
   const ctx = useContext(UpdaterContext);

@@ -1,13 +1,20 @@
-export type AppErrorCode =
-  | "INVALID_CREDENTIALS"
-  | "ACCOUNT_LOCKED"
-  | "ACCOUNT_EXISTS"
-  | "VALIDATION"
-  | "SESSION_EXPIRED"
-  | "NOT_FOUND"
-  | "INTERNAL"
-  | "EXPORT_FAILED"
-  | "UNKNOWN";
+import i18n from "@/core/i18n";
+
+/** Error codes the backend can return (`presentation/commands/error.rs`). */
+const KNOWN_CODES = [
+  "INVALID_CREDENTIALS",
+  "ACCOUNT_LOCKED",
+  "ACCOUNT_EXISTS",
+  "VALIDATION",
+  "SESSION_EXPIRED",
+  "NOT_FOUND",
+  "INTERNAL",
+  "EXPORT_FAILED",
+  "KEYSTORE_UNRECOVERABLE",
+  "VAULT_TAMPERED",
+] as const;
+
+export type AppErrorCode = (typeof KNOWN_CODES)[number] | "UNKNOWN";
 
 /** Shape the Rust backend serializes on the `Err` side: `{ code, message }`. */
 interface BackendError {
@@ -30,16 +37,9 @@ export function isAppError(value: unknown): value is AppError {
   return value instanceof AppError;
 }
 
-const KNOWN_CODES: readonly string[] = [
-  "INVALID_CREDENTIALS",
-  "ACCOUNT_LOCKED",
-  "ACCOUNT_EXISTS",
-  "VALIDATION",
-  "SESSION_EXPIRED",
-  "NOT_FOUND",
-  "INTERNAL",
-  "EXPORT_FAILED",
-];
+function isKnownCode(code: string | undefined): code is AppErrorCode {
+  return (KNOWN_CODES as readonly string[]).includes(code ?? "");
+}
 
 /** Convert anything thrown by `invoke` into a typed {@link AppError}. */
 export function normalizeError(raw: unknown): AppError {
@@ -47,15 +47,13 @@ export function normalizeError(raw: unknown): AppError {
 
   if (raw && typeof raw === "object") {
     const e = raw as BackendError;
-    const code: AppErrorCode = KNOWN_CODES.includes(e.code ?? "")
-      ? (e.code as AppErrorCode)
-      : "UNKNOWN";
-    return new AppError(code, e.message ?? "Une erreur est survenue");
+    const code: AppErrorCode = isKnownCode(e.code) ? e.code : "UNKNOWN";
+    return new AppError(code, e.message ?? i18n.t("errors.generic"));
   }
 
   if (typeof raw === "string") {
     return new AppError("UNKNOWN", raw);
   }
 
-  return new AppError("UNKNOWN", "Une erreur inconnue est survenue");
+  return new AppError("UNKNOWN", i18n.t("errors.unknown"));
 }

@@ -13,4 +13,11 @@ pub trait SessionStore: Send + Sync {
     fn list(&self) -> Vec<Session>;
     /// Drop every stored session.
     fn clear(&self);
+
+    /// Record backend activity on one session (idle-timeout bookkeeping).
+    fn touch(&self, token: &str, now_ms: i64);
+
+    /// Record backend activity on every stored session. Used by the global
+    /// session gate, which (by design, see ADR 0001) does not see a token.
+    fn touch_all(&self, now_ms: i64);
 }

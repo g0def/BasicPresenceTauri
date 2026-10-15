@@ -10,17 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DAY_CHILD_KEYS,
   effective,
   presentCategories,
   selectionFromManifest,
@@ -30,10 +20,15 @@ import {
   type ConflictStrategy,
   type ImportTargetKind,
 } from "@/features/profile-transfer/domain/entities/bundle";
+import {
+  ConflictStrategyPicker,
+  ImportCategoryPicker,
+  ImportTargetPicker,
+  type NewProfileForm,
+} from "@/features/profile-transfer/presentation/components/import-review-steps";
 import { useProfileTransfer } from "@/features/profile-transfer/presentation/hooks/use-profile-transfer";
-import { fullName } from "@/features/profile/domain/entities/profile";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+import { useProfile } from "@/entities/profile/model/use-profile";
+import { usePresence } from "@/entities/presence/model/use-presence";
 
 interface ImportProfileDialogProps {
   open: boolean;
@@ -41,13 +36,6 @@ interface ImportProfileDialogProps {
 }
 
 type Stage = "idle" | "review" | "result";
-
-interface NewProfileForm {
-  firstName: string;
-  lastName: string;
-  enterprise: string;
-  poste: string;
-}
 
 /**
  * Import a shared profile bundle. Flow: pick a file → the backend inspects it →
@@ -73,7 +61,7 @@ export function ImportProfileDialog({
 
   const [stage, setStage] = useState<Stage>("idle");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [path, setPath] = useState<string | null>(null);
+  const [handle, setHandle] = useState<string | null>(null);
   const [manifest, setManifest] = useState<BundleManifest | null>(null);
   const [selection, setSelection] = useState<BundleSelection | null>(null);
   const [targetKind, setTargetKind] = useState<ImportTargetKind>("new");
@@ -92,7 +80,7 @@ export function ImportProfileDialog({
     if (!open) return;
     setStage("idle");
     setLocalError(null);
-    setPath(null);
+    setHandle(null);
     setManifest(null);
     setSelection(null);
     setTargetKind("new");
@@ -107,12 +95,12 @@ export function ImportProfileDialog({
     setLocalError(null);
     const res = await inspectBundle();
     if (!res) return; // cancelled, or a backend error already surfaced
-    const { path: picked, manifest: m } = res;
+    const { handle: picked, manifest: m } = res;
     if (!m.compatible) {
       setLocalError(t("transfer.import.incompatible"));
       return;
     }
-    setPath(picked);
+    setHandle(picked);
     setManifest(m);
     setSelection(selectionFromManifest(m));
     setNewProfile({
@@ -131,7 +119,7 @@ export function ImportProfileDialog({
     setSelection((prev) => (prev ? { ...prev, [key]: !prev[key] } : prev));
 
   const runImport = async () => {
-    if (!path || !selection) return;
+    if (!handle || !selection) return;
     const sel = effective(selection);
     const target =
       targetKind === "new"
@@ -143,7 +131,7 @@ export function ImportProfileDialog({
             poste: newProfile.poste.trim() || null,
           }
         : { kind: "existing" as const, profileId: targetProfileId };
-    const result = await importBundle(path, sel, target, conflict);
+    const result = await importBundle(handle, sel, target, conflict);
     if (result) {
       // Surface the imported/changed profile + refresh the calendar if we merged
       // into the active one.
@@ -202,148 +190,29 @@ export function ImportProfileDialog({
             )}
 
             {/* Destination */}
-            <div className="grid gap-2">
-              <span className="font-medium">
-                {t("transfer.import.target.heading")}
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {(["new", "existing"] as ImportTargetKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => setTargetKind(kind)}
-                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                      targetKind === kind
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-card hover:bg-accent"
-                    }`}
-                  >
-                    {t(`transfer.import.target.${kind}`)}
-                  </button>
-                ))}
-              </div>
-
-              {targetKind === "new" ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="grid gap-1">
-                    <Label htmlFor="import-first-name">
-                      {t("profile.firstName")}
-                    </Label>
-                    <Input
-                      id="import-first-name"
-                      value={newProfile.firstName}
-                      onChange={(e) =>
-                        setNewProfile((p) => ({
-                          ...p,
-                          firstName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1">
-                    <Label htmlFor="import-last-name">
-                      {t("profile.lastName")}
-                    </Label>
-                    <Input
-                      id="import-last-name"
-                      value={newProfile.lastName}
-                      onChange={(e) =>
-                        setNewProfile((p) => ({
-                          ...p,
-                          lastName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="grid gap-1 sm:col-span-2">
-                    <Label htmlFor="import-enterprise">
-                      {t("profile.enterprise")}
-                    </Label>
-                    <Input
-                      id="import-enterprise"
-                      value={newProfile.enterprise}
-                      onChange={(e) =>
-                        setNewProfile((p) => ({
-                          ...p,
-                          enterprise: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              ) : (
-                <Select
-                  value={targetProfileId}
-                  onValueChange={setTargetProfileId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue
-                      placeholder={t("transfer.import.target.selectProfile")}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {fullName(p)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            <ImportTargetPicker
+              targetKind={targetKind}
+              setTargetKind={setTargetKind}
+              newProfile={newProfile}
+              setNewProfile={setNewProfile}
+              targetProfileId={targetProfileId}
+              setTargetProfileId={setTargetProfileId}
+              profiles={profiles}
+            />
 
             {/* Categories present in the file */}
-            <div className="grid gap-2">
-              <span className="font-medium">
-                {t("transfer.import.categoriesHeading")}
-              </span>
-              {categories.map(({ key, count }) => {
-                const child = DAY_CHILD_KEYS.includes(key);
-                const disabled = child && !sel.includeDays;
-                return (
-                  <label
-                    key={key}
-                    className={`flex items-center gap-2 ${child ? "pl-6" : ""} ${
-                      disabled ? "opacity-50" : ""
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="size-4"
-                      disabled={disabled}
-                      checked={!disabled && sel[key]}
-                      onChange={() => toggle(key)}
-                    />
-                    {t(`transfer.fields.${key}`)}
-                    {count !== undefined ? ` (${count})` : ""}
-                  </label>
-                );
-              })}
-            </div>
+            <ImportCategoryPicker
+              categories={categories}
+              sel={sel}
+              toggle={toggle}
+            />
 
             {/* Conflict strategy — only when merging days into an existing profile */}
             {targetKind === "existing" && sel.includeDays && (
-              <div className="grid gap-2">
-                <span className="text-muted-foreground">
-                  {t("transfer.import.conflict.heading")}
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {(["skip", "replace"] as ConflictStrategy[]).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setConflict(s)}
-                      className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                        conflict === s
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "bg-card hover:bg-accent"
-                      }`}
-                    >
-                      {t(`transfer.import.conflict.${s}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <ConflictStrategyPicker
+                conflict={conflict}
+                setConflict={setConflict}
+              />
             )}
           </div>
         )}

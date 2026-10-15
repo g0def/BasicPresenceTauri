@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { isAppError } from "@/core/errors";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import {
   toWorkEntryInput,
   type WorkDaySchedule,
   type WorkEntry,
   type WorkEntryInput,
-} from "@/features/work-hours/domain/entities/work-hours";
-import {
-  getWorkEntries as getEntriesUseCase,
-  getWorkSchedule as getScheduleUseCase,
-  setWorkEntries as setEntriesUseCase,
-  setWorkSchedule as setScheduleUseCase,
-} from "@/features/work-hours/presentation/work-day-actions";
+} from "@/entities/work-day/model/work-hours";
+import { useWorkDayActions } from "@/entities/work-day/api/work-day-actions";
 
 /** Delay between the last local mutation and the persisting replace-all call. */
 const SAVE_DEBOUNCE_MS = 600;
@@ -42,10 +38,17 @@ export interface UseWorkDayValue {
  * backend-side once edits settle. Pending edits are flushed on unmount so
  * navigating back never loses the last change.
  */
-export function useWorkDay(
-  presenceId: string,
-  onSessionExpired?: () => void,
-): UseWorkDayValue {
+export function useWorkDay(presenceId: string): UseWorkDayValue {
+  const { t } = useTranslation();
+  const {
+    getWorkEntries: getEntriesUseCase,
+    getWorkSchedule: getScheduleUseCase,
+    setWorkEntries: setEntriesUseCase,
+    setWorkSchedule: setScheduleUseCase,
+  } = useWorkDayActions();
+  // Every IPC call goes through the command runner: a locked vault
+  // (SESSION_EXPIRED) is then handled globally by the query client.
+  const { run } = useCommand();
   const [entries, setEntries] = useState<WorkEntry[]>([]);
   const [schedule, setScheduleState] = useState<WorkDaySchedule | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,25 +63,20 @@ export function useWorkDay(
   // newer edit happened while the call was in flight.
   const versionRef = useRef(0);
 
-  const onSessionExpiredRef = useRef(onSessionExpired);
-  onSessionExpiredRef.current = onSessionExpired;
-
-  const handleError = useCallback((e: unknown) => {
-    if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-      onSessionExpiredRef.current?.();
-      return;
-    }
-    setError(isAppError(e) ? e.message : "Une erreur est survenue");
-  }, []);
+  const handleError = useCallback(
+    (e: unknown) => {
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
+    },
+    [t],
+  );
 
   const persist = useCallback(async () => {
     if (!dirtyRef.current) return;
     dirtyRef.current = false;
     const version = versionRef.current;
     try {
-      const saved = await setEntriesUseCase(
-        presenceId,
-        entriesRef.current.map(toWorkEntryInput),
+      const saved = await run(() =>
+        setEntriesUseCase(presenceId, entriesRef.current.map(toWorkEntryInput)),
       );
       // Adopt the canonical rows (fresh ids) and the recomputed schedule only
       // if nothing changed meanwhile.
@@ -94,7 +92,7 @@ export function useWorkDay(
     } finally {
       if (versionRef.current === version) setIsSaving(false);
     }
-  }, [presenceId, handleError]);
+  }, [presenceId, run, setEntriesUseCase, handleError]);
 
   const scheduleSave = useCallback(() => {
     dirtyRef.current = true;
@@ -120,7 +118,12 @@ export function useWorkDay(
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    Promise.all([getEntriesUseCase(presenceId), getScheduleUseCase(presenceId)])
+    run(() =>
+      Promise.all([
+        getEntriesUseCase(presenceId),
+        getScheduleUseCase(presenceId),
+      ]),
+    )
       .then(([list, sched]) => {
         if (cancelled) return;
         entriesRef.current = list;
@@ -141,7 +144,14 @@ export function useWorkDay(
       }
       void persist();
     };
-  }, [presenceId, persist, handleError]);
+  }, [
+    presenceId,
+    persist,
+    run,
+    getEntriesUseCase,
+    getScheduleUseCase,
+    handleError,
+  ]);
 
   const addEntry = useCallback(
     (input: WorkEntryInput) => {
@@ -194,14 +204,14 @@ export function useWorkDay(
   // The displayed schedule is always the saved row returned by the backend.
   const setSchedule = useCallback(
     (startMinutes: number) => {
-      setScheduleUseCase(presenceId, startMinutes)
+      run(() => setScheduleUseCase(presenceId, startMinutes))
         .then((saved) => {
           setScheduleState(saved);
           setError(null);
         })
         .catch(handleError);
     },
-    [presenceId, handleError],
+    [presenceId, run, setScheduleUseCase, handleError],
   );
 
   const totalMinutes = useMemo(

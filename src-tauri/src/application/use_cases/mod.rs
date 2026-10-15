@@ -1,4 +1,5 @@
 pub mod account_exists;
+pub mod change_password;
 pub mod check_session;
 pub mod create_commute;
 pub mod create_profile;
@@ -9,7 +10,6 @@ pub mod delete_profile;
 pub mod delete_task_preset;
 pub mod export_profile_bundle;
 pub mod export_profile_data;
-pub(crate) mod factor_maps;
 pub mod get_day_note;
 pub mod get_licence;
 pub mod get_presence_trips;

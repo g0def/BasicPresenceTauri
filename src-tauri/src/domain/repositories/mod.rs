@@ -4,5 +4,6 @@ pub mod emission_factor_repository;
 pub mod presence_repository;
 pub mod profile_repository;
 pub mod profile_settings_repository;
+pub mod security_log;
 pub mod task_preset_repository;
 pub mod work_entry_repository;

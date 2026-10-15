@@ -3,7 +3,7 @@ import type {
   WorkDaySchedule,
   WorkEntry,
   WorkEntryInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 
 export interface WorkEntryRepository {
   listByPresence(presenceId: string): Promise<WorkEntry[]>;

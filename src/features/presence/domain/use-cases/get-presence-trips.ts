@@ -1,4 +1,4 @@
-import type { PresenceTrip } from "@/features/presence/domain/entities/presence";
+import type { PresenceTrip } from "@/entities/presence/model/presence";
 import type { PresenceRepository } from "@/features/presence/domain/repositories/presence-repository";
 
 export type GetPresenceTripsUseCase = (

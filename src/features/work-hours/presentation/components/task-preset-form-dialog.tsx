@@ -19,8 +19,8 @@ import {
   STEP_MINUTES,
   type TaskPreset,
   type TaskPresetInput,
-} from "@/features/work-hours/domain/entities/work-hours";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+} from "@/entities/work-day/model/work-hours";
+import { formatMinutes } from "@/shared/format/duration-format";
 import {
   DEFAULT_TASK_COLOR,
   TASK_COLOR_PALETTE,

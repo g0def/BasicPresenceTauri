@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import type { PresenceType } from "@/features/presence/domain/entities/presence";
-import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
-import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
+import type { PresenceType } from "@/entities/presence/model/presence";
+import { PRESENCE_TYPES } from "@/entities/presence/model/presence";
+import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import { cn } from "@/lib/utils";
 
 interface PresenceTypeFilterProps {

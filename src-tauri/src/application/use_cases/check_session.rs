@@ -27,17 +27,22 @@ impl CheckSessionUseCase {
         }
     }
 
-    pub fn execute(&self, token: &str) -> Result<SessionStatusDto, DomainError> {
+    pub async fn execute(&self, token: &str) -> Result<SessionStatusDto, DomainError> {
         let now = self.clock.now_ms();
         match self.sessions.get(token) {
-            Some(session) if session.is_valid(now) => Ok(SessionStatusDto {
-                valid: true,
-                remaining_ms: session.remaining_ms(now),
-            }),
+            Some(session) if session.is_valid(now) => {
+                // The frontend pings this while the user is active in the UI,
+                // which keeps the backend idle timer in step with real use.
+                self.sessions.touch(token, now);
+                Ok(SessionStatusDto {
+                    valid: true,
+                    remaining_ms: session.remaining_ms(now),
+                })
+            }
             Some(_) => {
                 // Expired: revoke and lock the vault.
                 self.sessions.remove(token);
-                self.vault.close();
+                self.vault.close().await;
                 Ok(SessionStatusDto {
                     valid: false,
                     remaining_ms: 0,

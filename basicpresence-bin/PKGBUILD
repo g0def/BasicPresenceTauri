@@ -5,13 +5,17 @@ pkgrel=1
 pkgdesc="A presence tracking application"
 arch=('x86_64')
 url="https://github.com/g0def/BasicPresenceTauri"
-license=('MIT')
+# Proprietary licence (see LICENCE in the upstream repository), not MIT.
+license=('LicenseRef-BasicPresence')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
 provides=('basic-presence')
 conflicts=('basic-presence')
 
 source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/g0def/BasicPresenceTauri/releases/download/v${pkgver}/basic-presence_${pkgver}_amd64.deb")
-sha256sums_x86_64=('SKIP')
+# Pinned checksum of the published .deb: makepkg refuses a modified download.
+# On each release, take the value from the release's SHA256SUMS asset
+# (or run `updpkgsums`) — never 'SKIP'.
+sha256sums_x86_64=('8623b10d231ad155d461877d4b4e3beef878fad59d776311adc572a54fffdc08')
 
 package() {
     cd "${srcdir}"

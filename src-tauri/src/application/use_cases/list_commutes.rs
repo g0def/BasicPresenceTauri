@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::application::dto::commute_dto::CommuteDto;
-use crate::application::use_cases::factor_maps::load_factor_maps;
+use crate::application::services::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::PresenceType;
 use crate::domain::entities::trip::TripInput;
 use crate::domain::error::DomainError;

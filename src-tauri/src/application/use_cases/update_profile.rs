@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use crate::application::dto::profile_dto::ProfileDto;
-use crate::application::use_cases::create_profile::{normalize_optional, validate_required};
 use crate::domain::error::DomainError;
 use crate::domain::repositories::profile_repository::ProfileRepository;
+use crate::domain::rules;
 use crate::domain::services::clock::Clock;
 
 /// Update an existing profile's fields (preserving its `created_at`).
@@ -25,21 +25,19 @@ impl UpdateProfileUseCase {
         enterprise: &str,
         poste: Option<&str>,
     ) -> Result<ProfileDto, DomainError> {
-        let first_name = first_name.trim();
-        let last_name = last_name.trim();
-        let enterprise = enterprise.trim();
-        validate_required("firstName", first_name)?;
-        validate_required("lastName", last_name)?;
-        validate_required("enterprise", enterprise)?;
-        let poste = normalize_optional("poste", poste)?;
+        let first_name = rules::profile_field("firstName", first_name)?;
+        let last_name = rules::profile_field("lastName", last_name)?;
+        let enterprise = rules::profile_field("enterprise", enterprise)?;
+        let poste = rules::profile_optional_field("poste", poste)?;
 
+        let id = rules::required_id("id", id)?;
         let Some(mut profile) = self.profiles.find_by_id(id).await? else {
             return Err(DomainError::ProfileNotFound);
         };
 
-        profile.first_name = first_name.to_string();
-        profile.last_name = last_name.to_string();
-        profile.enterprise = enterprise.to_string();
+        profile.first_name = first_name;
+        profile.last_name = last_name;
+        profile.enterprise = enterprise;
         profile.poste = poste;
         profile.updated_at = self.clock.now_ms();
 

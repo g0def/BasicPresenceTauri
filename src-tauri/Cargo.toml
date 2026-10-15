@@ -3,7 +3,9 @@ name = "basic-presence"
 version = "0.1.1"
 description = "A Tauri App"
 authors = ["you"]
-edition = "2021"
+edition = "2024"
+# Proprietary licence (see ../LICENCE); never published to crates.io.
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,10 +17,12 @@ name = "basic_presence_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", features = ["isolation"] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `isolation`: every IPC message goes through the sandboxed isolation app
+# (`isolation/`), which filters commands before they reach the core.
+tauri = { version = "2", features = ["isolation"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-process = "2"
 tauri-plugin-opener = "2"
@@ -26,7 +30,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Persistance offline-first chiffrée (moteur libSQL / Turso), 100% locale en v1
-libsql = { version = "0.9", features = ["encryption"] }
+libsql = { version = "0.9", default-features = false, features = ["encryption"] }
 bytes = "1"
 
 # Hachage de mot de passe & dérivation de clé (Argon2id)
@@ -60,6 +64,9 @@ uuid = { version = "1", features = ["v7"] }
 thiserror = "2"
 base64 = "0.22"
 async-trait = "0.1"
+# Verrou d'écriture asynchrone + transaction ambiante (task-local) du vault.
+# Déjà présent via tauri : aucune nouvelle dépendance téléchargée.
+tokio = { version = "1", features = ["sync", "rt"] }
 
 # Rendu des notes Markdown -> HTML côté backend (source de vérité = Markdown brut).
 # comrak en `default-features = false` écarte sa CLI + son intégration syntect par
@@ -67,12 +74,30 @@ async-trait = "0.1"
 # syntect en `default-fancy` (moteur regex pur-Rust `fancy-regex`, donc PAS de dep C).
 # Le HTML est ensuite assaini par Ammonia (whitelist html5ever) avant la WebView.
 comrak = { version = "0.52.0", default-features = false }
-ammonia = "4.1.2"
+ammonia = "4.1.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 spreadsheet-ods = "1.0.4"
 tauri-plugin-dialog = "2.7.1"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 
 [dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
 calamine = "0.35.0"
 
+
+# Argon2 is ~10x slower unoptimized: keep `tauri dev` logins (auth hash + 64 MiB
+# KEK derivation) responsive without changing the security parameters.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+# Smaller, harder-to-reverse binary; whole-program optimisation.
+lto = true
+codegen-units = 1
+strip = true
+# Arithmetic overflow panics instead of silently wrapping (CO2 / minutes maths).
+overflow-checks = true
+# `panic = "unwind"` (the default) is kept on purpose: unwinding runs the
+# `Zeroizing` destructors, so key material is wiped even on a panic.

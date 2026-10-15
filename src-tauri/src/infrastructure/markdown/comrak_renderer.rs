@@ -4,10 +4,10 @@ use std::fmt;
 
 use comrak::adapters::SyntaxHighlighterAdapter;
 use comrak::options::Plugins;
-use comrak::{markdown_to_html_with_plugins, Options};
+use comrak::{Options, markdown_to_html_with_plugins};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Color, Theme, ThemeSet};
-use syntect::html::{styled_line_to_highlighted_html, IncludeBackground};
+use syntect::html::{IncludeBackground, styled_line_to_highlighted_html};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 

@@ -23,8 +23,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supportedLngs } from "@/core/i18n/resources";
-import { fullName } from "@/features/profile/domain/entities/profile";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { fullName } from "@/entities/profile/model/profile";
+import { useProfile } from "@/entities/profile/model/use-profile";
 import {
   useCellDisplayMode,
   type CellDisplayMode,

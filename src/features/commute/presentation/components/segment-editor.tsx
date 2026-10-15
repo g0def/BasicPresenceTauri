@@ -18,14 +18,14 @@ import type {
   CommuteCategory,
   CommuteSegment,
   EmissionFactor,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 import {
   CATEGORY_ICONS,
   CATEGORY_LABEL_KEYS,
   CATEGORY_ORDER,
   isCarCategory,
 } from "@/features/commute/presentation/components/commute-icons";
-import { modeLabel } from "@/features/commute/presentation/mode-labels";
+import { modeLabel } from "@/entities/commute/lib/mode-labels";
 
 interface SegmentEditorProps {
   segments: CommuteSegment[];

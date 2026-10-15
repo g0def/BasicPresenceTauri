@@ -4,7 +4,7 @@ import type {
   AvailableUpdate,
   DownloadProgress,
   UpdatePhase,
-} from "../../domain/entities/update";
+} from "@/features/updater/domain/entities/update";
 
 export interface UpdaterContextValue {
   phase: UpdatePhase;

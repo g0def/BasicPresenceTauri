@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 
 use crate::domain::entities::presence::Presence;
@@ -20,6 +22,18 @@ pub trait PresenceRepository: Send + Sync {
 
     /// The trip snapshot rows recorded for a presence day, ordered by position.
     async fn list_trips(&self, presence_id: &str) -> Result<Vec<Trip>, DomainError>;
+
+    /// Every trip of a profile, grouped by presence id (one query — exports).
+    async fn list_trips_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, Vec<Trip>>, DomainError>;
+
+    /// Every non-null note of a profile, by presence id (one query — exports).
+    async fn list_notes_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, String>, DomainError>;
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Presence>, DomainError>;
 

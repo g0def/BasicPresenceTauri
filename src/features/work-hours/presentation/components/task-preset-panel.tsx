@@ -7,13 +7,13 @@ import type {
   TaskPreset,
   TaskPresetInput,
   WorkEntryInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 import { useTaskPresets } from "@/features/work-hours/presentation/hooks/use-task-presets";
 import {
   TaskPresetFormDialog,
   type TaskFormMode,
 } from "@/features/work-hours/presentation/components/task-preset-form-dialog";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { formatMinutes } from "@/shared/format/duration-format";
 
 interface TaskPresetPanelProps {
   /** Adds a task to the day (preset click or validated one-off form). */

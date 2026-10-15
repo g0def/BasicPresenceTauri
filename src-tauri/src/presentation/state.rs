@@ -1,4 +1,5 @@
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
+use crate::application::use_cases::change_password::ChangePasswordUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
 use crate::application::use_cases::create_commute::CreateCommuteUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
@@ -36,7 +37,9 @@ use crate::application::use_cases::set_work_schedule::SetWorkScheduleUseCase;
 use crate::application::use_cases::update_commute::UpdateCommuteUseCase;
 use crate::application::use_cases::update_profile::UpdateProfileUseCase;
 use crate::application::use_cases::update_task_preset::UpdateTaskPresetUseCase;
+use crate::domain::services::session_store::SessionStore;
 use crate::domain::services::vault::VaultManager;
+use crate::presentation::file_dialogs::PendingImports;
 use std::sync::Arc;
 
 /// Application state injected via Tauri `.manage()` and read by the commands.
@@ -44,6 +47,7 @@ pub struct AppState {
     pub register_account: RegisterAccountUseCase,
     pub login: LoginUseCase,
     pub logout: LogoutUseCase,
+    pub change_password: ChangePasswordUseCase,
     pub check_session: CheckSessionUseCase,
     /// Backend-side gate: every vault-touching command calls it first, so the
     /// absolute session expiry holds even if the frontend never checks in.
@@ -84,6 +88,10 @@ pub struct AppState {
     /// Vault handle, exposed so a window-close hook can lock it and refresh the
     /// integrity baseline on a clean app exit.
     pub vault: Arc<dyn VaultManager>,
+    /// Session store, so the app can revoke every session on exit.
+    pub sessions: Arc<dyn SessionStore>,
+    /// Bundles picked by the user and awaiting import (opaque handles).
+    pub pending_imports: PendingImports,
     /// Keeps the keystore database alive for the lifetime of the app.
     #[allow(dead_code)]
     pub keystore_db: libsql::Database,

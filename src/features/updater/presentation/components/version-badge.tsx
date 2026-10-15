@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { DownloadCloud, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useUpdater } from "../hooks/use-updater";
+import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
 
 /**
  * Version pill next to the "Basic Presence" wordmark. Shows the running version

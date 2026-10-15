@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 
 use crate::domain::entities::work_day_schedule::WorkDaySchedule;
 use crate::domain::entities::work_entry::WorkEntry;
@@ -58,52 +59,96 @@ impl WorkEntryRepository for LibsqlWorkEntryRepository {
         Ok(entries)
     }
 
+    async fn list_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, Vec<WorkEntry>>, DomainError> {
+        let columns = ENTRY_COLUMNS
+            .split(", ")
+            .map(|c| format!("e.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT {columns} FROM work_entry e JOIN presence p ON p.id = e.presence_id \
+             WHERE p.profile_id = ?1 ORDER BY e.presence_id, e.position"
+        );
+        let mut rows = self
+            .conn()?
+            .query(&sql, params![profile_id])
+            .await
+            .map_err(map_storage)?;
+        let mut by_presence: HashMap<String, Vec<WorkEntry>> = HashMap::new();
+        while let Some(row) = rows.next().await.map_err(map_storage)? {
+            let entry = row_to_entry(&row)?;
+            by_presence
+                .entry(entry.presence_id.clone())
+                .or_default()
+                .push(entry);
+        }
+        Ok(by_presence)
+    }
+
+    async fn list_schedules_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, WorkDaySchedule>, DomainError> {
+        let mut rows = self
+            .conn()?
+            .query(
+                "SELECT s.presence_id, s.start_minutes, s.end_minutes \
+                 FROM work_day_schedule s JOIN presence p ON p.id = s.presence_id \
+                 WHERE p.profile_id = ?1",
+                params![profile_id],
+            )
+            .await
+            .map_err(map_storage)?;
+        let mut schedules = HashMap::new();
+        while let Some(row) = rows.next().await.map_err(map_storage)? {
+            let schedule = WorkDaySchedule {
+                presence_id: row.get(0).map_err(map_storage)?,
+                start_minutes: row.get(1).map_err(map_storage)?,
+                end_minutes: row.get(2).map_err(map_storage)?,
+            };
+            schedules.insert(schedule.presence_id.clone(), schedule);
+        }
+        Ok(schedules)
+    }
+
     async fn replace_for_presence(
         &self,
         presence_id: &str,
         entries: &[WorkEntry],
     ) -> Result<(), DomainError> {
-        let conn = self.conn()?;
-        conn.execute("BEGIN", ()).await.map_err(map_storage)?;
-        let result = async {
-            conn.execute(
-                "DELETE FROM work_entry WHERE presence_id = ?1",
-                params![presence_id],
-            )
-            .await
-            .map_err(map_storage)?;
-            let sql = format!(
-                "INSERT INTO work_entry ({ENTRY_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
-            );
-            for e in entries {
+        self.vault
+            .write(|conn| async move {
                 conn.execute(
-                    &sql,
-                    params![
-                        e.id.clone(),
-                        e.presence_id.clone(),
-                        e.title.clone(),
-                        e.description.clone(),
-                        e.minutes,
-                        e.color.clone(),
-                        e.position,
-                    ],
+                    "DELETE FROM work_entry WHERE presence_id = ?1",
+                    params![presence_id],
                 )
                 .await
                 .map_err(map_storage)?;
-            }
-            Ok(())
-        }
-        .await;
-        match result {
-            Ok(()) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
+                let sql = format!(
+                    "INSERT INTO work_entry ({ENTRY_COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+                );
+                for e in entries {
+                    conn.execute(
+                        &sql,
+                        params![
+                            e.id.clone(),
+                            e.presence_id.clone(),
+                            e.title.clone(),
+                            e.description.clone(),
+                            e.minutes,
+                            e.color.clone(),
+                            e.position,
+                        ],
+                    )
+                    .await
+                    .map_err(map_storage)?;
+                }
                 Ok(())
-            }
-            Err(e) => {
-                let _ = conn.execute("ROLLBACK", ()).await;
-                Err(e)
-            }
-        }
+            })
+            .await
     }
 
     async fn get_schedule(
@@ -130,8 +175,8 @@ impl WorkEntryRepository for LibsqlWorkEntryRepository {
     }
 
     async fn set_schedule(&self, schedule: &WorkDaySchedule) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "INSERT INTO work_day_schedule (presence_id, start_minutes, end_minutes) \
                  VALUES (?1, ?2, ?3) \
                  ON CONFLICT(presence_id) DO UPDATE SET \
@@ -143,19 +188,17 @@ impl WorkEntryRepository for LibsqlWorkEntryRepository {
                     schedule.end_minutes,
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 
     async fn clear_schedule(&self, presence_id: &str) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "DELETE FROM work_day_schedule WHERE presence_id = ?1",
                 params![presence_id],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 }

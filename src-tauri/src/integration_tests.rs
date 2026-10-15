@@ -5,13 +5,14 @@ use std::path::PathBuf;
 
 use crate::application::dto::commute_dto::CommuteSegmentInputDto;
 use crate::application::dto::profile_bundle_dto::{
-    BundleExportOptionsDto, BundleImportSelectionDto, BundleImportTargetDto,
+    BundleExportOptionsDto, BundleImportSelectionDto, BundleImportTargetDto, ConflictStrategy,
+    ImportTargetKind,
 };
 use crate::application::dto::trip_dto::TripInputDto;
 use crate::application::dto::work_entry_dto::WorkEntryInputDto;
 use crate::build_state;
 use crate::domain::error::DomainError;
-use crate::infrastructure::config::{AppConfig, Argon2Params, AuthPolicy, IntegrityPolicy};
+use crate::infrastructure::config::{AppConfig, AuthPolicy, IntegrityPolicy, KdfParams};
 use crate::infrastructure::persistence::db::open_plain_db;
 
 /// Fixed device key for tests: stands in for the OS-keychain-backed key so the
@@ -23,19 +24,28 @@ fn temp_config(name: &str) -> (AppConfig, PathBuf) {
     dir.push(format!("basic-presence-it-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
+    // Tiny Argon2 params so the test stays fast.
+    let kdf = KdfParams {
+        m_cost: 64,
+        t_cost: 1,
+        p_cost: 1,
+    };
     let config = AppConfig {
         keystore_path: dir.join("keystore.db"),
         vault_path: dir.join("vault.db"),
-        // Tiny Argon2 params so the test stays fast.
-        argon2: Argon2Params {
-            m_cost: 64,
-            t_cost: 1,
-            p_cost: 1,
-        },
+        argon2: kdf,
         auth: AuthPolicy {
             session_ttl_ms: 15 * 60 * 1000,
+            idle_timeout_ms: 6 * 60 * 1000,
             max_attempts: 3,
             lockout_ms: 60_000,
+            max_lockout_ms: 24 * 60 * 60 * 1000,
+            kek_kdf: KdfParams {
+                m_cost: 128,
+                t_cost: 2,
+                p_cost: 1,
+            },
+            legacy_kek_kdf: kdf,
         },
         integrity: IntegrityPolicy::WarnAndAllow,
     };
@@ -87,9 +97,23 @@ fn full_auth_flow_and_encryption() {
         assert_eq!(result.user.username, "alice");
 
         // Session is valid, then logout invalidates it.
-        assert!(state.check_session.execute(&result.token).unwrap().valid);
-        state.logout.execute(&result.token).unwrap();
-        assert!(!state.check_session.execute(&result.token).unwrap().valid);
+        assert!(
+            state
+                .check_session
+                .execute(&result.token)
+                .await
+                .unwrap()
+                .valid
+        );
+        state.logout.execute(&result.token).await.unwrap();
+        assert!(
+            !state
+                .check_session
+                .execute(&result.token)
+                .await
+                .unwrap()
+                .valid
+        );
 
         // The vault file must be encrypted: opening it WITHOUT the key cannot
         // read its schema.
@@ -212,7 +236,7 @@ fn profile_crud_requires_unlocked_vault() {
         assert_eq!(listed.active_profile_id.as_deref(), Some(p1.id.as_str()));
 
         // Logout locks the vault; profile operations are refused again.
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         assert!(matches!(
             state.list_profiles.execute().await,
             Err(DomainError::Unauthorized)
@@ -330,7 +354,7 @@ fn presence_set_list_delete_with_upsert_per_day() {
         assert_eq!(listed[0].day, DAY_2);
 
         // Logout locks the vault; presence operations are refused again.
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         assert!(matches!(
             state.list_presences.execute(&profile.id).await,
             Err(DomainError::Unauthorized)
@@ -388,12 +412,14 @@ fn deleting_a_profile_cascades_to_its_presences() {
             .execute(&profile.id)
             .await
             .expect("delete profile");
-        assert!(state
-            .list_presences
-            .execute(&profile.id)
-            .await
-            .expect("list")
-            .is_empty());
+        assert!(
+            state
+                .list_presences
+                .execute(&profile.id)
+                .await
+                .expect("list")
+                .is_empty()
+        );
 
         let _ = std::fs::remove_dir_all(dir);
     });
@@ -403,7 +429,7 @@ fn deleting_a_profile_cascades_to_its_presences() {
 fn legacy_plaintext_keystore_is_migrated_and_sealed() {
     use crate::infrastructure::persistence::db::connect;
     use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
-    use crate::infrastructure::persistence::migrations::{run, KEYSTORE_MIGRATIONS};
+    use crate::infrastructure::persistence::migrations::{KEYSTORE_MIGRATIONS, run};
 
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("legacy_migration");
@@ -440,10 +466,12 @@ fn legacy_plaintext_keystore_is_migrated_and_sealed() {
         // Sanity: the fixture is readable in clear before migration.
         let plain = open_plain_db(&keystore_path).await.unwrap();
         let pconn = plain.connect().unwrap();
-        assert!(pconn
-            .query("SELECT count(*) FROM account", ())
-            .await
-            .is_ok());
+        assert!(
+            pconn
+                .query("SELECT count(*) FROM account", ())
+                .await
+                .is_ok()
+        );
         drop(pconn);
         drop(plain);
 
@@ -485,7 +513,7 @@ fn legacy_plaintext_keystore_is_migrated_and_sealed() {
 fn interrupted_keystore_migration_swap_is_recovered() {
     use crate::infrastructure::persistence::db::connect;
     use crate::infrastructure::persistence::keystore_bootstrap::open_or_migrate_keystore;
-    use crate::infrastructure::persistence::migrations::{run, KEYSTORE_MIGRATIONS};
+    use crate::infrastructure::persistence::migrations::{KEYSTORE_MIGRATIONS, run};
 
     tauri::async_runtime::block_on(async {
         let (config, dir) = temp_config("interrupted_migration");
@@ -575,7 +603,7 @@ fn require_session_gates_data_access() {
 
         // No session yet: the gate every data command goes through refuses.
         assert!(matches!(
-            state.require_session.execute(),
+            state.require_session.execute().await,
             Err(DomainError::Unauthorized)
         ));
 
@@ -584,12 +612,12 @@ fn require_session_gates_data_access() {
             .execute("alice", "password123")
             .await
             .expect("login");
-        assert!(state.require_session.execute().is_ok());
+        assert!(state.require_session.execute().await.is_ok());
 
         // After logout the gate refuses again (and the vault is locked).
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         assert!(matches!(
-            state.require_session.execute(),
+            state.require_session.execute().await,
             Err(DomainError::Unauthorized)
         ));
         assert!(matches!(
@@ -628,7 +656,7 @@ fn tampering_with_the_vault_is_detected_under_hard_fail() {
             .execute("Ada", "Lovelace", "Analytical Engine", None)
             .await
             .expect("create profile");
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
 
         // Tamper with the at-rest ciphertext.
         let mut bytes = std::fs::read(&vault_path).unwrap();
@@ -734,12 +762,14 @@ fn presence_co2_is_computed_snapshotted_and_tied_to_presence() {
             .await
             .expect("vacation");
         assert!(p3.co2_kg.is_none());
-        assert!(state
-            .get_presence_trips
-            .execute(&p.id)
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            state
+                .get_presence_trips
+                .execute(&p.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
 
         // Remote days also accept an optional trip (scope: office + remote).
         let r = state
@@ -749,7 +779,7 @@ fn presence_co2_is_computed_snapshotted_and_tied_to_presence() {
             .expect("remote");
         assert!((r.co2_kg.unwrap() - 0.1752).abs() < 1e-3);
 
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         let _ = std::fs::remove_dir_all(dir);
     });
 }
@@ -783,16 +813,20 @@ fn co2_referential_exposes_full_table_with_sources() {
         assert!((referential.radiative_forcing - 1.7).abs() < 1e-9);
 
         // Unlike the trip picker, building factors are included here.
-        assert!(referential
-            .factors
-            .iter()
-            .any(|f| f.category == "building" && f.mode_id == "office_day"));
+        assert!(
+            referential
+                .factors
+                .iter()
+                .any(|f| f.category == "building" && f.mode_id == "office_day")
+        );
 
         // Every factor carries scope + source for traceability.
-        assert!(referential
-            .factors
-            .iter()
-            .all(|f| f.scope.is_some() && f.source.is_some()));
+        assert!(
+            referential
+                .factors
+                .iter()
+                .all(|f| f.scope.is_some() && f.source.is_some())
+        );
 
         // car_ev still carries its 4 grid variants; BE corrected to 0.11 in 2026.
         let ev = referential
@@ -808,7 +842,7 @@ fn co2_referential_exposes_full_table_with_sources() {
             .expect("BE variant");
         assert!((be.value - 0.11).abs() < 1e-9);
 
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         let _ = std::fs::remove_dir_all(dir);
     });
 }
@@ -904,12 +938,14 @@ fn commute_crud_and_emission_factors() {
 
         // Delete removes it (and its segments cascade).
         state.delete_commute.execute(&c.id).await.expect("delete");
-        assert!(state
-            .list_commutes
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            state
+                .list_commutes
+                .execute(&profile.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
 
         // Deleting the profile cascades to its commutes.
         let segs3 = vec![CommuteSegmentInputDto {
@@ -927,14 +963,16 @@ fn commute_crud_and_emission_factors() {
             .execute(&profile.id)
             .await
             .expect("delete profile");
-        assert!(state
-            .list_commutes
-            .execute(&profile.id)
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            state
+                .list_commutes
+                .execute(&profile.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
 
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         let _ = std::fs::remove_dir_all(dir);
     });
 }
@@ -1080,7 +1118,7 @@ fn task_preset_crud_and_validation() {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, alpha.id);
 
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         let _ = std::fs::remove_dir_all(dir);
     });
 }
@@ -1125,12 +1163,14 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
 
         // A fresh work day has no entries, but its schedule is seeded with the
         // profile's default start (08:30); end == start until entries are added.
-        assert!(state
-            .get_work_entries
-            .execute(&office.id)
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(
+            state
+                .get_work_entries
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
         let seeded = state
             .get_work_schedule
             .execute(&office.id)
@@ -1140,12 +1180,14 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
         assert_eq!(seeded.start_minutes, 510);
         assert_eq!(seeded.end_minutes, 510);
         // Non-work days never get a seeded schedule.
-        assert!(state
-            .get_work_schedule
-            .execute(&vacation.id)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&vacation.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         // Hours can only be encoded on office/remote days.
         assert!(matches!(
@@ -1250,21 +1292,25 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
             .execute(&profile.id, DAY_OFFICE, "vacation", vec![])
             .await
             .expect("flip to vacation");
-        assert!(state
-            .get_work_entries
-            .execute(&office.id)
-            .await
-            .unwrap()
-            .is_empty());
-        assert!(state
-            .get_work_schedule
-            .execute(&office.id)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            state
+                .get_work_entries
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         // Logout locks the vault: work-hours reads are refused again.
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         assert!(matches!(
             state.get_work_entries.execute(&office.id).await,
             Err(DomainError::Unauthorized)
@@ -1359,12 +1405,14 @@ fn office_day_seeds_default_start_time() {
             .execute(&profile.id, DAY, "vacation", vec![])
             .await
             .expect("vacation");
-        assert!(state
-            .get_work_schedule
-            .execute(&office.id)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&office.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
         let reoffice = state
             .set_presence
             .execute(&profile.id, DAY, "office", vec![])
@@ -1526,16 +1574,18 @@ fn day_note_persists_and_is_rendered_to_safe_html() {
             .await
             .expect("clear note");
         assert!(cleared.markdown.is_empty());
-        assert!(state
-            .get_day_note
-            .execute(&presence.id)
-            .await
-            .unwrap()
-            .markdown
-            .is_empty());
+        assert!(
+            state
+                .get_day_note
+                .execute(&presence.id)
+                .await
+                .unwrap()
+                .markdown
+                .is_empty()
+        );
 
         // Logout locks the vault: note reads are refused again.
-        state.logout.execute(&session.token).unwrap();
+        state.logout.execute(&session.token).await.unwrap();
         assert!(matches!(
             state.get_day_note.execute(&presence.id).await,
             Err(DomainError::Unauthorized)
@@ -1671,7 +1721,7 @@ fn profile_bundle_round_trips_through_export_and_import() {
 
         // --- Export everything to a JSON bundle. ---
         let bundle_path = dir.join("profile.json");
-        let path = bundle_path.to_str().unwrap();
+        let path = bundle_path.as_path();
         let all = BundleExportOptionsDto {
             include_days: true,
             include_trips: true,
@@ -1741,14 +1791,14 @@ fn profile_bundle_round_trips_through_export_and_import() {
                 path,
                 selection,
                 BundleImportTargetDto {
-                    kind: "new".into(),
+                    kind: ImportTargetKind::New,
                     profile_id: None,
                     first_name: None,
                     last_name: None,
                     enterprise: None,
                     poste: None,
                 },
-                "skip",
+                ConflictStrategy::Skip,
             )
             .await
             .expect("import new");
@@ -1832,14 +1882,14 @@ fn profile_bundle_round_trips_through_export_and_import() {
                 path,
                 selection,
                 BundleImportTargetDto {
-                    kind: "existing".into(),
+                    kind: ImportTargetKind::Existing,
                     profile_id: Some(new_id.clone()),
                     first_name: None,
                     last_name: None,
                     enterprise: None,
                     poste: None,
                 },
-                "skip",
+                ConflictStrategy::Skip,
             )
             .await
             .expect("merge skip");
@@ -1859,14 +1909,14 @@ fn profile_bundle_round_trips_through_export_and_import() {
                 path,
                 selection,
                 BundleImportTargetDto {
-                    kind: "existing".into(),
+                    kind: ImportTargetKind::Existing,
                     profile_id: Some(new_id.clone()),
                     first_name: None,
                     last_name: None,
                     enterprise: None,
                     poste: None,
                 },
-                "replace",
+                ConflictStrategy::Replace,
             )
             .await
             .expect("merge replace");
@@ -1924,7 +1974,7 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
             include_settings: true,
         };
         let new_target = || BundleImportTargetDto {
-            kind: "new".into(),
+            kind: ImportTargetKind::New,
             profile_id: None,
             first_name: None,
             last_name: None,
@@ -1952,56 +2002,38 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
             matches!(
                 state
                     .import_profile_bundle
-                    .execute(&too_new, selection, new_target(), "skip")
+                    .execute(
+                        std::path::Path::new(&too_new),
+                        selection,
+                        new_target(),
+                        ConflictStrategy::Skip
+                    )
                     .await,
                 Err(DomainError::Validation(_))
             ),
             "a newer-version bundle is rejected"
         );
 
-        // Unknown conflict strategy / target kind.
-        assert!(matches!(
-            state
-                .import_profile_bundle
-                .execute(&valid, selection, new_target(), "merge-maybe")
-                .await,
-            Err(DomainError::Validation(_))
-        ));
-        assert!(matches!(
-            state
-                .import_profile_bundle
-                .execute(
-                    &valid,
-                    selection,
-                    BundleImportTargetDto {
-                        kind: "clone".into(),
-                        profile_id: None,
-                        first_name: None,
-                        last_name: None,
-                        enterprise: None,
-                        poste: None,
-                    },
-                    "skip",
-                )
-                .await,
-            Err(DomainError::Validation(_))
-        ));
+        // Unknown conflict strategy / target kind: unrepresentable, rejected at
+        // the IPC boundary by deserialization.
+        assert!(serde_json::from_str::<ConflictStrategy>("\"merge-maybe\"").is_err());
+        assert!(serde_json::from_str::<ImportTargetKind>("\"clone\"").is_err());
         // "existing" without a profileId.
         assert!(matches!(
             state
                 .import_profile_bundle
                 .execute(
-                    &valid,
+                    std::path::Path::new(&valid),
                     selection,
                     BundleImportTargetDto {
-                        kind: "existing".into(),
+                        kind: ImportTargetKind::Existing,
                         profile_id: None,
                         first_name: None,
                         last_name: None,
                         enterprise: None,
                         poste: None,
                     },
-                    "skip",
+                    ConflictStrategy::Skip,
                 )
                 .await,
             Err(DomainError::Validation(_))
@@ -2018,7 +2050,12 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
         assert!(matches!(
             state
                 .import_profile_bundle
-                .execute(&bad_day, selection, new_target(), "skip")
+                .execute(
+                    std::path::Path::new(&bad_day),
+                    selection,
+                    new_target(),
+                    ConflictStrategy::Skip
+                )
                 .await,
             Err(DomainError::Validation(_))
         ));
@@ -2033,7 +2070,7 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
         );
         let manifest = state
             .inspect_profile_bundle
-            .execute(&unknown_mode)
+            .execute(std::path::Path::new(&unknown_mode))
             .await
             .expect("inspect");
         assert!(
@@ -2054,7 +2091,12 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
         );
         let res = state
             .import_profile_bundle
-            .execute(&dirty_vacation, selection, new_target(), "skip")
+            .execute(
+                std::path::Path::new(&dirty_vacation),
+                selection,
+                new_target(),
+                ConflictStrategy::Skip,
+            )
             .await
             .expect("vacation import succeeds (sanitized)");
         assert_eq!((res.days_imported, res.trips, res.work_entries), (1, 0, 0));
@@ -2091,6 +2133,542 @@ fn profile_bundle_import_rejects_bad_input_and_gates_nonwork_days() {
                 .is_none(),
             "no schedule on a vacation day"
         );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+/// Register + login + one write + clean logout: leaves a vault with a recorded
+/// clean-close baseline. Returns the state (still usable) for further steps.
+async fn vault_with_clean_baseline(config: AppConfig) -> crate::presentation::state::AppState {
+    let state = build_state(config, &TEST_DEVICE_KEY)
+        .await
+        .expect("build_state");
+    state
+        .register_account
+        .execute("alice", "password123")
+        .await
+        .expect("register");
+    let session = state
+        .login
+        .execute("alice", "password123")
+        .await
+        .expect("login");
+    state
+        .create_profile
+        .execute("Ada", "Lovelace", "Analytical Engine", None)
+        .await
+        .expect("create profile");
+    state.logout.execute(&session.token).await.unwrap();
+    state
+}
+
+fn flip_middle_byte(path: &std::path::Path) {
+    let mut bytes = std::fs::read(path).unwrap();
+    let mid = bytes.len() / 2;
+    bytes[mid] ^= 0xFF;
+    std::fs::write(path, &bytes).unwrap();
+}
+
+#[test]
+fn tamper_evidence_cannot_be_bypassed_through_sidecar_files() {
+    tauri::async_runtime::block_on(async {
+        let (mut config, dir) = temp_config("tamper-sidecars");
+        config.integrity = IntegrityPolicy::HardFail;
+        let vault_path = config.vault_path.clone();
+        let state = vault_with_clean_baseline(config).await;
+
+        // The integrity state lives in the sealed keystore, not in sidecars.
+        let sidecar = dir.join("vault.db.hmac");
+        let dirty = dir.join("vault.db.dirty");
+        assert!(!sidecar.exists(), "no filesystem baseline any more");
+
+        flip_middle_byte(&vault_path);
+        // What used to defeat the check: a planted "dirty" marker (crash
+        // pretence) and a deleted sidecar (no-baseline pretence).
+        std::fs::write(&dirty, b"open").unwrap();
+        let _ = std::fs::remove_file(&sidecar);
+
+        assert!(matches!(
+            state.login.execute("alice", "password123").await,
+            Err(DomainError::VaultTampered)
+        ));
+
+        // Deleting the vault outright is not a way around it either: an empty
+        // vault must not silently replace the baselined one.
+        std::fs::remove_file(&vault_path).unwrap();
+        assert!(matches!(
+            state.login.execute("alice", "password123").await,
+            Err(DomainError::VaultTampered)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn crash_during_a_session_is_recovered_not_reported_as_tampering() {
+    tauri::async_runtime::block_on(async {
+        let (mut config, dir) = temp_config("crash-recovery");
+        config.integrity = IntegrityPolicy::HardFail;
+        let restart_config = config.clone();
+        let state = vault_with_clean_baseline(config).await;
+
+        // Session in progress, writes land, then the process "dies": no logout,
+        // no clean close, no baseline refresh.
+        state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        state
+            .create_profile
+            .execute("Grace", "Hopper", "Navy", None)
+            .await
+            .expect("create profile");
+        drop(state);
+
+        // Restart: the file differs from the baseline, but the keystore says a
+        // session was open — a crash, so the vault opens with its data.
+        let restarted = build_state(restart_config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state after crash");
+        restarted
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login after crash");
+        let profiles = restarted.list_profiles.execute().await.unwrap();
+        assert_eq!(
+            profiles.profiles.len(),
+            2,
+            "writes before the crash are kept"
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn legacy_sidecar_baseline_is_migrated_into_the_keystore() {
+    tauri::async_runtime::block_on(async {
+        let (mut config, dir) = temp_config("legacy-sidecar");
+        config.integrity = IntegrityPolicy::HardFail;
+        let vault_path = config.vault_path.clone();
+        let state = vault_with_clean_baseline(config).await;
+
+        // A sidecar left by an older version is ignored once the keystore holds
+        // the baseline, and removed on the next open.
+        let sidecar = dir.join("vault.db.hmac");
+        std::fs::write(&sidecar, b"stale").unwrap();
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login with stale sidecar");
+        assert!(!sidecar.exists(), "legacy sidecar cleaned up");
+        state.logout.execute(&session.token).await.unwrap();
+
+        flip_middle_byte(&vault_path);
+        assert!(matches!(
+            state.login.execute("alice", "password123").await,
+            Err(DomainError::VaultTampered)
+        ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn concurrent_writes_do_not_leak_into_each_others_transactions() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("concurrency");
+        let state = std::sync::Arc::new(
+            build_state(config, &TEST_DEVICE_KEY)
+                .await
+                .expect("build_state"),
+        );
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const DAY: i64 = 1_717_200_000_000;
+        let mut handles = Vec::new();
+        for i in 0..24i64 {
+            let st = state.clone();
+            let profile_id = profile.id.clone();
+            handles.push(tauri::async_runtime::spawn(async move {
+                // Every other task writes against a missing profile: its
+                // transaction fails (FK) and rolls back — and must not take
+                // the successful writes of the other tasks with it.
+                let target = if i % 2 == 0 {
+                    profile_id
+                } else {
+                    "missing-profile".to_string()
+                };
+                st.set_presence
+                    .execute(&target, DAY + i * 86_400_000, "office", vec![])
+                    .await
+                    .is_ok()
+            }));
+        }
+        let mut ok = 0;
+        for h in handles {
+            if h.await.unwrap() {
+                ok += 1;
+            }
+        }
+        assert_eq!(ok, 12, "only the writes against the real profile succeed");
+        let listed = state.list_presences.execute(&profile.id).await.unwrap();
+        assert_eq!(listed.len(), 12, "every successful write is committed");
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+async fn keystore_i64(state: &crate::presentation::state::AppState, sql: &str) -> Option<i64> {
+    let conn = state.keystore_db.connect().unwrap();
+    let mut rows = conn.query(sql, ()).await.unwrap();
+    rows.next().await.unwrap().and_then(|r| r.get(0).ok())
+}
+
+async fn keystore_exec(state: &crate::presentation::state::AppState, sql: &str) {
+    let conn = state.keystore_db.connect().unwrap();
+    conn.execute(sql, ()).await.unwrap();
+}
+
+#[test]
+fn legacy_v1_key_material_is_upgraded_at_login() {
+    use chacha20poly1305::aead::Aead;
+    use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
+
+    use crate::domain::services::key_service::KeyService;
+    use crate::domain::services::password_hasher::PasswordHasher;
+    use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
+    use crate::infrastructure::crypto::key_service::Argon2KeyService;
+
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("legacy-v1-keys");
+        let legacy_kdf = config.auth.legacy_kek_kdf;
+        let auth_kdf = config.argon2;
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+
+        // Forge an account exactly as the pre-2026-10 code stored it: KEK from
+        // the auth-hash parameters, DEK wrapped without associated data, no
+        // stored KDF parameters, no MAC key.
+        let ks = Argon2KeyService;
+        let phc = Argon2PasswordHasher::new(auth_kdf)
+            .unwrap()
+            .hash(b"password123")
+            .await
+            .unwrap();
+        let salt = ks.generate_salt().unwrap();
+        let kek = ks
+            .derive_kek(b"password123", &salt, legacy_kdf)
+            .await
+            .unwrap();
+        let dek = ks.generate_key().unwrap();
+        let nonce = [5u8; 24];
+        let wrapped = XChaCha20Poly1305::new(Key::from_slice(kek.as_slice()))
+            .encrypt(XNonce::from_slice(&nonce), dek.as_slice())
+            .unwrap();
+        let conn = state.keystore_db.connect().unwrap();
+        conn.execute(
+            "INSERT INTO account (id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, \
+             failed_attempts, locked_until, created_at, updated_at) \
+             VALUES ('legacy-id', 'alice', ?1, ?2, ?3, ?4, 0, NULL, 1, 1)",
+            libsql::params![phc, wrapped, salt, nonce.to_vec()],
+        )
+        .await
+        .unwrap();
+
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("legacy login");
+        assert_eq!(
+            keystore_i64(&state, "SELECT key_version FROM account").await,
+            Some(2),
+            "wrap format upgraded"
+        );
+        assert_eq!(
+            keystore_i64(&state, "SELECT kdf_m_cost FROM account").await,
+            Some(128),
+            "KEK re-derived with the current KDF parameters"
+        );
+        assert_eq!(
+            keystore_i64(&state, "SELECT wrapped_mac_key IS NOT NULL FROM account").await,
+            Some(1),
+            "MAC key backfilled"
+        );
+        state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("vault usable");
+        state.logout.execute(&session.token).await.unwrap();
+
+        // The upgraded material still opens the same vault.
+        state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login after upgrade");
+        let listed = state.list_profiles.execute().await.unwrap();
+        assert_eq!(listed.profiles.len(), 1);
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn lockout_is_exact_under_parallel_guesses_and_backs_off() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("lockout");
+        let max_attempts = config.auth.max_attempts;
+        let lockout_ms = config.auth.lockout_ms;
+        let state = std::sync::Arc::new(
+            build_state(config, &TEST_DEVICE_KEY)
+                .await
+                .expect("build_state"),
+        );
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        // A burst of parallel wrong guesses: exactly `max_attempts` are
+        // evaluated, every later one hits the lockout.
+        let mut handles = Vec::new();
+        for _ in 0..(max_attempts * 3) {
+            let st = state.clone();
+            handles.push(tauri::async_runtime::spawn(async move {
+                st.login.execute("alice", "wrong-password").await
+            }));
+        }
+        let mut locked = 0;
+        for h in handles {
+            if matches!(h.await.unwrap(), Err(DomainError::AccountLocked { .. })) {
+                locked += 1;
+            }
+        }
+        assert_eq!(locked, max_attempts * 2);
+        assert_eq!(
+            keystore_i64(&state, "SELECT failed_attempts FROM account").await,
+            Some(max_attempts)
+        );
+
+        // Lockout expires; the next failure doubles it.
+        keystore_exec(&state, "UPDATE account SET locked_until = 0").await;
+        assert!(matches!(
+            state.login.execute("alice", "wrong-password").await,
+            Err(DomainError::InvalidCredentials)
+        ));
+        let now = keystore_i64(&state, "SELECT updated_at FROM account")
+            .await
+            .unwrap();
+        let until = keystore_i64(&state, "SELECT locked_until FROM account")
+            .await
+            .unwrap();
+        assert_eq!(
+            until - now,
+            2 * lockout_ms,
+            "second lockout is twice as long"
+        );
+
+        // Oversized inputs are refused without being hashed or counted.
+        let huge = "x".repeat(10_000);
+        keystore_exec(&state, "UPDATE account SET locked_until = 0").await;
+        assert!(matches!(
+            state.login.execute("alice", &huge).await,
+            Err(DomainError::InvalidCredentials)
+        ));
+        assert_eq!(
+            keystore_i64(&state, "SELECT failed_attempts FROM account").await,
+            Some(max_attempts + 1)
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn change_password_rewraps_the_keys_without_touching_the_vault() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("change-password");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        assert!(matches!(
+            state
+                .change_password
+                .execute("not-the-password", "brand-new-secret")
+                .await,
+            Err(DomainError::InvalidCredentials)
+        ));
+        assert!(matches!(
+            state.change_password.execute("password123", "short").await,
+            Err(DomainError::Validation(_))
+        ));
+        state
+            .change_password
+            .execute("password123", "brand-new-secret")
+            .await
+            .expect("change password");
+        state.logout.execute(&session.token).await.unwrap();
+
+        assert!(matches!(
+            state.login.execute("alice", "password123").await,
+            Err(DomainError::InvalidCredentials)
+        ));
+        state
+            .login
+            .execute("alice", "brand-new-secret")
+            .await
+            .expect("login with the new password");
+        let listed = state.list_profiles.execute().await.unwrap();
+        assert_eq!(listed.profiles.len(), 1, "vault data intact");
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn only_the_session_holder_can_log_out() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("logout-token");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+
+        state.logout.execute("forged-token").await.unwrap();
+        assert!(
+            state
+                .check_session
+                .execute(&session.token)
+                .await
+                .unwrap()
+                .valid
+        );
+        state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("vault still open");
+
+        state.logout.execute(&session.token).await.unwrap();
+        assert!(
+            !state
+                .check_session
+                .execute(&session.token)
+                .await
+                .unwrap()
+                .valid
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn security_journal_reports_what_happened_since_the_last_visit() {
+    use crate::application::dto::login_result_dto::LoginResultDto;
+
+    fn kinds(r: &LoginResultDto) -> Vec<&str> {
+        r.security_events.iter().map(|e| e.kind.as_str()).collect()
+    }
+
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("security-journal");
+        let max_attempts = config.auth.max_attempts;
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+
+        let first = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        assert!(first.security_events.is_empty());
+        assert_eq!(first.failed_attempts_since_last_login, 0);
+        state
+            .change_password
+            .execute("password123", "brand-new-secret")
+            .await
+            .expect("change password");
+        state.logout.execute(&first.token).await.unwrap();
+
+        // Someone tries to guess the password until the account locks.
+        for _ in 0..max_attempts {
+            let _ = state.login.execute("alice", "wrong-password").await;
+        }
+        keystore_exec(&state, "UPDATE account SET locked_until = 0").await;
+
+        let second = state
+            .login
+            .execute("alice", "brand-new-secret")
+            .await
+            .expect("login");
+        assert_eq!(second.failed_attempts_since_last_login, max_attempts);
+        assert_eq!(kinds(&second), vec!["password_changed", "account_locked"]);
+        state.logout.execute(&second.token).await.unwrap();
+
+        // Nothing new happened: nothing to report.
+        let third = state
+            .login
+            .execute("alice", "brand-new-secret")
+            .await
+            .expect("login");
+        assert!(third.security_events.is_empty());
+        assert_eq!(third.failed_attempts_since_last_login, 0);
 
         let _ = std::fs::remove_dir_all(dir);
     });

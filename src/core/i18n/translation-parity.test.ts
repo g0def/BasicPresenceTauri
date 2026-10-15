@@ -29,8 +29,8 @@ function leaves(tree: Tree, prefix = ""): Record<string, string> {
   return out;
 }
 
-const frLeaves = leaves(fr as Tree);
-const enLeaves = leaves(en as Tree);
+const frLeaves = leaves(fr);
+const enLeaves = leaves(en);
 
 describe("translation catalogues", () => {
   it("has no key present in only one language", () => {

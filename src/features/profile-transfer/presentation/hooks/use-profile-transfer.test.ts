@@ -7,32 +7,24 @@ import type {
   BundleImportSummary,
   BundleImportTarget,
   BundleManifest,
+  InspectedBundle,
   BundleSelection,
 } from "@/features/profile-transfer/domain/entities/bundle";
 import { useProfileTransfer } from "@/features/profile-transfer/presentation/hooks/use-profile-transfer";
+import { withContainer } from "@/test/app-providers";
 
-// Mock the repository at the boundary the hook talks to. The hook instantiates a
-// single TauriTransferRepository at module load, so the class returns an object
-// backed by these shared spies that each test programs. `vi.hoisted` makes the
-// spies available inside the hoisted `vi.mock` factory.
-const { exportProfileBundle, pickAndInspect, importProfileBundle } = vi.hoisted(
-  () => ({
-    exportProfileBundle: vi.fn(),
-    pickAndInspect: vi.fn(),
-    importProfileBundle: vi.fn(),
-  }),
-);
-
-vi.mock(
-  "@/features/profile-transfer/data/repositories/tauri-transfer.repository",
-  () => ({
-    TauriTransferRepository: vi.fn(() => ({
-      exportProfileBundle,
-      pickAndInspect,
-      importProfileBundle,
-    })),
-  }),
-);
+// Fake repository injected through the DI container: each test programs these
+// spies; the hook never reaches IPC.
+const exportProfileBundle = vi.fn();
+const pickAndInspect = vi.fn();
+const importProfileBundle = vi.fn();
+const wrapper = withContainer({
+  transferRepository: {
+    exportProfileBundle,
+    pickAndInspect,
+    importProfileBundle,
+  },
+});
 
 const SELECTION: BundleSelection = {
   includeDays: true,
@@ -102,7 +94,7 @@ describe("useProfileTransfer", () => {
         }),
       );
 
-      const { result } = renderHook(() => useProfileTransfer());
+      const { result } = renderHook(() => useProfileTransfer(), { wrapper });
 
       let pending: Promise<BundleExportSummary | null>;
       act(() => {
@@ -125,7 +117,7 @@ describe("useProfileTransfer", () => {
         new AppError("EXPORT_FAILED", "export boom"),
       );
 
-      const { result } = renderHook(() => useProfileTransfer());
+      const { result } = renderHook(() => useProfileTransfer(), { wrapper });
 
       let outcome: BundleExportSummary | null = EXPORT_SUMMARY;
       await act(async () => {
@@ -148,10 +140,10 @@ describe("useProfileTransfer", () => {
         new AppError("INTERNAL", "inspect boom"),
       );
 
-      const { result } = renderHook(() => useProfileTransfer());
+      const { result } = renderHook(() => useProfileTransfer(), { wrapper });
 
-      let outcome: { path: string; manifest: BundleManifest } | null = {
-        path: "x",
+      let outcome: InspectedBundle | null = {
+        handle: "x",
         manifest: MANIFEST,
       };
       await act(async () => {
@@ -173,16 +165,11 @@ describe("useProfileTransfer", () => {
         }),
       );
 
-      const { result } = renderHook(() => useProfileTransfer());
+      const { result } = renderHook(() => useProfileTransfer(), { wrapper });
 
       let pending: Promise<BundleImportSummary | null>;
       act(() => {
-        pending = result.current.importBundle(
-          "/tmp/in.json",
-          SELECTION,
-          TARGET,
-          "skip",
-        );
+        pending = result.current.importBundle("h1", SELECTION, TARGET, "skip");
       });
 
       await waitFor(() => expect(result.current.isImporting).toBe(true));
@@ -201,12 +188,12 @@ describe("useProfileTransfer", () => {
         new AppError("INTERNAL", "import boom"),
       );
 
-      const { result } = renderHook(() => useProfileTransfer());
+      const { result } = renderHook(() => useProfileTransfer(), { wrapper });
 
       let outcome: BundleImportSummary | null = IMPORT_SUMMARY;
       await act(async () => {
         outcome = await result.current.importBundle(
-          "/tmp/in.json",
+          "h1",
           SELECTION,
           TARGET,
           "skip",

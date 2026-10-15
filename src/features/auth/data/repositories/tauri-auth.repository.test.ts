@@ -12,6 +12,8 @@ describe("TauriAuthRepository", () => {
           token: "tok_123",
           expiresAt: 1000,
           user: { id: "u1", username: "alice", createdAt: 1, updatedAt: 2 },
+          failedAttemptsSinceLastLogin: 0,
+          securityEvents: [],
         };
       }
       throw new Error(`unexpected command: ${cmd}`);
@@ -27,6 +29,7 @@ describe("TauriAuthRepository", () => {
       token: "tok_123",
       expiresAt: 1000,
       user: { id: "u1", username: "alice", createdAt: 1, updatedAt: 2 },
+      securityNotice: { failedAttempts: 0, events: [] },
     });
   });
 

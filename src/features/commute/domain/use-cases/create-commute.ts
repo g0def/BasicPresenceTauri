@@ -1,7 +1,7 @@
 import type {
   Commute,
   CreateCommuteInput,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 import type { CommuteRepository } from "@/features/commute/domain/repositories/commute-repository";
 
 export type CreateCommuteUseCase = (

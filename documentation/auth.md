@@ -23,40 +23,41 @@ mot de passe ──Argon2id(kek_salt)──▶ KEK ──(dé)chiffre──▶ D
 
 Composants cryptographiques :
 
-- **Argon2id** (1er choix OWASP). **Deux usages distincts, sels séparés** :
-  1. **Hash d'auth** (chaîne PHC) → vérifie le mot de passe. [argon2_hasher.rs](../src-tauri/src/infrastructure/crypto/argon2_hasher.rs)
-  2. **Dérivation du KEK** (Key Encryption Key, 32 octets) → enveloppe le DEK. [key_service.rs](../src-tauri/src/infrastructure/crypto/key_service.rs)
-  Paramètres dans [config.rs](../src-tauri/src/infrastructure/config.rs) (profil OWASP « 46 MiB » : `m=47104, t=1, p=1`).
+- **Argon2id** (1er choix OWASP). **Deux usages distincts, sels et paramètres séparés** :
+  1. **Hash d'auth** (chaîne PHC) → vérifie le mot de passe. Profil OWASP « 46 MiB » (`m=47104, t=1, p=1`). [argon2_hasher.rs](../src-tauri/src/infrastructure/crypto/argon2_hasher.rs)
+  2. **Dérivation du KEK** (Key Encryption Key, 32 octets) → enveloppe le DEK et la clé MAC. Profil **plus fort** (`m=65536` = 64 MiB, `t=3`, `p=1`, inspiré de la 2ᵉ recommandation de la RFC 9106) : c'est la KEK qu'un attaquant détenant le keystore *et* la clé de device chercherait à casser hors ligne. Les paramètres sont **stockés par compte** (`kdf_m_cost/t_cost/p_cost`). [key_service.rs](../src-tauri/src/infrastructure/crypto/key_service.rs)
+  Politiques dans [domain/policy.rs](../src-tauri/src/domain/policy.rs), valeurs dans [config.rs](../src-tauri/src/infrastructure/config.rs). Tout paramètre relu depuis le stockage (chaîne PHC, KDF du compte) est **borné** (`KdfParams::within_bounds`, ≤ 256 MiB, t ≤ 10) : un keystore altéré ne peut pas imposer un calcul de plusieurs Go. Le calcul Argon2 tourne sur le **pool bloquant** (`spawn_blocking`), jamais sur l'exécuteur async.
 - **DEK** (Data Encryption Key, 32 octets aléatoires) = la vraie clé du coffre `vault.db`.
-- **XChaCha20-Poly1305** (AEAD **authentifié**, nonce aléatoire 192 bits) = enveloppe (wrap) le DEK avec le KEK.
+- **XChaCha20-Poly1305** (AEAD **authentifié**, nonce aléatoire 192 bits) = enveloppe (wrap) le DEK et la clé MAC avec le KEK. Format **v2** : *associated data* `"bp-wrap-v2" ‖ rôle (dek | vault-mac) ‖ id du compte` — le DEK et la clé MAC enveloppés ne sont plus interchangeables, ni transplantables d'un compte à l'autre. Les comptes au format v1 (sans AAD) sont **ré-enveloppés automatiquement au login** suivant ([credentials.rs](../src-tauri/src/application/services/credentials.rs)).
 - **libSQL AES-256-CBC** = chiffrement at-rest du coffre, clé = DEK (voir [turso.md](turso.md)).
 - **Clé de device** (32 octets aléatoires, **scellée dans le trousseau de l'OS** — libsecret / Keychain / Credential Manager via le crate `keyring`) = chiffre **aussi** `keystore.db` au repos (AES-256-CBC). Résolue au démarrage, indépendante du compte. [device_key.rs](../src-tauri/src/infrastructure/crypto/device_key.rs)
-- **Clé MAC** (32 octets aléatoires, **enveloppée par le même KEK** que le DEK) = évidence d'altération du coffre via HMAC-SHA256 du fichier (le CBC libSQL n'étant pas authentifié). [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs)
+- **Clé MAC** (32 octets aléatoires, **enveloppée par le même KEK** que le DEK) = évidence d'altération du coffre via HMAC-SHA256 du fichier (le CBC libSQL n'étant pas authentifié). La base de référence et l'état « session en cours » sont conservés **dans le keystore scellé**, pas dans des fichiers à côté du coffre (voir [Durcissements](#durcissements-implémentés)). [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs)
 
 ### Flux d'inscription (`register`)
 
 [register_account.rs](../src-tauri/src/application/use_cases/register_account.rs)
 
-1. Valider username / mot de passe (longueurs). Refuser si un compte existe déjà (mono-utilisateur).
+1. Valider username / mot de passe (longueurs, [domain/policy.rs](../src-tauri/src/domain/policy.rs)). Refuser si un compte existe déjà (mono-utilisateur).
 2. `password_hash = Argon2id(password)` (sel propre, intégré au PHC).
-3. `DEK = aléatoire(32o)` ; `kek_salt = aléatoire` ; `KEK = Argon2id(password, kek_salt)`.
-4. `wrapped_dek, nonce = XChaCha20Poly1305(KEK).encrypt(DEK)`.
-5. `MAC key = aléatoire(32o)` ; `wrapped_mac_key, mac_key_nonce = XChaCha20Poly1305(KEK).encrypt(MAC key)`.
-6. Insérer dans `keystore.db` (lui-même **scellé** par la clé de device) : `{id, username, password_hash, wrapped_dek, kek_salt, dek_nonce, wrapped_mac_key, mac_key_nonce, ...}`.
-7. Le mot de passe (et le DEK/KEK/MAC en mémoire) sont **effacés** (`Zeroizing`).
+3. `DEK = aléatoire(32o)` ; `MAC key = aléatoire(32o)` ; `kek_salt = aléatoire` ; `KEK = Argon2id_kek(password, kek_salt)`.
+4. `wrapped_dek = XChaCha20Poly1305(KEK).encrypt(DEK, aad = v2‖dek‖id)` ; idem pour la clé MAC (`aad = v2‖vault-mac‖id`) — [credentials::seal](../src-tauri/src/application/services/credentials.rs).
+5. Insérer dans `keystore.db` (lui-même **scellé** par la clé de device) en **une seule instruction** `INSERT … WHERE NOT EXISTS (SELECT 1 FROM account)` : deux inscriptions concurrentes ne peuvent pas créer deux comptes.
+6. Le mot de passe (et le DEK/KEK/MAC en mémoire) sont **effacés** (`Zeroizing`).
 
 ### Flux de connexion (`login`)
 
 [login.rs](../src-tauri/src/application/use_cases/login.rs)
 
-1. Charger le compte. _(Si username inconnu : faire un hash « à blanc » pour égaliser le timing, puis renvoyer `InvalidCredentials`.)_
+Les vérifications de mot de passe (login, changement de mot de passe) sont **sérialisées** (`CredentialGate`) : des tentatives parallèles ne peuvent pas toutes passer le contrôle de verrouillage avant que le compteur ne les rattrape.
+
+1. Refuser sans calcul un username > 64 ou un mot de passe > 1024 caractères. Charger le compte. _(Si username inconnu : hash « à blanc » pour égaliser le timing, puis `InvalidCredentials`.)_
 2. Si verrouillé (`locked_until` futur) → `AccountLocked`.
-3. Vérifier `password_hash`. Échec → incrémenter `failed_attempts`, verrouiller au seuil, renvoyer `InvalidCredentials`.
-4. Succès → `KEK = Argon2id(password, kek_salt)` → `DEK = unwrap(wrapped_dek, nonce, KEK)`.
-5. Résoudre la **clé MAC** : `unwrap(wrapped_mac_key, …)` si présente, sinon en générer une et la persister (*backfill* unique pour les comptes créés avant la fonctionnalité).
-6. **Ouvrir le coffre** : vérifier d'abord l'intégrité at-rest (HMAC) avec la clé MAC, puis déchiffrer avec le DEK.
-7. Réinitialiser les compteurs, **purger les sessions précédentes** (mono-propriétaire : une seule session active, l'invariant « une session valide existe ⇔ coffre ouvert » reste exact), créer une **session** (token + `expiresAt = now + 15 min`).
-8. Renvoyer `{ token, expiresAt, user }`.
+3. Vérifier `password_hash`. Échec → `failed_attempts` **incrémenté atomiquement** (`UPDATE … RETURNING`), verrouillage progressif au-delà du seuil (voir [Anti-bruteforce](#anti-bruteforce)), `InvalidCredentials`.
+4. Succès → `KEK = Argon2id(password, kek_salt, paramètres du compte)` → `DEK`, clé MAC = `unwrap(…, aad)` selon la version du format.
+5. **Mises à niveau transparentes** (le mot de passe est disponible) : format v1 ou paramètres KDF périmés → nouveau sel, nouvelle KEK, ré-enveloppement v2 ; chaîne PHC aux anciens paramètres → nouveau hash ; clé MAC absente → générée (*backfill*). Écrit en une seule mise à jour (`update_credentials`).
+6. **Ouvrir le coffre** : vérifier d'abord l'intégrité at-rest avec la clé MAC (état lu dans le keystore), marquer la session « ouverte » **avant** toute écriture (migrations comprises), puis déchiffrer avec le DEK.
+7. Réinitialiser les compteurs, **purger les sessions précédentes** (mono-propriétaire), journaliser l'événement `login`, créer une **session** (token, `expiresAt = now + 15 min`, `lastSeen = now`).
+8. Renvoyer `{ token, expiresAt, user, failedAttemptsSinceLastLogin, securityEvents }` — l'UI affiche une fois ce qui s'est passé depuis la dernière connexion.
 
 ### Le « chicken-and-egg » résolu
 
@@ -64,15 +65,20 @@ Le matériel d'auth (hash + DEK **enveloppé**) vit **hors** du coffre chiffré,
 
 ## Stockage : keystore vs vault
 
-Table `account` (keystore, **scellé** par la clé de device) — [0001_init.sql](../src-tauri/migrations/keystore/0001_init.sql) + [0002_add_mac_key.sql](../src-tauri/migrations/keystore/0002_add_mac_key.sql) :
+Keystore (**scellé** par la clé de device), migrations [keystore/](../src-tauri/migrations/keystore/) :
 
 ```
-id, username, password_hash, wrapped_dek, kek_salt, dek_nonce,
-failed_attempts, locked_until, created_at, updated_at,
-wrapped_mac_key, mac_key_nonce
+account          id, username, password_hash, wrapped_dek, kek_salt, dek_nonce,
+                 failed_attempts, locked_until, created_at, updated_at,
+                 wrapped_mac_key, mac_key_nonce,
+                 key_version (1 = sans AAD, 2 = AAD), kdf_m_cost, kdf_t_cost, kdf_p_cost
+vault_integrity  (ligne unique) baseline_mac, session_open, updated_at
+security_event   id, kind, at_ms   (50 dernières entrées, aucun contenu métier)
 ```
 
-Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d'altération) ne contient encore qu'un placeholder ; il accueillera les entités présence/déplacement/CO₂.
+Le coffre `vault.db` (chiffré par le DEK) contient toutes les données métier : profils, présences, trajets, heures, notes, paramètres.
+
+**Écritures dans le coffre** : toutes passent par `LibsqlVaultManager::write` / `unit_of_work` ([vault.rs](../src-tauri/src/infrastructure/persistence/vault.rs)) — verrou d'écriture, **connexion dédiée** par transaction (`BEGIN IMMEDIATE … COMMIT`), et transaction « ambiante » (task-local) que rejoignent tous les dépôts appelés pendant une unité de travail. Une connexion partagée entre commandes concurrentes mélangerait leurs `BEGIN`/`ROLLBACK`. Les écritures multi-dépôts d'un use case (jour + horaire, entrées + horaire, profil + profil actif, import complet) passent par le port `UnitOfWork` : tout ou rien.
 
 ## Session
 
@@ -81,14 +87,18 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 - **Tokens jamais stockés en clair** : le store indexe les sessions par **SHA-256 du token** et la copie stockée est expurgée — un dump mémoire ne révèle que des empreintes, et la recherche compare des digests (pas de signal de timing sur le secret).
 - **Expiration absolue 15 min** : basée sur `expiresAt` (epoch ms), donc insensible à la mise en veille / aux changements d'horloge. Timer front : [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts).
 - **Appliquée côté backend** : chaque commande touchant au coffre passe d'abord par [require_session.rs](../src-tauri/src/application/use_cases/require_session.rs) — s'il ne reste aucune session valide, les sessions restantes sont révoquées et le **coffre est verrouillé**, puis `SESSION_EXPIRED` est renvoyé. L'expiration tient donc même si la WebView (compromise ou boguée) n'appelle jamais `check_session`.
-- **Timeout d'inactivité (5 min)** : en complément de l'expiration absolue, l'absence d'interaction (souris / clavier / scroll / retour au premier plan) déclenche une déconnexion. [use-idle-timeout.ts](../src/features/auth/presentation/hooks/use-idle-timeout.ts), seuil dans [config.ts](../src/core/config.ts) (`IDLE_TIMEOUT_MS`).
-- À l'**expiration ou au logout** : session révoquée + coffre **fermé** + DEK **oublié** (re-verrouillage), et la **base d'intégrité (HMAC) du coffre est rafraîchie**. [check_session.rs](../src-tauri/src/application/use_cases/check_session.rs), [logout.rs](../src-tauri/src/application/use_cases/logout.rs). Une fermeture propre de la fenêtre déclenche aussi ce verrouillage (hook `on_window_event` dans [lib.rs](../src-tauri/src/lib.rs)).
+- **Timeout d'inactivité** : côté UI, 5 min sans interaction (souris / clavier / scroll) déconnectent ; au retour au premier plan, c'est le **temps réellement écoulé** qui compte (une fenêtre en arrière-plan n'est plus « réarmée »). [use-idle-timeout.ts](../src/features/auth/presentation/hooks/use-idle-timeout.ts), seuil `IDLE_TIMEOUT_MS` ([config.ts](../src/core/config.ts)).
+- **Inactivité appliquée côté backend** (6 min) : chaque session porte `last_seen_ms`, mis à jour par `require_session` et par `check_session` ; au-delà, la session est invalide et le coffre verrouillé — même si l'UI ne fait rien. L'UI « ping » `check_session` (au plus une fois par minute) tant que l'utilisateur est actif, pour qu'un utilisateur qui lit sans déclencher d'appel ne soit pas déconnecté.
+- À l'**expiration ou au logout** : session révoquée + coffre **fermé** (après la fin des écritures en cours) + DEK **oublié**, et la **base d'intégrité du coffre est enregistrée** dans le keystore. [check_session.rs](../src-tauri/src/application/use_cases/check_session.rs), [logout.rs](../src-tauri/src/application/use_cases/logout.rs). `logout` n'agit que pour le **détenteur du token** (un token inconnu est sans effet). La fermeture de la fenêtre et tout chemin de sortie (`RunEvent::Exit`) verrouillent aussi le coffre ([lib.rs](../src-tauri/src/lib.rs)) ; avant de redémarrer sur une mise à jour, l'UI se déconnecte.
+- **Modèle de session global** (décision [ADR 0001](adr/0001-session-globale.md)) : les commandes du coffre ne reçoivent pas le token ; la session est un état temporel du processus, pas une capacité.
 
 ## Anti-bruteforce
 
 [login.rs](../src-tauri/src/application/use_cases/login.rs) + colonnes `failed_attempts` / `locked_until`.
 
-- 5 échecs (`max_attempts`) → verrouillage 5 min (`lockout_ms`), réglable dans [config.rs](../src-tauri/src/infrastructure/config.rs).
+- 5 échecs (`max_attempts`) → verrouillage 5 min (`lockout_ms`), puis **progressif** : chaque échec supplémentaire double la durée, plafonnée à 24 h (`AuthPolicy::lockout_for`, [policy.rs](../src-tauri/src/domain/policy.rs)). Le compteur n'est remis à zéro que par une connexion réussie.
+- Compteur incrémenté **atomiquement** et tentatives **sérialisées** : une rafale de tentatives parallèles n'en fait passer que `max_attempts`.
+- Le changement de mot de passe re-vérifie le mot de passe actuel et ses échecs comptent aussi.
 - Erreur **générique** `InvalidCredentials` (ne révèle pas si le username existe).
 - Hash « à blanc » pour les usernames inconnus (timing constant).
 
@@ -102,7 +112,8 @@ Le coffre `vault.db` (chiffré + HMAC sidecar `vault.db.hmac` pour l'évidence d
 | `register` | `username, password` | `UserDto { id, username, createdAt, updatedAt }` |
 | `login` | `username, password` | `{ token, expiresAt, user: UserDto }` |
 | `check_session` | `token` | `{ valid, remainingMs }` |
-| `logout` | `token` | `void` |
+| `logout` | `token` | `void` (sans effet si le token est inconnu) |
+| `change_password` | `currentPassword, newPassword` | `void` (session requise ; ré-enveloppe DEK + clé MAC, le coffre n'est pas re-chiffré) |
 
 ### Profils
 
@@ -198,12 +209,14 @@ Deux sorties distinctes, toutes deux session-gated (coffre déverrouillé requis
 
 | Commande | Entrée | Sortie |
 | --- | --- | --- |
-| `export_profile_data` | `profileId, options, labels, path` | `ExportSummaryDto { days, tasks, trips, path }` |
-| `export_profile_bundle` | `profileId, options, path` | `{ days, trips, workEntries, notes, taskPresets, commutes, settings, path }` |
-| `inspect_profile_bundle` | `path` | `BundleManifestDto { version, compatible, identité, comptes par catégorie, unknownModeIds }` |
-| `import_profile_bundle` | `path, selection, target, conflictStrategy` | `{ profileId, daysImported, daysReplaced, daysSkipped, trips, workEntries, notes, taskPresets, commutes, settings }` |
+| `export_profile_data` | `profileId, options, labels, defaultFileName` | `ExportSummaryDto { days, tasks, trips, path }` ou `null` (dialogue annulé) |
+| `export_profile_bundle` | `profileId, options, defaultFileName` | `{ days, trips, workEntries, notes, taskPresets, commutes, settings, path }` ou `null` |
+| `inspect_profile_bundle` | – | `{ handle, manifest: BundleManifestDto }` ou `null` |
+| `import_profile_bundle` | `handle, selection, target, conflictStrategy` | `{ profileId, daysImported, daysReplaced, daysSkipped, trips, workEntries, notes, taskPresets, commutes, settings }` |
 
-> **Bundle** = `format: "basic-presence-profile"`, `version: 1`. Catégories cochables : jours (avec trajets / heures+tâches / notes en enfants), modèles de tâches, trajets enregistrés, paramètres. **Import flexible** : `target.kind = "new"` crée un profil (identité du bundle, surchargeable champ par champ) **ou** `"existing"` fusionne dans un profil (conflits de jours résolus par `conflictStrategy` ∈ `skip | replace`). Empreinte CO₂ figée (`co2Kg`/`factorYear`) et horodatages **préservés tels quels** (réutilise `set_for_day`, sans recalcul). Le fichier est **en clair** (le destinataire l'importe dans son propre coffre chiffré). *(Remplace l'ancien import de migration `import_presences`, retiré.)*
+> **Aucun chemin de fichier ne traverse l'IPC** : le backend ouvre lui-même les dialogues natifs ([file_dialogs.rs](../src-tauri/src/presentation/file_dialogs.rs)). `defaultFileName` n'est qu'une suggestion (réduite à un nom de fichier simple) ; un bundle inspecté est désigné par un **handle opaque à usage unique** (15 min). Une WebView compromise ne peut donc ni écrire un fichier où elle veut, ni sonder des fichiers. Les exports sont écrits de façon **atomique** (fichier temporaire, `fsync`, `rename`). Le **plugin dialog n'est plus exposé à la WebView** (permissions retirées de la capability).
+
+> **Bundle** = `format: "basic-presence-profile"`, `version: 1`. Catégories cochables : jours (avec trajets / heures+tâches / notes en enfants), modèles de tâches, trajets enregistrés, paramètres. **Import flexible** : `target.kind = "new"` crée un profil (identité du bundle, surchargeable champ par champ) **ou** `"existing"` fusionne dans un profil (conflits de jours résolus par `conflictStrategy` ∈ `skip | replace`). Empreinte CO₂ figée (`co2Kg`/`factorYear`) et horodatages **préservés tels quels** (réutilise `set_for_day`, sans recalcul). L'import est validé intégralement avec les **mêmes règles** que les commandes (`domain::rules`), puis écrit en **une seule transaction** : il aboutit entièrement ou pas du tout. Le fichier est **en clair** (le destinataire l'importe dans son propre coffre chiffré) — l'UI le rappelle à l'export. *(Remplace l'ancien import de migration `import_presences`, retiré.)*
 
 ## Mapping Clean Architecture
 
@@ -214,21 +227,14 @@ Deux sorties distinctes, toutes deux session-gated (coffre déverrouillé requis
 - `infrastructure/` — implémentations : `Argon2PasswordHasher`, `Argon2KeyService`, `RandomTokenGenerator`, `InMemorySessionStore`, `LibsqlAccountRepository`, `LibsqlProfileRepository`, `LibsqlPresenceRepository`, `LibsqlCommuteRepository`, `LibsqlEmissionFactorRepository`, `LibsqlCo2SettingsRepository`, `LibsqlTaskPresetRepository`, `LibsqlWorkEntryRepository`, `ComrakMarkdownRenderer`, `OdsSpreadsheetExporter`, `JsonProfileBundleCodec`, `LibsqlVaultManager`, `SystemClock`, `AppConfig`.
 - `presentation/` — commandes Tauri fines + `AppError` sérialisable + **composition root** dans [lib.rs](../src-tauri/src/lib.rs) (`build_state` câble tout via `Arc<dyn …>`).
 
-**Frontend** ([src/](../src/)) :
+**Frontend** ([src/](../src/)) — couches, de haut en bas (une couche n'importe que celles du dessous ; vérifié par ESLint, cf. [../Claude.md](../Claude.md) §6) :
 
-- `core/` — [ipc.ts](../src/core/ipc.ts) (**seul** à importer `@tauri-apps/api`), `errors.ts` (`AppError`), `config.ts`.
-- `features/auth/` — `domain` (entités, `AuthRepository`, use cases), `data` (DTOs, mappers, `TauriAuthRepository`), `presentation` (`AuthProvider` = composition root front, `useAuth`, `useSessionTimer`, écrans Register/Login/Home, compte à rebours).
-- `features/profile/` — `domain` (`Profile`, `ProfileRepository`, use cases), `data` (DTOs, mapper, `TauriProfileRepository`), `presentation` (`ProfileProvider` = composition root front recevant `onSessionExpired`, `useProfile`, formulaire `Dialog`, et le **badge** = menu compte regroupant profils + langue + thème + déconnexion). Indépendante de `auth` : `logout` est injecté (`onSessionExpired` au provider, `onLogout` au badge) ; langue/thème viennent de `core`/`shared`.
-- `features/presence/` — calendrier mensuel des présences. `domain`/`data`/`presentation` (`PresenceProvider`, `usePresence`, `PresenceCalendar`, `PresenceDayDialog`). L'entité de transport `PresenceTrip` est **redéclarée ici** (structurellement identique au `TripInput` de `commute`) pour ne pas faire dépendre le domaine présence du domaine commute.
-- `features/commute/` — modèles de trajet réutilisables + référentiel de facteurs d'émission. `domain` (`Commute`, `EmissionFactor`, `commuteToTrips`, `CommuteRepository`, `EmissionFactorRepository`, use cases), `data` (DTOs, mappers, `TauriCommuteRepository`, `TauriEmissionFactorRepository`), `presentation` (`CommuteProvider` = composition root front, `useCommute`, `CommuteView`, `SegmentEditor`, helpers de formatage/icônes/labels).
-- `features/work-hours/` — encodage des heures d'un jour `office`/`remote` (page routée `/work-hours/$day`). `domain` (`TaskPreset`, `WorkEntry`/`WorkDaySchedule`/`WorkDay`, `TaskPresetRepository`, `WorkEntryRepository`, use cases purs), `data` (DTOs miroir, mappers, `TauriTaskPresetRepository`, `TauriWorkEntryRepository`), `presentation` (`TaskPresetProvider` = composition root front pour les presets ; `useWorkDay` = état local du jour à persistance *live* (debounce + flush au démontage) ; `DayDonut`, `WorkEntryList`, `DayScheduleEditor`, `TaskPresetPanel`, helpers de géométrie/format testés). Consomme `usePresence` pour résoudre la présence du jour (même convention que `commute`).
-- `features/export/` — export tableur `.ods` du profil actif. `domain` (`ExportOptions`/`ExportLabels`/`ExportSummary`, `ExportRepository`), `data` (`TauriExportRepository`), `presentation` (`useExport`, `ExportDialog`, `buildExportLabels`). Appelle `export_profile_data` (l'écriture du fichier est côté Rust). `buildExportLabels` importe `MODE_LABEL_KEYS` de `commute/presentation/mode-labels` : le backend n'i18n jamais, les libellés de modes lui sont donc transmis traduits dans `ExportLabels.modeNames` (cf. la note ci-dessous).
-- `features/profile-transfer/` — partage de profil par **bundle JSON** (export / inspect / import). `domain` (types `bundle`, `TransferRepository`), `data` (`TauriTransferRepository` → `core/ipc` + `plugin-dialog`), `presentation` (`useProfileTransfer`, `ExportProfileDialog`, `ImportProfileDialog`). Consomme `useProfile`/`usePresence` (hooks publics) pour rafraîchir la liste de profils + le calendrier après un import.
-
-> **Dépendances dirigées assumées vers `commute`** — deux niveaux, la règle commune étant l'absence de cycle (rien dans `commute` n'importe un de ses consommateurs). Miroir de la note de [../Claude.md](../Claude.md) §6.
->
-> 1. **Vocabulaire de présentation, ouvert à toutes les features.** `commute/presentation/commute-format.ts` (`formatCo2`, `summarizeSegments`) est consommé par `presence` (`PresenceCalendar`, `PresenceDayDialog`), `stats` (`PeriodBarChart`) et le shell `routes/_authenticated.tsx` ; `commute/presentation/mode-labels.ts` (`MODE_LABEL_KEYS`, `modeLabel`) par `methodology` et par `export`. Ce sont des modules feuilles sans état ni dépendance (hors le type `TFunction`) : les importer ne demande pas de justification particulière.
-> 2. **Dépendance lourde, réservée à `presence`.** L'empreinte CO₂ étant *par conception* attachée à un jour de présence, `PresenceDayDialog`/`PresenceCalendar` consomment le `SegmentEditor` et `useCommute`. C'est une dérogation **délibérée** à l'isolation stricte des features, justifiée par le couplage métier réel ; à conserver unidirectionnelle et à ne pas étendre à d'autres features sans le même niveau de justification. (`CommuteProvider` consomme `useProfile` comme le fait déjà `PresenceProvider` — convention admise pour le profil actif.)
+- `app/` + `main.tsx`/`App.tsx`/`router.ts` — **composition root** : [container.ts](../src/app/container.ts) est le **seul** endroit qui instancie les dépôts `Tauri*` ; [query-client.ts](../src/app/query-client.ts) configure TanStack Query (pas de refetch/retry automatiques, `SESSION_EXPIRED` → logout **centralisé**, cache vidé au logout).
+- `routes/` — fichiers de routes minces ; `pages/` — écrans qui composent plusieurs features (Réglages).
+- `features/*` — une capacité métier chacune (`auth`, `profile`, `presence`, `commute`, `work-hours`, `export`, `profile-transfer`, `profile-settings`, `stats`, `methodology`, `licence`, `updater`), avec `domain` (entités, ports, use cases purs), `data` (DTO, mappers, dépôts Tauri, `commands.ts` = déclaration typée des commandes IPC), `presentation` (providers sur TanStack Query, hooks, composants) et `di.ts` (ports pris dans le conteneur). Les features ne s'importent pas entre elles, à **une** exception assumée : `presence` → `commute` (l'éditeur de segments d'un jour).
+- `entities/*` — modèles et contextes partagés (`profile` actif, `presence`, `commute`, `work-day`) : ce qui était auparavant importé d'une feature à l'autre.
+- `shared/`, `components/`, `lib/` — UI kit et utilitaires génériques.
+- `core/` — [ipc.ts](../src/core/ipc.ts) (**seul** à importer `@tauri-apps/api`, registre de commandes **typé**), [di.ts](../src/core/di.ts) (conteneur), [query.ts](../src/core/query.ts), `errors.ts`, `i18n`, `config.ts`.
 
 ## Garanties (mappées aux exigences)
 
@@ -236,22 +242,27 @@ Deux sorties distinctes, toutes deux session-gated (coffre déverrouillé requis
 - `password_hash` / `DEK` / `KEK` / clé MAC / `token` **jamais** envoyés au frontend.
 - Données au repos chiffrées, clé **dérivée du mot de passe** (coffre illisible sans login).
 - `keystore.db` **scellé** par la clé de device (trousseau OS) → fichier volé inutilisable hors de l'appareil.
-- Évidence d'altération du coffre (HMAC-SHA256 sidecar, vérifié à l'ouverture).
+- Évidence d'altération du coffre (HMAC-SHA256, référence et état de session **scellés dans le keystore**), non contournable par manipulation de fichiers.
 - Mémoire sensible effacée (`Zeroizing` / `zeroize`).
-- Session 15 min absolue + timeout d'inactivité + re-login à chaque démarrage.
+- Session 15 min absolue + inactivité appliquée côté UI **et** backend + re-login à chaque démarrage.
+- Aucun chemin de fichier fourni par la WebView ; IPC filtré par le **pattern d'isolation** (liste blanche des commandes, [isolation/index.js](../src-tauri/isolation/index.js)).
+- Toutes les entrées bornées dans le domaine ([rules.rs](../src-tauri/src/domain/rules.rs)).
 
 ## Durcissements implémentés
 
 - **Scellement du `keystore.db` par le trousseau OS** *(résout le brute-force hors-ligne)*. Le keystore est désormais chiffré au repos (AES-256-CBC) avec une **clé de device** stockée dans le trousseau de l'OS (libsecret / Keychain / Credential Manager). Un attaquant qui copie le fichier ne peut plus tester des mots de passe hors-ligne sans **aussi** extraire la clé du trousseau. Bootstrap + migration d'un keystore historique en clair : [keystore_bootstrap.rs](../src-tauri/src/infrastructure/persistence/keystore_bootstrap.rs) (marqueur `keystore.db.sealed`). La bascule de migration est **récupérable après crash** : l'original est renommé en `keystore.db.old` avant l'échange (jamais supprimé avant), et le démarrage restaure ce backup si le fichier principal manque — un keystore manquant n'est donc jamais confondu avec une installation neuve (ce qui perdrait le DEK enveloppé, et le coffre avec).
   - ⚠️ **Contrainte runtime (Linux)** : un Secret Service actif (GNOME Keyring / KWallet) est requis ; en headless/CI le démarrage échoue explicitement (pas de repli silencieux en clair).
   - ⚠️ **Risque inhérent** : si l'entrée du trousseau est supprimée (reset OS, réinstallation), `keystore.db` devient illisible → coffre perdu. Surfacé via `KeystoreUnrecoverable` (pas d'effacement automatique).
-- **Évidence d'altération du coffre (HMAC-SHA256)** *(atténue le CBC non authentifié)*. À la fermeture propre, un HMAC du fichier `vault.db` (clé MAC enveloppée par le KEK) est écrit dans `vault.db.hmac` ; il est vérifié à l'ouverture. Politique `IntegrityPolicy` ([config.rs](../src-tauri/src/infrastructure/config.rs)) : **`HardFail` (défaut)** — un mismatch après un arrêt propre refuse l'ouverture (`VAULT_TAMPERED`) ; `WarnAndAllow` reste disponible pour des déploiements tolérants. Un marqueur `vault.db.dirty` distingue un crash (rebaseline silencieux, toléré quelle que soit la politique) d'une altération après arrêt propre. [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs).
-  - ⚠️ C'est de la **détection**, pas de la prévention, et uniquement entre sessions propres. libSQL 0.9 n'expose que `Cipher::Aes256Cbc` (aucun AEAD at-rest) — un chiffrement authentifié natif reste à surveiller côté lib.
+- **Évidence d'altération du coffre (HMAC-SHA256)** *(atténue le CBC non authentifié)*. À la fermeture propre, un HMAC du fichier `vault.db` (+ WAL éventuel, chaque segment suivi de sa longueur, étiquette de domaine `bp-vault-mac-v2`, calcul en flux) est enregistré **dans le keystore scellé** (table `vault_integrity`) ; il est vérifié à l'ouverture. L'indicateur « session en cours » (`session_open`) y est aussi conservé, posé **avant** l'ouverture et les migrations : un mismatch avec une session ouverte est un crash (toléré, signalé à l'utilisateur au login), un mismatch après arrêt propre est une altération. Politique `IntegrityPolicy` ([config.rs](../src-tauri/src/infrastructure/config.rs)) : **`HardFail` (défaut)** refuse l'ouverture (`VAULT_TAMPERED`). Un coffre **supprimé** alors qu'une référence existe est aussi refusé (il ne sera pas recréé vide). [vault_integrity.rs](../src-tauri/src/infrastructure/persistence/vault_integrity.rs), [integrity_store.rs](../src-tauri/src/infrastructure/persistence/integrity_store.rs).
+  - Les anciens fichiers `vault.db.hmac` / `vault.db.dirty` (versions antérieures) ne sont consultés qu'**une fois**, pour la migration, puis supprimés : les créer ou les effacer n'a plus aucun effet. Avant ce correctif, effacer `.hmac` ou créer `.dirty` suffisait à faire accepter un coffre modifié ([ADR 0002](adr/0002-integrite-du-coffre.md)).
+  - ⚠️ C'est de la **détection**, pas de la prévention, et uniquement entre sessions propres. libSQL 0.9 n'expose que `Cipher::Aes256Cbc` ; la migration vers un chiffrement authentifié (crate `turso`, AEGIS-256) est reportée tant que celui-ci est expérimental ([ADR 0004](adr/0004-report-migration-turso.md)).
+- **Migrations atomiques** : chaque migration (keystore et coffre) et sa ligne `_migrations` sont appliquées dans une même transaction.
+- **Démarrage robuste** : une erreur de démarrage (trousseau absent, clé de device perdue, données illisibles) s'affiche dans une **boîte de dialogue native** puis l'application se ferme ; une clé de device absente alors qu'un keystore scellé existe n'est **jamais régénérée** (ce qui détruirait toute chance de restaurer l'entrée d'origine).
+- **Journal de sécurité minimal** (`security_event`, 50 entrées, aucun contenu métier) : connexions, verrouillages, arrêts non propres, altérations, changements de mot de passe ; présenté une fois après la connexion suivante.
 - **Timeout d'inactivité** en complément de l'expiration absolue.
 
 ## Limites connues & Phase 2
 
-- `change_password` (peu coûteux : ré-envelopper le DEK + la clé MAC, sans re-chiffrer tout le coffre).
 - Surfacer dans l'UI l'avertissement d'altération si un déploiement repasse en `WarnAndAllow` (le défaut `HardFail` refuse l'ouverture avec `VAULT_TAMPERED`).
 - Multi-comptes par appareil (le v1 est mono-utilisateur, cohérent avec la clé dérivée du mot de passe).
 - Le mot de passe transite par les buffers de désérialisation de l'IPC Tauri avant d'être enveloppé dans `Zeroizing` (dès la commande, [auth.rs](../src-tauri/src/presentation/commands/auth.rs)) — limite résiduelle connue, non contournable sans changer le transport.
@@ -260,6 +271,6 @@ Deux sorties distinctes, toutes deux session-gated (coffre déverrouillé requis
 
 ## Vérification
 
-- `cargo test` — tests crypto (hash/verify, wrap/unwrap) + tests d'intégration : `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement coffre **et** keystore + lockout), `legacy_plaintext_keystore_is_migrated_and_sealed` (migration + scellement), `interrupted_keystore_migration_swap_is_recovered` (crash au milieu de la bascule → restauration du backup + reprise de la migration), `tampering_with_the_vault_is_detected_under_hard_fail` (évidence d'altération), `require_session_gates_data_access` (garde de session backend). Tests unitaires de la garde (expiration → révocation + verrouillage) dans [require_session.rs](../src-tauri/src/application/use_cases/require_session.rs). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
+- `cargo test` — tests crypto (hash/verify, wrap/unwrap, AAD, bornes des paramètres) + tests d'intégration (dont : contournement de l'intégrité par les fichiers annexes, crash pendant une session, écritures concurrentes, verrouillage exact sous tentatives parallèles et progressif, `change_password`, mise à niveau du format de clés v1 → v2, journal de sécurité) : `full_auth_flow_and_encryption` (register → login → session → logout + preuve de chiffrement coffre **et** keystore + lockout), `legacy_plaintext_keystore_is_migrated_and_sealed` (migration + scellement), `interrupted_keystore_migration_swap_is_recovered` (crash au milieu de la bascule → restauration du backup + reprise de la migration), `tampering_with_the_vault_is_detected_under_hard_fail` (évidence d'altération), `require_session_gates_data_access` (garde de session backend). Tests unitaires de la garde (expiration → révocation + verrouillage) dans [require_session.rs](../src-tauri/src/application/use_cases/require_session.rs). [integration_tests.rs](../src-tauri/src/integration_tests.rs)
 - `pnpm test` — mapper, repository (via `mockIPC`), timer de session, flux login → Home.
 - Manuel : `pnpm tauri dev` → **Créer un compte** → **Connexion** → **Home** (« Bonjour {username} » + compte à rebours).

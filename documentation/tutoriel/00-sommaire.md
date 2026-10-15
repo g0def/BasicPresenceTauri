@@ -1,5 +1,20 @@
 # Tutoriel BasicPresence — de Rust jusqu'au front React
 
+> ⚠️ **Mise à jour d'octobre 2026** — certains extraits de code de ce tutoriel datent d'avant la
+> [refonte architecture & sécurité](../audit-securite-2026-10-remediation.md). Les principes restent
+> valables ; ce qui a changé :
+>
+> - **Frontend** : les providers lisent leurs dépôts dans un **conteneur d'injection** (`useContainer()`,
+>   composition root `src/app/container.ts`) et gèrent l'état serveur avec **TanStack Query** ; il n'y a plus
+>   de prop `onSessionExpired` (la session expirée est gérée une fois, par le query client). Le partagé entre
+>   features vit dans `src/entities/`, les pages multi-features dans `src/pages/` (chapitres 07, 08, 09).
+> - **Backend** : le verrouillage du compte passe par `register_failed_attempt` (incrément atomique) +
+>   `set_locked_until`, avec une durée progressive ; la KEK a ses propres paramètres et les clés sont enveloppées
+>   avec AAD ; les écritures du coffre passent par `LibsqlVaultManager::write` / `UnitOfWork` ; les règles de
+>   validation sont dans `domain/rules.rs` (chapitres 04, 05, 08).
+> - Référence à jour : [../auth.md](../auth.md), [../../Claude.md](../../Claude.md) et les [ADR](../adr/README.md).
+
+
 Ce tutoriel explique **comment fonctionne cette codebase de bout en bout** — du cœur Rust
 (Tauri) jusqu'à l'interface React — et **comment la répliquer** pour ajouter tes propres
 fonctionnalités.

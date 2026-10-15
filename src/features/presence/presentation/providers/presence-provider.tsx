@@ -2,13 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { startOfMonth } from "date-fns";
 
-import { isAppError } from "@/core/errors";
-import { TauriPresenceRepository } from "@/features/presence/data/repositories/tauri-presence.repository";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import type {
   Presence,
   PresenceTrip,
   PresenceType,
-} from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
 import { makeDeletePresenceUseCase } from "@/features/presence/domain/use-cases/delete-presence";
 import { makeGetPresenceTripsUseCase } from "@/features/presence/domain/use-cases/get-presence-trips";
 import { makeListPresencesUseCase } from "@/features/presence/domain/use-cases/list-presences";
@@ -16,72 +19,54 @@ import { makeSetPresenceUseCase } from "@/features/presence/domain/use-cases/set
 import {
   PresenceContext,
   type PresenceContextValue,
-} from "@/features/presence/presentation/context/presence-context";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+} from "@/entities/presence/model/presence-context";
+import { presenceKeys } from "@/features/presence/presentation/query-keys";
+import { useProfile } from "@/entities/profile/model/use-profile";
 
-// Composition root for the presence feature: wire the repository to the use cases.
-const repo = new TauriPresenceRepository();
-const listPresencesUseCase = makeListPresencesUseCase(repo);
-const setPresenceUseCase = makeSetPresenceUseCase(repo);
-const deletePresenceUseCase = makeDeletePresenceUseCase(repo);
-const getPresenceTripsUseCase = makeGetPresenceTripsUseCase(repo);
+const NO_PRESENCES: Presence[] = [];
 
-interface PresenceProviderProps {
-  children: ReactNode;
-  /** Called when a command reports a locked vault (SESSION_EXPIRED). Injected
-   * by the composition root (App) so the feature stays independent of auth. */
-  onSessionExpired?: () => void;
-}
-
-export function PresenceProvider({
-  children,
-  onSessionExpired,
-}: PresenceProviderProps) {
+export function PresenceProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   // Presences are scoped to the active profile (owned by the profile feature).
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? null;
 
-  const [presences, setPresences] = useState<Presence[]>([]);
+  const { presenceRepository } = useContainer();
+  const useCases = useMemo(
+    () => ({
+      list: makeListPresencesUseCase(presenceRepository),
+      set: makeSetPresenceUseCase(presenceRepository),
+      remove: makeDeletePresenceUseCase(presenceRepository),
+      trips: makeGetPresenceTripsUseCase(presenceRepository),
+    }),
+    [presenceRepository],
+  );
+  const queryClient = useQueryClient();
+  const { run, isPending: isSubmitting } = useCommand();
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback(
+  const reportError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-        onSessionExpired?.();
-        return;
-      }
-      setError(isAppError(e) ? e.message : "Une erreur est survenue");
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
     },
-    [onSessionExpired],
+    [t],
   );
 
-  // Reload presences whenever the active profile changes.
+  // Reloads whenever the active profile changes (the key carries it).
+  const key = presenceKeys.byProfile(profileId);
+  const query = useQuery({
+    queryKey: key,
+    enabled: profileId !== null,
+    queryFn: () => useCases.list(profileId as string),
+  });
+  const presences = (profileId && query.data) || NO_PRESENCES;
+
   useEffect(() => {
-    if (!profileId) {
-      setPresences([]);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
-    listPresencesUseCase(profileId)
-      .then((list) => {
-        if (!cancelled) setPresences(list);
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, handleError]);
+    if (query.error) reportError(query.error);
+  }, [query.error, reportError]);
 
   const setPresence = useCallback(
     async (
@@ -90,74 +75,72 @@ export function PresenceProvider({
       trips?: PresenceTrip[],
     ): Promise<Presence | null> => {
       if (!profileId) return null;
-      setIsSubmitting(true);
       setError(null);
       try {
-        const saved = await setPresenceUseCase({ profileId, day, type, trips });
+        const saved = await run(() =>
+          useCases.set({ profileId, day, type, trips }),
+        );
         // Upsert by day: drop any previous record for that day, keep the rest.
-        setPresences((prev) => [
-          ...prev.filter((p) => p.day !== saved.day),
-          saved,
-        ]);
+        queryClient.setQueryData<Presence[]>(
+          presenceKeys.byProfile(profileId),
+          (prev = []) => [...prev.filter((p) => p.day !== saved.day), saved],
+        );
+        queryClient.removeQueries({ queryKey: presenceKeys.trips(saved.id) });
         return saved;
       } catch (e) {
-        handleError(e);
+        reportError(e);
         return null;
-      } finally {
-        setIsSubmitting(false);
       }
     },
-    [profileId, handleError],
+    [profileId, run, useCases, queryClient, reportError],
   );
 
   const getPresenceTrips = useCallback(
     async (presenceId: string): Promise<PresenceTrip[]> => {
       try {
-        return await getPresenceTripsUseCase(presenceId);
+        return await queryClient.fetchQuery({
+          queryKey: presenceKeys.trips(presenceId),
+          queryFn: () => useCases.trips(presenceId),
+        });
       } catch (e) {
-        handleError(e);
+        reportError(e);
         return [];
       }
     },
-    [handleError],
+    [queryClient, useCases, reportError],
   );
 
   const deletePresence = useCallback(
     async (id: string): Promise<boolean> => {
-      setIsSubmitting(true);
       setError(null);
       try {
-        await deletePresenceUseCase(id);
-        setPresences((prev) => prev.filter((p) => p.id !== id));
+        await run(() => useCases.remove(id));
+        queryClient.setQueryData<Presence[]>(
+          presenceKeys.byProfile(profileId),
+          (prev = []) => prev.filter((p) => p.id !== id),
+        );
+        queryClient.removeQueries({ queryKey: presenceKeys.trips(id) });
         return true;
       } catch (e) {
-        handleError(e);
+        reportError(e);
         return false;
-      } finally {
-        setIsSubmitting(false);
       }
     },
-    [handleError],
+    [profileId, run, useCases, queryClient, reportError],
   );
 
-  // Re-pull the whole list from the backend. Used after a bulk import, where a
-  // single re-list is simpler (and safer) than reconciling many rows by hand.
+  // Re-pull the whole list from the backend. Used after a bulk import or a
+  // work-hours change, where a single re-list is simpler (and safer) than
+  // reconciling many rows by hand.
   const reload = useCallback(async (): Promise<void> => {
-    if (!profileId) {
-      setPresences([]);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      setPresences(await listPresencesUseCase(profileId));
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [profileId, handleError]);
+    if (!profileId) return;
+    await queryClient.invalidateQueries({
+      queryKey: presenceKeys.byProfile(profileId),
+    });
+  }, [profileId, queryClient]);
 
   const clearError = useCallback(() => setError(null), []);
+  const isLoading = profileId !== null && (query.isPending || query.isFetching);
 
   const presencesByDay = useMemo(() => {
     const map = new Map<number, Presence>();

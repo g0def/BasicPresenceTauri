@@ -11,12 +11,18 @@ describe("auth.mapper", () => {
       token: "t",
       expiresAt: 123,
       user: { id: "u1", username: "bob", createdAt: 1, updatedAt: 2 },
+      failedAttemptsSinceLastLogin: 2,
+      securityEvents: [{ kind: "account_locked", at: 100 }],
     });
 
     expect(session).toEqual({
       token: "t",
       expiresAt: 123,
       user: { id: "u1", username: "bob", createdAt: 1, updatedAt: 2 },
+      securityNotice: {
+        failedAttempts: 2,
+        events: [{ kind: "account_locked", at: 100 }],
+      },
     });
   });
 

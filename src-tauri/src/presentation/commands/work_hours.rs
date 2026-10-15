@@ -22,7 +22,7 @@ pub async fn create_task_preset(
     color: String,
     state: State<'_, AppState>,
 ) -> Result<TaskPresetDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .create_task_preset
         .execute(&profile_id, &title, description, default_minutes, &color)
@@ -35,7 +35,7 @@ pub async fn list_task_presets(
     profile_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<TaskPresetDto>, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.list_task_presets.execute(&profile_id).await?)
 }
 
@@ -49,7 +49,7 @@ pub async fn update_task_preset(
     color: String,
     state: State<'_, AppState>,
 ) -> Result<TaskPresetDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .update_task_preset
         .execute(&id, &title, description, default_minutes, &color)
@@ -59,7 +59,7 @@ pub async fn update_task_preset(
 /// Delete a saved task preset by id.
 #[tauri::command]
 pub async fn delete_task_preset(id: String, state: State<'_, AppState>) -> Result<(), AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     state.delete_task_preset.execute(&id).await?;
     Ok(())
 }
@@ -70,7 +70,7 @@ pub async fn get_work_entries(
     presence_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<WorkEntryDto>, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.get_work_entries.execute(&presence_id).await?)
 }
 
@@ -82,7 +82,7 @@ pub async fn set_work_entries(
     entries: Vec<WorkEntryInputDto>,
     state: State<'_, AppState>,
 ) -> Result<WorkDayDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .set_work_entries
         .execute(&presence_id, entries)
@@ -95,7 +95,7 @@ pub async fn get_work_schedule(
     presence_id: String,
     state: State<'_, AppState>,
 ) -> Result<Option<WorkDayScheduleDto>, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.get_work_schedule.execute(&presence_id).await?)
 }
 
@@ -106,7 +106,7 @@ pub async fn set_work_schedule(
     start_minutes: i64,
     state: State<'_, AppState>,
 ) -> Result<WorkDayScheduleDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .set_work_schedule
         .execute(&presence_id, start_minutes)
@@ -119,7 +119,7 @@ pub async fn get_day_note(
     presence_id: String,
     state: State<'_, AppState>,
 ) -> Result<DayNoteDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.get_day_note.execute(&presence_id).await?)
 }
 
@@ -131,6 +131,6 @@ pub async fn set_day_note(
     markdown: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<DayNoteDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.set_day_note.execute(&presence_id, markdown).await?)
 }

@@ -1,10 +1,5 @@
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
-import type {
-  LoginResponseDto,
-  SessionStatusDto,
-} from "@/features/auth/data/dto/auth.dto";
-import type { UserDto } from "@/features/auth/data/dto/user.dto";
 import {
   toAuthSession,
   toSessionStatus,
@@ -21,11 +16,11 @@ import type { AuthRepository } from "@/features/auth/domain/repositories/auth-re
 /** AuthRepository implementation backed by Tauri IPC commands. */
 export class TauriAuthRepository implements AuthRepository {
   async accountExists(): Promise<boolean> {
-    return invoke<boolean>(COMMANDS.accountExists);
+    return invoke(COMMANDS.accountExists);
   }
 
   async register({ username, password }: Credentials): Promise<User> {
-    const dto = await invoke<UserDto>(COMMANDS.register, {
+    const dto = await invoke(COMMANDS.register, {
       username,
       password,
     });
@@ -33,7 +28,7 @@ export class TauriAuthRepository implements AuthRepository {
   }
 
   async login({ username, password }: Credentials): Promise<AuthSession> {
-    const dto = await invoke<LoginResponseDto>(COMMANDS.login, {
+    const dto = await invoke(COMMANDS.login, {
       username,
       password,
     });
@@ -41,13 +36,20 @@ export class TauriAuthRepository implements AuthRepository {
   }
 
   async checkSession(token: string): Promise<SessionStatus> {
-    const dto = await invoke<SessionStatusDto>(COMMANDS.checkSession, {
+    const dto = await invoke(COMMANDS.checkSession, {
       token,
     });
     return toSessionStatus(dto);
   }
 
   async logout(token: string): Promise<void> {
-    await invoke<void>(COMMANDS.logout, { token });
+    await invoke(COMMANDS.logout, { token });
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    await invoke(COMMANDS.changePassword, { currentPassword, newPassword });
   }
 }

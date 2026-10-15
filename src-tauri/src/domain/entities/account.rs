@@ -1,10 +1,12 @@
 use super::user::User;
+use crate::domain::policy::KdfParams;
 
 /// Cryptographic material that protects the encrypted vault, stored alongside
-/// the auth credentials in the (unencrypted) keystore.
+/// the auth credentials in the keystore.
 ///
-/// Every field here is already cryptographically protected (the DEK is wrapped,
-/// the salt is public by design), so storing it in clear is safe.
+/// Every field here is already cryptographically protected (the keys are
+/// wrapped, the salt is public by design), so storing it is safe even before
+/// the keystore's own at-rest sealing.
 #[derive(Debug, Clone)]
 pub struct KeyMaterial {
     /// DEK encrypted (wrapped) with the password-derived KEK (AEAD ciphertext).
@@ -18,6 +20,11 @@ pub struct KeyMaterial {
     pub wrapped_mac_key: Option<Vec<u8>>,
     /// AEAD nonce used when wrapping the MAC key.
     pub mac_key_nonce: Option<Vec<u8>>,
+    /// Wrap format version (see `key_service::CURRENT_WRAP_VERSION`).
+    pub key_version: i64,
+    /// Argon2id parameters the KEK was derived with; `None` for legacy
+    /// accounts (derived with the policy's `legacy_kek_kdf`).
+    pub kdf: Option<KdfParams>,
 }
 
 /// The single device-owner account: auth credentials + key material + lockout state.

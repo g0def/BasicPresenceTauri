@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { isAppError } from "@/core/errors";
-import { TauriDayNoteRepository } from "@/features/work-hours/data/repositories/tauri-day-note.repository";
+import { useTranslation } from "react-i18next";
+
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import { makeGetDayNoteUseCase } from "@/features/work-hours/domain/use-cases/get-day-note";
 import { makeSetDayNoteUseCase } from "@/features/work-hours/domain/use-cases/set-day-note";
-
-const repo = new TauriDayNoteRepository();
-const getDayNote = makeGetDayNoteUseCase(repo);
-const setDayNote = makeSetDayNoteUseCase(repo);
 
 /** Delay between the last keystroke and the persisting call. */
 const SAVE_DEBOUNCE_MS = 600;
@@ -33,10 +31,19 @@ export interface UseDayNoteValue {
  * backend returns the rendered, sanitized HTML which we adopt for the read-only
  * view. Pending edits are flushed on unmount so navigating away never loses one.
  */
-export function useDayNote(
-  presenceId: string,
-  onSessionExpired?: () => void,
-): UseDayNoteValue {
+export function useDayNote(presenceId: string): UseDayNoteValue {
+  const { t } = useTranslation();
+  const { dayNoteRepository } = useContainer();
+  const { getDayNote, setDayNote } = useMemo(
+    () => ({
+      getDayNote: makeGetDayNoteUseCase(dayNoteRepository),
+      setDayNote: makeSetDayNoteUseCase(dayNoteRepository),
+    }),
+    [dayNoteRepository],
+  );
+  // Every IPC call goes through the command runner: a locked vault
+  // (SESSION_EXPIRED) is then handled globally by the query client.
+  const { run } = useCommand();
   const [markdown, setMarkdownState] = useState("");
   const [html, setHtml] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -50,23 +57,21 @@ export function useDayNote(
   // edit happened while the call was in flight.
   const versionRef = useRef(0);
 
-  const onSessionExpiredRef = useRef(onSessionExpired);
-  onSessionExpiredRef.current = onSessionExpired;
-
-  const handleError = useCallback((e: unknown) => {
-    if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-      onSessionExpiredRef.current?.();
-      return;
-    }
-    setError(isAppError(e) ? e.message : "Une erreur est survenue");
-  }, []);
+  const handleError = useCallback(
+    (e: unknown) => {
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
+    },
+    [t],
+  );
 
   const persist = useCallback(async () => {
     if (!dirtyRef.current) return;
     dirtyRef.current = false;
     const version = versionRef.current;
     try {
-      const saved = await setDayNote(presenceId, markdownRef.current);
+      const saved = await run(() =>
+        setDayNote(presenceId, markdownRef.current),
+      );
       // Adopt the rendered HTML only if no newer edit happened meanwhile.
       if (versionRef.current === version) {
         setHtml(saved.html);
@@ -78,7 +83,7 @@ export function useDayNote(
     } finally {
       if (versionRef.current === version) setIsSaving(false);
     }
-  }, [presenceId, handleError]);
+  }, [presenceId, run, setDayNote, handleError]);
 
   const scheduleSave = useCallback(() => {
     dirtyRef.current = true;
@@ -115,7 +120,7 @@ export function useDayNote(
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    getDayNote(presenceId)
+    run(() => getDayNote(presenceId))
       .then((note) => {
         if (cancelled) return;
         markdownRef.current = note.markdown;
@@ -136,7 +141,7 @@ export function useDayNote(
       }
       void persist();
     };
-  }, [presenceId, persist, handleError]);
+  }, [presenceId, persist, run, getDayNote, handleError]);
 
   return { markdown, html, isLoading, isSaving, error, setMarkdown, flush };
 }

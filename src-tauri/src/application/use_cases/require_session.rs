@@ -29,27 +29,29 @@ impl RequireSessionUseCase {
         }
     }
 
-    pub fn execute(&self) -> Result<(), DomainError> {
+    pub async fn execute(&self) -> Result<(), DomainError> {
         let now = self.clock.now_ms();
         if self.sessions.list().iter().any(|s| s.is_valid(now)) {
+            self.sessions.touch_all(now);
             return Ok(());
         }
         // No valid session: revoke expired leftovers and lock the vault.
         self.sessions.clear();
-        self.vault.close();
+        self.vault.close().await;
         Err(DomainError::Unauthorized)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     use async_trait::async_trait;
 
     use super::*;
     use crate::domain::entities::session::Session;
+    use crate::domain::services::vault::VaultOpenOutcome;
     use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
 
     struct FixedClock(i64);
@@ -65,10 +67,14 @@ mod tests {
     }
     #[async_trait]
     impl VaultManager for SpyVault {
-        async fn open(&self, _dek: &[u8], _mac_key: &[u8]) -> Result<(), DomainError> {
-            Ok(())
+        async fn open(
+            &self,
+            _dek: &[u8],
+            _mac_key: &[u8],
+        ) -> Result<VaultOpenOutcome, DomainError> {
+            Ok(VaultOpenOutcome::Clean)
         }
-        fn close(&self) {
+        async fn close(&self) {
             self.closed.store(true, Ordering::SeqCst);
         }
     }
@@ -81,40 +87,51 @@ mod tests {
         RequireSessionUseCase::new(sessions, vault, Arc::new(FixedClock(now)))
     }
 
-    #[test]
-    fn passes_while_a_session_is_valid() {
+    #[tokio::test]
+    async fn passes_while_a_session_is_valid() {
         let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
         let vault = Arc::new(SpyVault::default());
         sessions.insert(Session {
             token: "tok".into(),
             expires_at: 1_000,
+            last_seen_ms: 0,
+            idle_timeout_ms: 10_000,
         });
 
-        assert!(use_case(sessions, vault.clone(), 999).execute().is_ok());
+        assert!(
+            use_case(sessions, vault.clone(), 999)
+                .execute()
+                .await
+                .is_ok()
+        );
         assert!(!vault.closed.load(Ordering::SeqCst));
     }
 
-    #[test]
-    fn expired_session_is_revoked_and_the_vault_locked() {
+    #[tokio::test]
+    async fn expired_session_is_revoked_and_the_vault_locked() {
         let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
         let vault = Arc::new(SpyVault::default());
         sessions.insert(Session {
             token: "tok".into(),
             expires_at: 1_000,
+            last_seen_ms: 0,
+            idle_timeout_ms: 10_000,
         });
 
-        let result = use_case(sessions.clone(), vault.clone(), 1_000).execute();
+        let result = use_case(sessions.clone(), vault.clone(), 1_000)
+            .execute()
+            .await;
         assert!(matches!(result, Err(DomainError::Unauthorized)));
         assert!(vault.closed.load(Ordering::SeqCst), "vault must be locked");
         assert!(sessions.list().is_empty(), "expired session revoked");
     }
 
-    #[test]
-    fn no_session_at_all_is_unauthorized() {
+    #[tokio::test]
+    async fn no_session_at_all_is_unauthorized() {
         let sessions: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
         let vault = Arc::new(SpyVault::default());
 
-        let result = use_case(sessions, vault, 0).execute();
+        let result = use_case(sessions, vault, 0).execute().await;
         assert!(matches!(result, Err(DomainError::Unauthorized)));
     }
 }

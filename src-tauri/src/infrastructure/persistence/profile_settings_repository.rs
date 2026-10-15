@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 
 use crate::domain::entities::co2_settings::Co2Settings;
 use crate::domain::entities::profile_settings::ProfileSettings;
@@ -46,7 +46,8 @@ fn row_to_settings(row: &Row) -> Result<ProfileSettings, DomainError> {
             include_radiative_forcing: include_rf != 0,
             count_building_energy: count_be != 0,
             working_days_per_year: row.get(7).map_err(map_storage)?,
-            factor_year: row.get::<i64>(8).map_err(map_storage)? as i32,
+            factor_year: i32::try_from(row.get::<i64>(8).map_err(map_storage)?)
+                .map_err(|_| DomainError::Storage("invalid factor_year".into()))?,
         },
     })
 }
@@ -67,8 +68,8 @@ impl ProfileSettingsRepository for LibsqlProfileSettingsRepository {
     }
 
     async fn save(&self, profile_id: &str, s: &ProfileSettings) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        self.vault
+            .execute_write(
                 "INSERT INTO profile_settings \
                  (profile_id, default_start_minutes, note_font, cell_display_mode, \
                   grid_country, default_car_occupancy, include_radiative_forcing, \
@@ -97,8 +98,7 @@ impl ProfileSettingsRepository for LibsqlProfileSettingsRepository {
                     s.co2.factor_year as i64,
                 ],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
         Ok(())
     }
 }

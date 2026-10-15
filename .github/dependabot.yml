@@ -1,0 +1,37 @@
+# Keeps dependencies from silently drifting into known vulnerabilities while the
+# project is idle (see documentation/audit-securite-2026-10.md, N1).
+# Security updates are opened as soon as an advisory lands; version updates are
+# grouped weekly to keep the PR noise low.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Let new releases age a week before proposing them (malicious releases are
+    # usually pulled within days). Security updates are not delayed.
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

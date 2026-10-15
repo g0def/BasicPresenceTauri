@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use libsql::{params, Connection, Row};
+use libsql::{Connection, Row, params};
 use uuid::Uuid;
 
 use crate::domain::entities::presence::{Presence, PresenceType};
@@ -11,15 +12,13 @@ use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::infrastructure::persistence::db::map_storage;
 use crate::infrastructure::persistence::vault::LibsqlVaultManager;
 
-const SELECT_COLUMNS: &str =
-    "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at, (SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = presence.id) AS work_minutes";
+const SELECT_COLUMNS: &str = "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at, (SELECT COALESCE(SUM(minutes), 0) FROM work_entry WHERE presence_id = presence.id) AS work_minutes";
 
 const RETURNING_COLUMNS: &str =
     "id, profile_id, day, type, co2_kg, is_estimated, created_at, updated_at";
 
 /// Columns written on insert (includes the owning `presence_id`).
-const TRIP_INSERT_COLUMNS: &str =
-    "id, presence_id, mode_id, distance_km, round_trip, occupants, co2_kg, is_estimated, factor_year, position";
+const TRIP_INSERT_COLUMNS: &str = "id, presence_id, mode_id, distance_km, round_trip, occupants, co2_kg, is_estimated, factor_year, position";
 /// Columns read back (the `presence_id` is implied by the query filter).
 const TRIP_SELECT_COLUMNS: &str =
     "id, mode_id, distance_km, round_trip, occupants, co2_kg, is_estimated, factor_year, position";
@@ -85,7 +84,8 @@ fn row_to_trip(row: &Row) -> Result<Trip, DomainError> {
         occupants: row.get(4).map_err(map_storage)?,
         co2_kg: row.get(5).map_err(map_storage)?,
         is_estimated: is_estimated != 0,
-        factor_year: factor_year as i32,
+        factor_year: i32::try_from(factor_year)
+            .map_err(|_| DomainError::Storage("invalid factor_year".into()))?,
         position: row.get(8).map_err(map_storage)?,
     })
 }
@@ -97,20 +97,11 @@ impl PresenceRepository for LibsqlPresenceRepository {
         presence: &Presence,
         trips: &[Trip],
     ) -> Result<Presence, DomainError> {
-        let conn = self.conn()?;
         // The presence upsert and its trip snapshot must commit together, so the
         // day total and its breakdown can never diverge.
-        conn.execute("BEGIN", ()).await.map_err(map_storage)?;
-        match set_for_day_in_tx(&conn, presence, trips).await {
-            Ok(saved) => {
-                conn.execute("COMMIT", ()).await.map_err(map_storage)?;
-                Ok(saved)
-            }
-            Err(e) => {
-                let _ = conn.execute("ROLLBACK", ()).await;
-                Err(e)
-            }
-        }
+        self.vault
+            .write(|conn| async move { set_for_day_in_tx(&conn, presence, trips).await })
+            .await
     }
 
     async fn list_trips(&self, presence_id: &str) -> Result<Vec<Trip>, DomainError> {
@@ -127,6 +118,58 @@ impl PresenceRepository for LibsqlPresenceRepository {
             trips.push(row_to_trip(&row)?);
         }
         Ok(trips)
+    }
+
+    async fn list_trips_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, Vec<Trip>>, DomainError> {
+        let columns = TRIP_SELECT_COLUMNS
+            .split(", ")
+            .map(|c| format!("t.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "SELECT {columns}, t.presence_id FROM presence_trip t \
+             JOIN presence p ON p.id = t.presence_id \
+             WHERE p.profile_id = ?1 ORDER BY t.presence_id, t.position"
+        );
+        let mut rows = self
+            .conn()?
+            .query(&sql, params![profile_id])
+            .await
+            .map_err(map_storage)?;
+        let mut by_presence: HashMap<String, Vec<Trip>> = HashMap::new();
+        while let Some(row) = rows.next().await.map_err(map_storage)? {
+            let presence_id: String = row.get(9).map_err(map_storage)?;
+            by_presence
+                .entry(presence_id)
+                .or_default()
+                .push(row_to_trip(&row)?);
+        }
+        Ok(by_presence)
+    }
+
+    async fn list_notes_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, String>, DomainError> {
+        let mut rows = self
+            .conn()?
+            .query(
+                "SELECT id, note FROM presence WHERE profile_id = ?1 AND note IS NOT NULL",
+                params![profile_id],
+            )
+            .await
+            .map_err(map_storage)?;
+        let mut notes = HashMap::new();
+        while let Some(row) = rows.next().await.map_err(map_storage)? {
+            notes.insert(
+                row.get::<String>(0).map_err(map_storage)?,
+                row.get::<String>(1).map_err(map_storage)?,
+            );
+        }
+        Ok(notes)
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Presence>, DomainError> {
@@ -158,10 +201,9 @@ impl PresenceRepository for LibsqlPresenceRepository {
     }
 
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
-        self.conn()?
-            .execute("DELETE FROM presence WHERE id = ?1", params![id])
-            .await
-            .map_err(map_storage)?;
+        self.vault
+            .execute_write("DELETE FROM presence WHERE id = ?1", params![id])
+            .await?;
         Ok(())
     }
 
@@ -186,13 +228,16 @@ impl PresenceRepository for LibsqlPresenceRepository {
         note: Option<&str>,
         updated_at: i64,
     ) -> Result<(), DomainError> {
-        self.conn()?
-            .execute(
+        let updated = self
+            .vault
+            .execute_write(
                 "UPDATE presence SET note = ?2, updated_at = ?3 WHERE id = ?1",
                 params![presence_id, note.map(|s| s.to_string()), updated_at],
             )
-            .await
-            .map_err(map_storage)?;
+            .await?;
+        if updated == 0 {
+            return Err(DomainError::NotFound);
+        }
         Ok(())
     }
 }
@@ -236,7 +281,7 @@ async fn set_for_day_in_tx(
             None => {
                 return Err(DomainError::Storage(
                     "presence upsert returned no row".into(),
-                ))
+                ));
             }
         }
     };

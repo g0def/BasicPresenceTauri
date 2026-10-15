@@ -1,5 +1,5 @@
 import type { ProfileDto } from "@/features/profile/data/dto/profile.dto";
-import type { Profile } from "@/features/profile/domain/entities/profile";
+import type { Profile } from "@/entities/profile/model/profile";
 
 export function toProfile(dto: ProfileDto): Profile {
   return {

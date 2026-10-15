@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import type { WorkEntry } from "@/features/work-hours/domain/entities/work-hours";
+import type { WorkEntry } from "@/entities/work-day/model/work-hours";
 import { computeDonutArcs } from "@/features/work-hours/presentation/donut-geometry";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { formatMinutes } from "@/shared/format/duration-format";
 import { cn } from "@/lib/utils";
 
 interface DayDonutProps {

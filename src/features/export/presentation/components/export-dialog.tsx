@@ -87,7 +87,12 @@ export function ExportDialog({
         <DialogHeader>
           <DialogTitle>{t("export.title")}</DialogTitle>
           {stage === "idle" && (
-            <DialogDescription>{t("export.description")}</DialogDescription>
+            <>
+              <DialogDescription>{t("export.description")}</DialogDescription>
+              <p className="text-xs text-warning">
+                {t("export.unencryptedWarning")}
+              </p>
+            </>
           )}
         </DialogHeader>
 

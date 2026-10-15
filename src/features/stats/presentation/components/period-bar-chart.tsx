@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { formatCo2 } from "@/features/commute/presentation/commute-format";
+import { formatCo2 } from "@/entities/commute/lib/commute-format";
 import type {
   Granularity,
   PeriodBucket,
@@ -15,7 +15,7 @@ import {
   useThemeTick,
   weekLabel,
 } from "@/features/stats/presentation/stats-format";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { formatMinutes } from "@/shared/format/duration-format";
 
 interface PeriodBarChartProps {
   buckets: PeriodBucket[];
@@ -118,7 +118,10 @@ export function PeriodBarChart({
       },
       yAxis: {
         type: "value",
-        axisLabel: { color: axisColor, formatter: (v) => formatValue(Number(v)) },
+        axisLabel: {
+          color: axisColor,
+          formatter: (v) => formatValue(Number(v)),
+        },
         splitLine: { lineStyle: { color: gridColor } },
       },
       series: [
@@ -152,7 +155,19 @@ export function PeriodBarChart({
     // themeTick is intentional: it isn't read here but bumps on light/dark
     // toggle so the memo recomputes and the canvas re-resolves its colors.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buckets, metric, granularity, startIndex, endIndex, color, lang, t, themeTick]);
+  }, [
+    buckets,
+    metric,
+    granularity,
+    startIndex,
+    endIndex,
+    color,
+    lang,
+    t,
+    themeTick,
+  ]);
 
-  return <EChart option={option} className="h-64 w-full" ariaLabel={ariaLabel} />;
+  return (
+    <EChart option={option} className="h-64 w-full" ariaLabel={ariaLabel} />
+  );
 }

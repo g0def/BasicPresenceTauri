@@ -14,7 +14,7 @@ import {
 import {
   formatCo2,
   summarizeSegments,
-} from "@/features/commute/presentation/commute-format";
+} from "@/entities/commute/lib/commute-format";
 import { useCommute } from "@/features/commute/presentation/hooks/use-commute";
 
 /** "Modes de déplacement" page: lists saved commutes with links to the

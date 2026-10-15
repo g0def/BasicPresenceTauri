@@ -57,6 +57,13 @@ export interface BundleExportSummary {
   path: string;
 }
 
+/** A picked and inspected bundle (matches `InspectedBundleDto`): the opaque,
+ *  single-use handle the backend keeps the file under, and its manifest. */
+export interface InspectedBundle {
+  handle: string;
+  manifest: BundleManifest;
+}
+
 /** What `inspect_profile_bundle` reports about a file (matches
  *  `BundleManifestDto`). Drives the "intelligent" review step. */
 export interface BundleManifest {

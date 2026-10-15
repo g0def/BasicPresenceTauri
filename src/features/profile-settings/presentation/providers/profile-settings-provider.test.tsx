@@ -2,11 +2,12 @@ import { render, waitFor } from "@testing-library/react";
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { Profile } from "@/features/profile/domain/entities/profile";
+import type { Profile } from "@/entities/profile/model/profile";
 import {
   ProfileContext,
   type ProfileContextValue,
-} from "@/features/profile/presentation/context/profile-context";
+} from "@/entities/profile/model/profile-context";
+import { DataProviders } from "@/test/app-providers";
 import { ProfileSettingsProvider } from "@/features/profile-settings/presentation/providers/profile-settings-provider";
 
 const FONT_BY_PROFILE: Record<string, string> = { p1: "serif", p2: "mono" };
@@ -58,6 +59,7 @@ function renderWith(active: Profile | null) {
         <div />
       </ProfileSettingsProvider>
     </ProfileContext.Provider>,
+    { wrapper: DataProviders },
   );
 }
 

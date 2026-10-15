@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   CommuteSegment,
   EmissionFactor,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 import { SegmentEditor } from "@/features/commute/presentation/components/segment-editor";
 
 const FACTORS: EmissionFactor[] = [

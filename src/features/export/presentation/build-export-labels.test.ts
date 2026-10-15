@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import i18n from "@/core/i18n";
-import { MODE_LABEL_KEYS } from "@/features/commute/presentation/mode-labels";
+import { MODE_LABEL_KEYS } from "@/entities/commute/lib/mode-labels";
 import { buildExportLabels } from "@/features/export/presentation/build-export-labels";
 
 // `getFixedT` rather than `changeLanguage`: the global setup pins the active

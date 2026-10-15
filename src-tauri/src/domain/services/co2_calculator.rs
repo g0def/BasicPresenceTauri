@@ -12,11 +12,7 @@ use crate::domain::entities::trip::TripInput;
 /// the year-matching multiplier to recover the CO2-only value (never multiply —
 /// that would double-count, R5).
 pub(crate) fn radiative_forcing_factor(factor_year: i32) -> f64 {
-    if factor_year >= 2026 {
-        1.7
-    } else {
-        1.9
-    }
+    if factor_year >= 2026 { 1.7 } else { 1.9 }
 }
 
 /// Fallback mode used when a trip's `mode_id` is absent from the referential

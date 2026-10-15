@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
-import { isAppError } from "@/core/errors";
-import { TauriProfileRepository } from "@/features/profile/data/repositories/tauri-profile.repository";
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import type {
   CreateProfileInput,
   Profile,
+  ProfileList,
   UpdateProfileInput,
-} from "@/features/profile/domain/entities/profile";
+} from "@/entities/profile/model/profile";
 import { makeCreateProfileUseCase } from "@/features/profile/domain/use-cases/create-profile";
 import { makeDeleteProfileUseCase } from "@/features/profile/domain/use-cases/delete-profile";
 import { makeListProfilesUseCase } from "@/features/profile/domain/use-cases/list-profiles";
@@ -16,140 +19,106 @@ import { makeUpdateProfileUseCase } from "@/features/profile/domain/use-cases/up
 import {
   ProfileContext,
   type ProfileContextValue,
-} from "@/features/profile/presentation/context/profile-context";
+} from "@/entities/profile/model/profile-context";
+import { profileKeys } from "@/features/profile/presentation/query-keys";
 
-// Composition root for the profile feature: wire the repository to the use cases.
-const repo = new TauriProfileRepository();
-const listProfilesUseCase = makeListProfilesUseCase(repo);
-const createProfileUseCase = makeCreateProfileUseCase(repo);
-const updateProfileUseCase = makeUpdateProfileUseCase(repo);
-const deleteProfileUseCase = makeDeleteProfileUseCase(repo);
-const setActiveProfileUseCase = makeSetActiveProfileUseCase(repo);
+const NO_PROFILES: Profile[] = [];
 
-interface ProfileProviderProps {
-  children: ReactNode;
-  /** Called when a command reports a locked vault (SESSION_EXPIRED). The auth
-   * feature owns the session, so the handler is injected by the composition
-   * root (App) rather than imported here — keeps the feature self-contained. */
-  onSessionExpired?: () => void;
-}
-
-export function ProfileProvider({
-  children,
-  onSessionExpired,
-}: ProfileProviderProps) {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+/**
+ * Profiles of the device owner + the active one. Server state lives in the
+ * query cache (`profileKeys.all`); a locked vault (SESSION_EXPIRED) is handled
+ * globally by the query client.
+ */
+export function ProfileProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
+  const { profileRepository } = useContainer();
+  const useCases = useMemo(
+    () => ({
+      list: makeListProfilesUseCase(profileRepository),
+      create: makeCreateProfileUseCase(profileRepository),
+      update: makeUpdateProfileUseCase(profileRepository),
+      remove: makeDeleteProfileUseCase(profileRepository),
+      setActive: makeSetActiveProfileUseCase(profileRepository),
+    }),
+    [profileRepository],
+  );
+  const queryClient = useQueryClient();
+  const { run, isPending: isSubmitting } = useCommand();
   const [error, setError] = useState<string | null>(null);
 
-  // A locked vault surfaces as SESSION_EXPIRED — drop the (now stale) session.
-  const handleError = useCallback(
+  const listQuery = useQuery({
+    queryKey: profileKeys.all,
+    queryFn: () => useCases.list(),
+  });
+
+  const reportError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-        onSessionExpired?.();
-        return;
-      }
-      setError(isAppError(e) ? e.message : "Une erreur est survenue");
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
     },
-    [onSessionExpired],
+    [t],
   );
 
-  const refresh = useCallback(async () => {
-    const list = await listProfilesUseCase();
-    setProfiles(list.profiles);
-    setActiveProfileId(list.activeProfileId);
-  }, []);
-
   useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    listProfilesUseCase()
-      .then((list) => {
-        if (cancelled) return;
-        setProfiles(list.profiles);
-        setActiveProfileId(list.activeProfileId);
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [handleError]);
+    if (listQuery.error) reportError(listQuery.error);
+  }, [listQuery.error, reportError]);
 
-  const createProfile = useCallback(
-    async (input: CreateProfileInput): Promise<boolean> => {
-      setIsSubmitting(true);
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: profileKeys.all });
+  }, [queryClient]);
+
+  const mutate = useCallback(
+    async (work: () => Promise<unknown>): Promise<boolean> => {
       setError(null);
       try {
-        await createProfileUseCase(input);
+        await run(work);
         await refresh();
         return true;
       } catch (e) {
-        handleError(e);
+        reportError(e);
         return false;
-      } finally {
-        setIsSubmitting(false);
       }
     },
-    [refresh, handleError],
+    [run, refresh, reportError],
+  );
+
+  const createProfile = useCallback(
+    (input: CreateProfileInput) => mutate(() => useCases.create(input)),
+    [mutate, useCases],
   );
 
   const updateProfile = useCallback(
-    async (input: UpdateProfileInput): Promise<boolean> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await updateProfileUseCase(input);
-        await refresh();
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [refresh, handleError],
+    (input: UpdateProfileInput) => mutate(() => useCases.update(input)),
+    [mutate, useCases],
   );
 
   const deleteProfile = useCallback(
     async (id: string): Promise<void> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await deleteProfileUseCase(id);
-        await refresh();
-      } catch (e) {
-        handleError(e);
-      } finally {
-        setIsSubmitting(false);
-      }
+      await mutate(() => useCases.remove(id));
     },
-    [refresh, handleError],
+    [mutate, useCases],
   );
 
   const setActiveProfile = useCallback(
     async (id: string): Promise<void> => {
-      const previous = activeProfileId;
-      setActiveProfileId(id); // optimistic
+      const previous = queryClient.getQueryData<ProfileList>(profileKeys.all);
+      // Optimistic: the header switches immediately.
+      queryClient.setQueryData<ProfileList>(profileKeys.all, (old) =>
+        old ? { ...old, activeProfileId: id } : old,
+      );
       try {
-        await setActiveProfileUseCase(id);
+        await run(() => useCases.setActive(id));
       } catch (e) {
-        setActiveProfileId(previous);
-        handleError(e);
+        queryClient.setQueryData(profileKeys.all, previous);
+        reportError(e);
       }
     },
-    [activeProfileId, handleError],
+    [queryClient, run, useCases, reportError],
   );
 
   const clearError = useCallback(() => setError(null), []);
 
+  const profiles = listQuery.data?.profiles ?? NO_PROFILES;
+  const activeProfileId = listQuery.data?.activeProfileId ?? null;
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId) ?? null,
     [profiles, activeProfileId],
@@ -159,7 +128,7 @@ export function ProfileProvider({
     () => ({
       profiles,
       activeProfile,
-      isLoading,
+      isLoading: listQuery.isPending,
       isSubmitting,
       error,
       createProfile,
@@ -172,7 +141,7 @@ export function ProfileProvider({
     [
       profiles,
       activeProfile,
-      isLoading,
+      listQuery.isPending,
       isSubmitting,
       error,
       createProfile,

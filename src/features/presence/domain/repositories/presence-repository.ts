@@ -2,7 +2,7 @@ import type {
   Presence,
   PresenceTrip,
   SetPresenceInput,
-} from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
 
 /** Contract the presentation layer depends on; implemented in the data layer. */
 export interface PresenceRepository {

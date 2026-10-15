@@ -5,6 +5,7 @@ pub mod emission_factor;
 pub mod presence;
 pub mod profile;
 pub mod profile_settings;
+pub mod security_event;
 pub mod session;
 pub mod task_preset;
 pub mod trip;

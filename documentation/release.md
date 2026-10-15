@@ -8,8 +8,23 @@ A minisign keypair is used to sign every update artifact.
 - **Public key**: committed in `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`.
 
 > **Version source of truth**: `package.json` → `version` is the **single place** to bump. `src-tauri/tauri.conf.json` reads it via `"version": "../package.json"`, and that config value takes precedence over `src-tauri/Cargo.toml`. So the Rust crate version in `Cargo.toml` is **not** release-relevant and does not need bumping.
-- **GitHub secret** `TAURI_SIGNING_PRIVATE_KEY`: content of the private key file.
-- **GitHub secret** `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: password chosen during key generation (empty string if none was set).
+- **Environment secret** `TAURI_SIGNING_PRIVATE_KEY` (environment `release`, **not** a repository secret): content of the private key file.
+- **Environment secret** `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (environment `release`): password chosen during key generation (empty string if none was set).
+
+### Protecting the signing key (audit finding E1)
+
+Whoever can run the release job with the signing key can ship a signed update to every installed client. The key is therefore only reachable through a protected **GitHub Environment** (one-time setup, in the repository settings):
+
+1. *Settings → Environments → New environment* `release`.
+2. *Required reviewers*: add yourself (and enable *Prevent self-review* if a second maintainer exists). Every release run then waits for a manual approval before the key is exposed.
+3. *Deployment branches and tags*: *Selected branches and tags* → add the tag pattern `v*`.
+4. *Settings → Rules → Rulesets → New tag ruleset* targeting `v*`: restrict creation/update/deletion to maintainers (tags cannot be moved or recreated by a stolen token).
+5. Move both `TAURI_SIGNING_*` secrets into the environment and **delete the repository-level copies**.
+6. Account hygiene: hardware security key / passkey MFA on the GitHub account; no long-lived classic PAT with `repo` scope.
+
+The release workflow additionally: re-runs all CI gates on the tagged commit (`verify` job), uses **no dependency cache** in the signing job (cache poisoning), publishes a **build-provenance attestation** for every artifact (`gh attestation verify <file> -R g0def/BasicPresenceTauri`) and attaches a **CycloneDX SBOM** and a **`SHA256SUMS`** file to the draft release.
+
+Longer term, the strongest option is to sign locally: CI builds and uploads unsigned artifacts, and the maintainer signs them on a trusted machine with `pnpm tauri signer sign`.
 
 ## Releasing a new version
 
@@ -19,6 +34,7 @@ A minisign keypair is used to sign every update artifact.
 4. The `.github/workflows/release.yml` workflow builds four matrix jobs (macOS arm64, macOS x86_64, Linux, Windows), signs updater artifacts, and creates a **draft** GitHub release with `latest.json`.
 5. Review the draft release on GitHub, then **publish** it. Publishing is the gate: `releases/latest/download/latest.json` only resolves once the release is non-draft and non-prerelease.
 6. Verify the update loop from an installed copy of the previous version (see below).
+7. AUR: copy the `.deb` hash from the release's `SHA256SUMS` into `basicpresence-bin/PKGBUILD` (`sha256sums_x86_64`), bump `pkgver`, then publish.
 
 ### Linux note
 

@@ -1,4 +1,4 @@
-import type { ProfileList } from "@/features/profile/domain/entities/profile";
+import type { ProfileList } from "@/entities/profile/model/profile";
 import type { ProfileRepository } from "@/features/profile/domain/repositories/profile-repository";
 
 export type ListProfilesUseCase = () => Promise<ProfileList>;

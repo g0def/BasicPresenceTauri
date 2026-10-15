@@ -1,5 +1,3 @@
-import { save } from "@tauri-apps/plugin-dialog";
-
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
 import type {
@@ -10,12 +8,10 @@ import type {
 import type { ExportRepository } from "@/features/export/domain/repositories/export-repository";
 
 /**
- * ExportRepository backed by the Tauri dialog plugin (native path picking) plus
- * the `export_profile_data` IPC command (the actual file writing happens in the
- * Rust backend, where the encrypted data lives).
- *
- * Only file in the export feature allowed to import `@tauri-apps/plugin-dialog`
- * directly (same convention as the updater repository).
+ * ExportRepository backed by the `export_profile_data` IPC command. The Rust
+ * backend shows the native "save as" dialog itself and writes the file: the
+ * WebView only suggests a file name and never handles a file path (a
+ * compromised WebView cannot write anywhere it likes).
  */
 export class TauriExportRepository implements ExportRepository {
   async exportProfileData(
@@ -24,17 +20,12 @@ export class TauriExportRepository implements ExportRepository {
     labels: ExportLabels,
     defaultFileName: string,
   ): Promise<ExportSummary | null> {
-    const path = await save({
-      defaultPath: defaultFileName,
-      filters: [{ name: "OpenDocument", extensions: ["ods"] }],
-    });
-    // `save` returns null when the user dismisses the dialog.
-    if (!path) return null;
-    return invoke<ExportSummary>(COMMANDS.exportProfileData, {
+    // `null` when the user dismissed the dialog.
+    return invoke(COMMANDS.exportProfileData, {
       profileId,
       options,
       labels,
-      path,
+      defaultFileName,
     });
   }
 }

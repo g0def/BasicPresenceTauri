@@ -1,7 +1,7 @@
 import { Bike, Bus, Car, HelpCircle, Plane, TrainFront } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import type { CommuteCategory } from "@/features/commute/domain/entities/commute";
+import type { CommuteCategory } from "@/entities/commute/model/commute";
 
 /** One icon per transport category (lucide-react, already a dependency). */
 export const CATEGORY_ICONS: Record<CommuteCategory, LucideIcon> = {

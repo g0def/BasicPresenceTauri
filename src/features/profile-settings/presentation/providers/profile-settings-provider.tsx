@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
-import { isAppError } from "@/core/errors";
-import { TauriProfileSettingsRepository } from "@/features/profile-settings/data/repositories/tauri-profile-settings.repository";
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import {
   DEFAULT_PROFILE_SETTINGS,
   type ProfileSettings,
@@ -14,18 +16,12 @@ import {
   ProfileSettingsContext,
   type ProfileSettingsContextValue,
 } from "@/features/profile-settings/presentation/context/profile-settings-context";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
-import type { CellDisplayMode } from "@/shared/cell-display/cell-display-context";
+import { useProfile } from "@/entities/profile/model/use-profile";
 import {
   applyNoteFont,
   NOTE_FONTS,
   type NoteFont,
 } from "@/shared/note-font/use-note-font";
-
-// Composition root for the profile-settings feature.
-const repo = new TauriProfileSettingsRepository();
-const getUseCase = makeGetProfileSettingsUseCase(repo);
-const setUseCase = makeSetProfileSettingsUseCase(repo);
 
 // One-time, device-level migration: before this feature, note-font and the
 // calendar cell-display mode lived in device-global localStorage. Fold whatever
@@ -45,112 +41,94 @@ function readLegacyPrefs(): LegacyPrefs | null {
   if (font && NOTE_FONTS.includes(font as NoteFont))
     out.noteFont = font as NoteFont;
   const cell = localStorage.getItem("cell-display-mode");
-  if (cell === "co2" || cell === "hours")
-    out.cellDisplayMode = cell as CellDisplayMode;
+  if (cell === "co2" || cell === "hours") out.cellDisplayMode = cell;
   return Object.keys(out).length > 0 ? out : null;
 }
 
-interface ProfileSettingsProviderProps {
-  children: ReactNode;
-  /** Called when a command reports a locked vault (SESSION_EXPIRED). Injected
-   * by the composition root so the feature stays independent of auth. */
-  onSessionExpired?: () => void;
-}
+/** TanStack Query key of a profile's settings row. */
+const settingsKey = (profileId: string | null) =>
+  ["profile-settings", profileId] as const;
 
-export function ProfileSettingsProvider({
-  children,
-  onSessionExpired,
-}: ProfileSettingsProviderProps) {
+export function ProfileSettingsProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? null;
 
-  const [settings, setSettings] = useState<ProfileSettings>(
-    DEFAULT_PROFILE_SETTINGS,
+  const { profileSettingsRepository } = useContainer();
+  const { getUseCase, setUseCase } = useMemo(
+    () => ({
+      getUseCase: makeGetProfileSettingsUseCase(profileSettingsRepository),
+      setUseCase: makeSetProfileSettingsUseCase(profileSettingsRepository),
+    }),
+    [profileSettingsRepository],
   );
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const queryClient = useQueryClient();
+  const { run, isPending: isSubmitting } = useCommand();
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback(
+  const reportError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-        onSessionExpired?.();
-        return;
-      }
-      setError(isAppError(e) ? e.message : "Une erreur est survenue");
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
     },
-    [onSessionExpired],
+    [t],
   );
 
   // Load (and reset on) active-profile change. Without a profile there is
-  // nothing to load — fall back to defaults.
+  // nothing to load — defaults apply.
+  const query = useQuery({
+    queryKey: settingsKey(profileId),
+    enabled: profileId !== null,
+    queryFn: async (): Promise<ProfileSettings> => {
+      const id = profileId as string;
+      const loaded = await getUseCase(id);
+      const legacy = readLegacyPrefs();
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(LEGACY_MIGRATED_KEY, "1");
+      }
+      if (!legacy) return loaded;
+      // Fold the legacy device prefs into this profile, once.
+      const merged: ProfileSettings = { ...loaded, ...legacy };
+      void setUseCase(id, merged).catch(() => {});
+      return merged;
+    },
+  });
+
   useEffect(() => {
-    if (!profileId) {
-      setSettings(DEFAULT_PROFILE_SETTINGS);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
-    getUseCase(profileId)
-      .then((loaded) => {
-        if (cancelled) return;
-        const legacy = readLegacyPrefs();
-        if (legacy) {
-          // Fold the legacy device prefs into this profile, once.
-          const merged: ProfileSettings = { ...loaded, ...legacy };
-          setSettings(merged);
-          void setUseCase(profileId, merged).catch(() => {});
-        } else {
-          setSettings(loaded);
-        }
-        if (typeof localStorage !== "undefined") {
-          localStorage.setItem(LEGACY_MIGRATED_KEY, "1");
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, handleError]);
+    if (query.error) reportError(query.error);
+  }, [query.error, reportError]);
+
+  const settings =
+    profileId && query.data ? query.data : DEFAULT_PROFILE_SETTINGS;
 
   // Authoritative note-font reconcile: apply the active profile's font (and
   // refresh the pre-React paint cache). With no profile, restore the default.
   useEffect(() => {
-    applyNoteFont(
-      profileId ? settings.noteFont : DEFAULT_PROFILE_SETTINGS.noteFont,
-    );
-  }, [profileId, settings.noteFont]);
+    applyNoteFont(settings.noteFont);
+  }, [settings.noteFont]);
 
   const update = useCallback(
     async (input: ProfileSettingsInput): Promise<boolean> => {
       if (!profileId) return false;
+      const key = settingsKey(profileId);
       const previous = settings;
       const optimistic: ProfileSettings = {
         ...settings,
         ...input,
         co2: { ...settings.co2, ...(input.co2 ?? {}) },
       };
-      setSettings(optimistic); // optimistic; the note-font effect fires now
-      setIsSubmitting(true);
+      queryClient.setQueryData(key, optimistic); // the note-font effect fires now
       setError(null);
       try {
-        const canonical = await setUseCase(profileId, optimistic);
-        setSettings(canonical);
+        const canonical = await run(() => setUseCase(profileId, optimistic));
+        queryClient.setQueryData(key, canonical);
         return true;
       } catch (e) {
-        setSettings(previous); // roll back
-        handleError(e);
+        queryClient.setQueryData(key, previous); // roll back
+        reportError(e);
         return false;
-      } finally {
-        setIsSubmitting(false);
       }
     },
-    [profileId, settings, handleError],
+    [profileId, settings, queryClient, run, setUseCase, reportError],
   );
 
   const clearError = useCallback(() => setError(null), []);
@@ -158,13 +136,21 @@ export function ProfileSettingsProvider({
   const value = useMemo<ProfileSettingsContextValue>(
     () => ({
       settings,
-      isLoading,
+      isLoading: profileId !== null && query.isPending,
       isSubmitting,
       error,
       update,
       clearError,
     }),
-    [settings, isLoading, isSubmitting, error, update, clearError],
+    [
+      settings,
+      profileId,
+      query.isPending,
+      isSubmitting,
+      error,
+      update,
+      clearError,
+    ],
   );
 
   return (

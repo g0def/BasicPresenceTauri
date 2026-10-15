@@ -2,11 +2,11 @@ use std::path::Path;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use spreadsheet_ods::style::CellStyle;
-use spreadsheet_ods::{format, mm, write_ods, CellStyleRef, Sheet, ValueFormatRef, WorkBook};
+use spreadsheet_ods::{CellStyleRef, Sheet, ValueFormatRef, WorkBook, format, mm, write_ods};
 
 use crate::domain::error::DomainError;
 use crate::domain::services::spreadsheet_exporter::{
-    day_counted_km, summarize_trips, ExportData, ExportLabels, ExportOptions, SpreadsheetExporter,
+    ExportData, ExportLabels, ExportOptions, SpreadsheetExporter, day_counted_km, summarize_trips,
 };
 
 /// Writes an [`ExportData`] as a multi-sheet OpenDocument (`.ods`) workbook with
@@ -90,8 +90,14 @@ impl SpreadsheetExporter for OdsSpreadsheetExporter {
             wb.push_sheet(build_notes_sheet(data, labels, &styles));
         }
 
-        write_ods(&mut wb, path)
-            .map_err(|e| DomainError::Export(format!("failed to write .ods file: {e}")))
+        crate::infrastructure::fs::replace_with(
+            path,
+            |tmp| {
+                write_ods(&mut wb, tmp)
+                    .map_err(|e| DomainError::Export(format!("failed to write .ods file: {e}")))
+            },
+            |e| DomainError::Export(format!("failed to write .ods file: {e}")),
+        )
     }
 }
 
@@ -316,7 +322,7 @@ mod tests {
     use crate::domain::entities::trip::Trip;
     use crate::domain::entities::work_entry::WorkEntry;
     use crate::domain::services::spreadsheet_exporter::DayExport;
-    use calamine::{open_workbook, Data, Ods, Reader};
+    use calamine::{Data, Ods, Reader, open_workbook};
     use std::collections::HashMap;
     use std::path::PathBuf;
 

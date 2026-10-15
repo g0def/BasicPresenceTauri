@@ -4,10 +4,10 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import type { PresenceType } from "@/features/presence/domain/entities/presence";
-import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
-import { dayKey } from "@/features/presence/presentation/day-key";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+import type { PresenceType } from "@/entities/presence/model/presence";
+import { PRESENCE_TYPES } from "@/entities/presence/model/presence";
+import { dayKey } from "@/entities/presence/lib/day-key";
+import { usePresence } from "@/entities/presence/model/use-presence";
 import {
   breakdownByType,
   bucketPresences,
@@ -26,14 +26,16 @@ import {
 // Chart components pull in ECharts; lazy-load them so the library lands in its
 // own chunk that only downloads when the stats page is opened.
 const PeriodBarChart = lazy(() =>
-  import(
-    "@/features/stats/presentation/components/period-bar-chart"
-  ).then((m) => ({ default: m.PeriodBarChart })),
+  import("@/features/stats/presentation/components/period-bar-chart").then(
+    (m) => ({ default: m.PeriodBarChart }),
+  ),
 );
 const BreakdownPie = lazy(() =>
-  import("@/features/stats/presentation/components/breakdown-pie").then((m) => ({
-    default: m.BreakdownPie,
-  })),
+  import("@/features/stats/presentation/components/breakdown-pie").then(
+    (m) => ({
+      default: m.BreakdownPie,
+    }),
+  ),
 );
 
 /** Periods the bar charts show by default (until the user narrows the range). */
@@ -169,7 +171,9 @@ export function StatsPage() {
                 ariaLabel={t("stats.breakdownTitle")}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">{t("stats.empty")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("stats.empty")}
+              </p>
             )}
           </div>
 

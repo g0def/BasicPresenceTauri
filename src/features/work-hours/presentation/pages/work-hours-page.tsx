@@ -6,15 +6,14 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
-import type { Presence } from "@/features/presence/domain/entities/presence";
-import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
+import type { Presence } from "@/entities/presence/model/presence";
+import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import { DayDonut } from "@/features/work-hours/presentation/components/day-donut";
 import { DayNote } from "@/features/work-hours/presentation/components/day-note";
 import { DayScheduleEditor } from "@/features/work-hours/presentation/components/day-schedule-editor";
 import { TaskPresetPanel } from "@/features/work-hours/presentation/components/task-preset-panel";
 import { WorkEntryList } from "@/features/work-hours/presentation/components/work-entry-list";
-import { formatClockTime } from "@/features/work-hours/presentation/duration-format";
+import { formatClockTime } from "@/shared/format/duration-format";
 import { useWorkDay } from "@/features/work-hours/presentation/hooks/use-work-day";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +29,6 @@ interface WorkHoursPageProps {
  */
 export function WorkHoursPage({ presence, date }: WorkHoursPageProps) {
   const { t, i18n } = useTranslation();
-  const { logout } = useAuth();
   const {
     entries,
     totalMinutes,
@@ -43,7 +41,7 @@ export function WorkHoursPage({ presence, date }: WorkHoursPageProps) {
     removeEntry,
     moveEntry,
     setSchedule,
-  } = useWorkDay(presence.id, logout);
+  } = useWorkDay(presence.id);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const lang = i18n.resolvedLanguage ?? "fr";
@@ -126,9 +124,7 @@ export function WorkHoursPage({ presence, date }: WorkHoursPageProps) {
         </div>
       )}
 
-      {!isLoading && (
-        <DayNote presenceId={presence.id} onSessionExpired={logout} />
-      )}
+      {!isLoading && <DayNote presenceId={presence.id} />}
     </section>
   );
 }

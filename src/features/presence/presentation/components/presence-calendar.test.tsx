@@ -16,13 +16,14 @@ import {
 import type {
   Presence,
   PresenceType,
-} from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
 import { PresenceCalendar } from "@/features/presence/presentation/components/presence-calendar";
 import {
   PresenceContext,
   type PresenceContextValue,
-} from "@/features/presence/presentation/context/presence-context";
+} from "@/entities/presence/model/presence-context";
 import { CellDisplayContext } from "@/shared/cell-display/cell-display-context";
+import { DataProviders } from "@/test/app-providers";
 
 const commuteValue: CommuteContextValue = {
   commutes: [],
@@ -83,7 +84,9 @@ async function renderCalendar(value: PresenceContextValue) {
   // Resolve the initial match before rendering, so the index route's content is
   // present synchronously for the queries below (no pending flash).
   await router.load();
-  return render(<RouterProvider router={router} />);
+  return render(<RouterProvider router={router} />, {
+    wrapper: DataProviders,
+  });
 }
 
 /** A context value whose `setPresence` records every call into `calls` (kept

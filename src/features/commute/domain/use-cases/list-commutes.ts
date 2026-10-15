@@ -1,4 +1,4 @@
-import type { Commute } from "@/features/commute/domain/entities/commute";
+import type { Commute } from "@/entities/commute/model/commute";
 import type { CommuteRepository } from "@/features/commute/domain/repositories/commute-repository";
 
 export type ListCommutesUseCase = (profileId: string) => Promise<Commute[]>;

@@ -12,7 +12,7 @@ pub async fn get_profile_settings(
     profile_id: String,
     state: State<'_, AppState>,
 ) -> Result<ProfileSettingsDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state.get_profile_settings.execute(&profile_id).await?)
 }
 
@@ -23,7 +23,7 @@ pub async fn set_profile_settings(
     settings: ProfileSettingsDto,
     state: State<'_, AppState>,
 ) -> Result<ProfileSettingsDto, AppError> {
-    state.require_session.execute()?;
+    state.require_session.execute().await?;
     Ok(state
         .set_profile_settings
         .execute(&profile_id, settings)

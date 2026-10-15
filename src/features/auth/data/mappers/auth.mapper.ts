@@ -13,6 +13,10 @@ export function toAuthSession(dto: LoginResponseDto): AuthSession {
     token: dto.token,
     expiresAt: dto.expiresAt,
     user: toUser(dto.user),
+    securityNotice: {
+      failedAttempts: dto.failedAttemptsSinceLastLogin ?? 0,
+      events: dto.securityEvents ?? [],
+    },
   };
 }
 
