@@ -82,7 +82,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
-calamine = "0.35.0"
+calamine = "0.36.1"
 
 
 # Argon2 is ~10x slower unoptimized: keep `tauri dev` logins (auth hash + 64 MiB
