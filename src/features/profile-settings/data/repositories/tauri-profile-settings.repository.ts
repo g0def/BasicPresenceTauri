@@ -1,6 +1,5 @@
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
-import type { ProfileSettingsDto } from "@/features/profile-settings/data/dto/profile-settings.dto";
 import {
   toProfileSettings,
   toProfileSettingsDto,
@@ -11,7 +10,7 @@ import type { ProfileSettingsRepository } from "@/features/profile-settings/doma
 /** ProfileSettingsRepository implementation backed by Tauri IPC commands. */
 export class TauriProfileSettingsRepository implements ProfileSettingsRepository {
   async get(profileId: string): Promise<ProfileSettings> {
-    const dto = await invoke<ProfileSettingsDto>(COMMANDS.getProfileSettings, {
+    const dto = await invoke(COMMANDS.getProfileSettings, {
       profileId,
     });
     return toProfileSettings(dto);
@@ -21,7 +20,7 @@ export class TauriProfileSettingsRepository implements ProfileSettingsRepository
     profileId: string,
     settings: ProfileSettings,
   ): Promise<ProfileSettings> {
-    const dto = await invoke<ProfileSettingsDto>(COMMANDS.setProfileSettings, {
+    const dto = await invoke(COMMANDS.setProfileSettings, {
       profileId,
       settings: toProfileSettingsDto(settings),
     });

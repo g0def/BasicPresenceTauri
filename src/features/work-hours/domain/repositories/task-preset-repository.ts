@@ -1,7 +1,7 @@
 import type {
   TaskPreset,
   TaskPresetInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 
 export interface TaskPresetRepository {
   listByProfile(profileId: string): Promise<TaskPreset[]>;

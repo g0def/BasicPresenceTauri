@@ -7,7 +7,7 @@ import {
   type Commute,
   type CommuteCategory,
   type EmissionFactor,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 
 function toCategory(value: string): CommuteCategory {
   return (COMMUTE_CATEGORIES as readonly string[]).includes(value)

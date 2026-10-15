@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 interface DayNoteProps {
   presenceId: string;
-  onSessionExpired?: () => void;
 }
 
 // Milkdown (Crepe, ProseMirror-based) is heavy; load it only when the user
@@ -28,10 +27,10 @@ const DayNoteEditor = lazy(() =>
  * tooltips render in portals outside the editable area, so a blur-to-exit would
  * close the editor the moment you click `/code` or a toolbar button.
  */
-export function DayNote({ presenceId, onSessionExpired }: DayNoteProps) {
+export function DayNote({ presenceId }: DayNoteProps) {
   const { t } = useTranslation();
   const { markdown, html, isLoading, isSaving, error, setMarkdown, flush } =
-    useDayNote(presenceId, onSessionExpired);
+    useDayNote(presenceId);
   const [editing, setEditing] = useState(false);
 
   const startEditing = () => setEditing(true);

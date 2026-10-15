@@ -10,21 +10,22 @@ import { useTranslation } from "react-i18next";
 import { isSameMonth } from "date-fns";
 import { Clock, Leaf } from "lucide-react";
 
+import { SecurityNoticeDialog } from "@/features/auth/presentation/components/security-notice-dialog";
 import { SessionCountdown } from "@/features/auth/presentation/components/session-countdown";
 import { useAuth } from "@/features/auth/presentation/hooks/use-auth";
 import { CommuteProvider } from "@/features/commute/presentation/providers/commute-provider";
-import { formatCo2 } from "@/features/commute/presentation/commute-format";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+import { formatCo2 } from "@/entities/commute/lib/commute-format";
+import { usePresence } from "@/entities/presence/model/use-presence";
 import { PresenceProvider } from "@/features/presence/presentation/providers/presence-provider";
 import { ProfileSettingsProvider } from "@/features/profile-settings/presentation/providers/profile-settings-provider";
 import { EmptyProfileState } from "@/features/profile/presentation/components/empty-profile-state";
 import { ProfileBadge } from "@/features/profile/presentation/components/profile-badge";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { useProfile } from "@/entities/profile/model/use-profile";
 import { ProfileProvider } from "@/features/profile/presentation/providers/profile-provider";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { formatMinutes } from "@/shared/format/duration-format";
 import { TaskPresetProvider } from "@/features/work-hours/presentation/providers/task-preset-provider";
 import { VersionBadge } from "@/features/updater/presentation/components/version-badge";
-import { CellDisplayProvider } from "@/shared/cell-display/cell-display-provider";
+import { CellDisplayProvider } from "@/features/profile-settings/presentation/providers/cell-display-provider";
 import { Logo } from "@/shared/components/logo";
 import {
   Tooltip,
@@ -43,18 +44,17 @@ export const Route = createFileRoute("/_authenticated")({
 
 /**
  * Composition root for the authenticated area: feature providers mount once
- * here and stay alive across page navigations, and session-expired errors
- * from any feature bubble into a logout (the guard above then redirects).
+ * here and stay alive across page navigations. Session-expired errors from any
+ * feature are handled centrally by the query client (logout; the guard above
+ * then redirects).
  */
 function AuthenticatedLayout() {
-  const { logout } = useAuth();
-
   return (
-    <ProfileProvider onSessionExpired={logout}>
-      <ProfileSettingsProvider onSessionExpired={logout}>
-        <PresenceProvider onSessionExpired={logout}>
-          <CommuteProvider onSessionExpired={logout}>
-            <TaskPresetProvider onSessionExpired={logout}>
+    <ProfileProvider>
+      <ProfileSettingsProvider>
+        <PresenceProvider>
+          <CommuteProvider>
+            <TaskPresetProvider>
               <CellDisplayProvider>
                 <AppShell />
               </CellDisplayProvider>
@@ -156,6 +156,7 @@ function AppShell() {
       ) : (
         <Outlet />
       )}
+      <SecurityNoticeDialog />
     </main>
   );
 }

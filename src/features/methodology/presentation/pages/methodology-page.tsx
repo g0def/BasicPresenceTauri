@@ -12,11 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { openExternal } from "@/core/external-link";
-import { modeLabel } from "@/features/commute/presentation/mode-labels";
+import { modeLabel } from "@/entities/commute/lib/mode-labels";
+import { CATEGORY_ORDER } from "@/features/methodology/domain/entities/co2-referential";
 import {
-  CATEGORY_ORDER,
-  type Co2ReferentialFactor,
-} from "@/features/methodology/domain/entities/co2-referential";
+  factorsByCategory as groupByCategory,
+  workedExamples,
+} from "@/features/methodology/domain/worked-examples";
 import { useCo2Referential } from "@/features/methodology/presentation/hooks/use-co2-referential";
 import { SOURCE_GROUPS } from "@/features/methodology/presentation/sources";
 
@@ -37,58 +38,14 @@ export function MethodologyPage() {
     [locale],
   );
 
-  const factorsByCategory = useMemo(() => {
-    const map = new Map<string, Co2ReferentialFactor[]>();
-    for (const f of referential?.factors ?? []) {
-      const list = map.get(f.category) ?? [];
-      list.push(f);
-      map.set(f.category, list);
-    }
-    return map;
-  }, [referential]);
-
-  const examples = useMemo(() => {
-    if (!referential) return [];
-    const byId = new Map(referential.factors.map((f) => [f.modeId, f]));
-    const out: {
-      key: "car" | "carpool" | "train" | "plane";
-      km: number;
-      factor: number;
-      total: number;
-    }[] = [];
-    const carPetrol = byId.get("car_petrol");
-    if (carPetrol) {
-      out.push({
-        key: "car",
-        km: 20,
-        factor: carPetrol.value,
-        total: 20 * 2 * carPetrol.value,
-      });
-      out.push({
-        key: "carpool",
-        km: 20,
-        factor: carPetrol.value,
-        total: (20 * 2 * carPetrol.value) / 3,
-      });
-    }
-    const tgv = byId.get("train_hs_fr");
-    if (tgv)
-      out.push({
-        key: "train",
-        km: 400,
-        factor: tgv.value,
-        total: 400 * 2 * tgv.value,
-      });
-    const plane = byId.get("plane_short");
-    if (plane)
-      out.push({
-        key: "plane",
-        km: 500,
-        factor: plane.value,
-        total: 500 * plane.value,
-      });
-    return out;
-  }, [referential]);
+  const factorsByCategory = useMemo(
+    () => groupByCategory(referential?.factors ?? []),
+    [referential],
+  );
+  const examples = useMemo(
+    () => (referential ? workedExamples(referential) : []),
+    [referential],
+  );
 
   return (
     <section className="mt-6 mx-auto w-full max-w-3xl flex flex-col gap-8 pb-12">

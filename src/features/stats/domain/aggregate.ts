@@ -10,8 +10,8 @@ import {
 import type {
   Presence,
   PresenceType,
-} from "@/features/presence/domain/entities/presence";
-import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
+import { PRESENCE_TYPES } from "@/entities/presence/model/presence";
 
 /** Time resolution for the period charts. */
 export type Granularity = "month" | "week";

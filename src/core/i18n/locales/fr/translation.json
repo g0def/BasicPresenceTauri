@@ -2,6 +2,12 @@
   "common": {
     "loading": "Chargement…"
   },
+  "errors": {
+    "generic": "Une erreur est survenue",
+    "unknown": "Une erreur inconnue est survenue",
+    "loginFailed": "Échec de la connexion",
+    "registerFailed": "Échec de la création du compte"
+  },
   "auth": {
     "loginSubtitle": "Entrez votre mot de passe pour déverrouiller vos données.",
     "registerSubtitle": "Première utilisation : créez votre compte propriétaire.",
@@ -12,7 +18,30 @@
     "submitLogin": "Se connecter",
     "tagline": "Suivez vos présences, mesurez votre empreinte carbone.",
     "carbon": "CO₂",
-    "local": "100% local · chiffré"
+    "local": "100% local · chiffré",
+    "noRecoveryWarning": "Vos données sont chiffrées avec ce mot de passe : s'il est perdu, elles ne peuvent pas être récupérées. Notez-le en lieu sûr (gestionnaire de mots de passe).",
+    "changePassword": {
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "confirm": "Confirmer le nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "done": "Mot de passe changé.",
+      "mismatch": "Les deux nouveaux mots de passe ne correspondent pas.",
+      "tooShort": "Le mot de passe doit contenir au moins {{min}} caractères."
+    },
+    "securityNotice": {
+      "title": "Depuis votre dernière connexion",
+      "failedAttempts_one": "{{count}} tentative de connexion échouée",
+      "failedAttempts_other": "{{count}} tentatives de connexion échouées",
+      "dismiss": "J'ai compris",
+      "kinds": {
+        "account_locked": "Compte verrouillé après trop de tentatives",
+        "unclean_shutdown": "L'application s'est arrêtée sans fermeture propre (plantage, coupure)",
+        "tamper_detected": "Une modification du stockage chiffré a été détectée",
+        "tamper_tolerated": "Une modification du stockage chiffré a été tolérée",
+        "password_changed": "Mot de passe changé"
+      }
+    }
   },
   "home": {
     "logout": "Se déconnecter"
@@ -63,7 +92,8 @@
         "DE": "Allemagne",
         "EU": "Europe"
       }
-    }
+    },
+    "securitySection": "Sécurité"
   },
   "profile": {
     "menu": "Menu du compte",
@@ -241,7 +271,8 @@
     "result": "Export réussi : {{days}} jour(s), {{tasks}} tâche(s), {{trips}} trajet(s).",
     "errors": {
       "failed": "Échec de l'export : le fichier n'a pas pu être écrit."
-    }
+    },
+    "unencryptedWarning": "Le fichier exporté n'est pas chiffré : conservez-le en lieu sûr et supprimez-le quand il n'est plus utile."
   },
   "commute": {
     "menuItem": "Modes de déplacement",

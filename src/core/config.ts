@@ -1,3 +1,5 @@
+import type { CommandName } from "@/core/ipc";
+
 /** UI tick for the session countdown. */
 export const SESSION_TICK_MS = 1_000;
 
@@ -17,6 +19,7 @@ export const COMMANDS = {
   login: "login",
   checkSession: "check_session",
   logout: "logout",
+  changePassword: "change_password",
   createProfile: "create_profile",
   listProfiles: "list_profiles",
   updateProfile: "update_profile",
@@ -49,4 +52,10 @@ export const COMMANDS = {
   exportProfileBundle: "export_profile_bundle",
   inspectProfileBundle: "inspect_profile_bundle",
   importProfileBundle: "import_profile_bundle",
-} as const;
+} as const satisfies Record<string, CommandName>;
+
+// Every registered command must also be reachable through COMMANDS (and,
+// above, every COMMANDS entry must be registered): the two lists cannot drift.
+type Unlisted = Exclude<CommandName, (typeof COMMANDS)[keyof typeof COMMANDS]>;
+export const ALL_COMMANDS_LISTED: [Unlisted] extends [never] ? true : Unlisted =
+  true;

@@ -1,4 +1,4 @@
-import type { TaskPreset } from "@/features/work-hours/domain/entities/work-hours";
+import type { TaskPreset } from "@/entities/work-day/model/work-hours";
 import type { TaskPresetRepository } from "@/features/work-hours/domain/repositories/task-preset-repository";
 
 export type ListTaskPresetsUseCase = (

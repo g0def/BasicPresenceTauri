@@ -3,7 +3,7 @@ import { createContext } from "react";
 import type {
   TaskPreset,
   TaskPresetInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 
 export interface TaskPresetContextValue {
   /** Saved task presets of the active profile (alphabetical). */

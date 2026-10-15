@@ -1,9 +1,9 @@
 import { MoveRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { WorkDaySchedule } from "@/features/work-hours/domain/entities/work-hours";
+import type { WorkDaySchedule } from "@/entities/work-day/model/work-hours";
 import { StartTimePicker } from "@/features/work-hours/presentation/components/start-time-picker";
-import { formatClockTime } from "@/features/work-hours/presentation/duration-format";
+import { formatClockTime } from "@/shared/format/duration-format";
 
 interface DayScheduleEditorProps {
   schedule: WorkDaySchedule | null;

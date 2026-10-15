@@ -5,7 +5,7 @@ import type {
 import type {
   Presence,
   PresenceTrip,
-} from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
 
 export function toPresence(dto: PresenceDto): Presence {
   return {

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Profile } from "@/features/profile/domain/entities/profile";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import type { Profile } from "@/entities/profile/model/profile";
+import { useProfile } from "@/entities/profile/model/use-profile";
 
 interface ProfileFormDialogProps {
   open: boolean;
@@ -66,7 +66,7 @@ export function ProfileFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <form onSubmit={onSubmit} className="grid gap-4">
+        <form onSubmit={(e) => void onSubmit(e)} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>
               {isEdit ? t("profile.editTitle") : t("profile.addTitle")}

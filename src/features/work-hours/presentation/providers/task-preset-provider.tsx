@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { isAppError } from "@/core/errors";
-import { TauriTaskPresetRepository } from "@/features/work-hours/data/repositories/tauri-task-preset.repository";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import type {
   TaskPreset,
   TaskPresetInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 import { makeCreateTaskPresetUseCase } from "@/features/work-hours/domain/use-cases/create-task-preset";
 import { makeDeleteTaskPresetUseCase } from "@/features/work-hours/domain/use-cases/delete-task-preset";
 import { makeListTaskPresetsUseCase } from "@/features/work-hours/domain/use-cases/list-task-presets";
@@ -15,126 +18,104 @@ import {
   TaskPresetContext,
   type TaskPresetContextValue,
 } from "@/features/work-hours/presentation/context/task-preset-context";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
-
-// Composition root for the work-hours presets: wire repository to use cases.
-const presetRepo = new TauriTaskPresetRepository();
-const listPresetsUseCase = makeListTaskPresetsUseCase(presetRepo);
-const createPresetUseCase = makeCreateTaskPresetUseCase(presetRepo);
-const updatePresetUseCase = makeUpdateTaskPresetUseCase(presetRepo);
-const deletePresetUseCase = makeDeleteTaskPresetUseCase(presetRepo);
+import { useProfile } from "@/entities/profile/model/use-profile";
 
 const byTitle = (a: TaskPreset, b: TaskPreset) =>
   a.title.localeCompare(b.title);
 
-interface TaskPresetProviderProps {
-  children: ReactNode;
-  /** Called when a command reports a locked vault (SESSION_EXPIRED). Injected
-   * by the composition root (App) so the feature stays independent of auth. */
-  onSessionExpired?: () => void;
-}
+const NO_PRESETS: TaskPreset[] = [];
+const presetsKey = (profileId: string | null) =>
+  ["task-presets", profileId] as const;
 
-export function TaskPresetProvider({
-  children,
-  onSessionExpired,
-}: TaskPresetProviderProps) {
+export function TaskPresetProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? null;
 
-  const [presets, setPresets] = useState<TaskPreset[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { taskPresetRepository } = useContainer();
+  const useCases = useMemo(
+    () => ({
+      list: makeListTaskPresetsUseCase(taskPresetRepository),
+      create: makeCreateTaskPresetUseCase(taskPresetRepository),
+      update: makeUpdateTaskPresetUseCase(taskPresetRepository),
+      remove: makeDeleteTaskPresetUseCase(taskPresetRepository),
+    }),
+    [taskPresetRepository],
+  );
+  const queryClient = useQueryClient();
+  const { run, isPending: isSubmitting } = useCommand();
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback(
+  const reportError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-        onSessionExpired?.();
-        return;
-      }
-      setError(isAppError(e) ? e.message : "Une erreur est survenue");
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
     },
-    [onSessionExpired],
+    [t],
   );
 
-  // Reload presets whenever the active profile changes.
+  // Reloads whenever the active profile changes (the key carries it).
+  const query = useQuery({
+    queryKey: presetsKey(profileId),
+    enabled: profileId !== null,
+    queryFn: () => useCases.list(profileId as string),
+  });
+  const presets = (profileId && query.data) || NO_PRESETS;
+  const isLoading = profileId !== null && query.isPending;
+
   useEffect(() => {
-    if (!profileId) {
-      setPresets([]);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
-    listPresetsUseCase(profileId)
-      .then((list) => {
-        if (!cancelled) setPresets(list);
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, handleError]);
+    if (query.error) reportError(query.error);
+  }, [query.error, reportError]);
+
+  /** Apply a write, then patch the cached list with `patch`. */
+  const mutate = useCallback(
+    async <T,>(
+      work: () => Promise<T>,
+      patch: (prev: TaskPreset[], result: T) => TaskPreset[],
+    ): Promise<boolean> => {
+      setError(null);
+      try {
+        const result = await run(work);
+        queryClient.setQueryData<TaskPreset[]>(
+          presetsKey(profileId),
+          (prev = []) => patch(prev, result),
+        );
+        return true;
+      } catch (e) {
+        reportError(e);
+        return false;
+      }
+    },
+    [profileId, run, queryClient, reportError],
+  );
 
   const createPreset = useCallback(
     async (input: TaskPresetInput): Promise<boolean> => {
       if (!profileId) return false;
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const created = await createPresetUseCase(profileId, input);
-        setPresets((prev) => [...prev, created].sort(byTitle));
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
+      return mutate(
+        () => useCases.create(profileId, input),
+        (prev, created) => [...prev, created].sort(byTitle),
+      );
     },
-    [profileId, handleError],
+    [profileId, mutate, useCases],
   );
 
   const updatePreset = useCallback(
-    async (id: string, input: TaskPresetInput): Promise<boolean> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const updated = await updatePresetUseCase(id, input);
-        setPresets((prev) =>
+    (id: string, input: TaskPresetInput) =>
+      mutate(
+        () => useCases.update(id, input),
+        (prev, updated) =>
           prev.map((p) => (p.id === id ? updated : p)).sort(byTitle),
-        );
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [handleError],
+      ),
+    [mutate, useCases],
   );
 
   const deletePreset = useCallback(
-    async (id: string): Promise<boolean> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await deletePresetUseCase(id);
-        setPresets((prev) => prev.filter((p) => p.id !== id));
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [handleError],
+    (id: string) =>
+      mutate(
+        () => useCases.remove(id),
+        (prev) => prev.filter((p) => p.id !== id),
+      ),
+    [mutate, useCases],
   );
 
   const clearError = useCallback(() => setError(null), []);

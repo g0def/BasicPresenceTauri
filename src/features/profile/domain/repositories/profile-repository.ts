@@ -3,7 +3,7 @@ import type {
   Profile,
   ProfileList,
   UpdateProfileInput,
-} from "@/features/profile/domain/entities/profile";
+} from "@/entities/profile/model/profile";
 
 /** Contract the presentation layer depends on; implemented in the data layer. */
 export interface ProfileRepository {

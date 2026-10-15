@@ -4,8 +4,8 @@ import { relaunch as tauriRelaunch } from "@tauri-apps/plugin-process";
 import type {
   AvailableUpdate,
   DownloadProgress,
-} from "../../domain/entities/update";
-import type { UpdaterRepository } from "../../domain/repositories/updater-repository";
+} from "@/features/updater/domain/entities/update";
+import type { UpdaterRepository } from "@/features/updater/domain/repositories/updater-repository";
 
 /**
  * Only file in the updater feature allowed to import @tauri-apps/plugin-updater
@@ -37,13 +37,17 @@ export class TauriUpdaterRepository implements UpdaterRepository {
       throw new Error("No pending update — call check() first.");
     }
     let downloaded = 0;
+    // The size is only announced once, on "Started": keep it for every
+    // "Progress" event so the progress bar can show a percentage.
+    let total: number | null = null;
     await this.pendingUpdate.downloadAndInstall((event) => {
       if (event.event === "Started") {
         downloaded = 0;
-        onProgress({ downloaded: 0, total: event.data.contentLength ?? null });
+        total = event.data.contentLength ?? null;
+        onProgress({ downloaded: 0, total });
       } else if (event.event === "Progress") {
         downloaded += event.data.chunkLength;
-        onProgress({ downloaded, total: null });
+        onProgress({ downloaded, total });
       }
     });
     this.pendingUpdate = null;

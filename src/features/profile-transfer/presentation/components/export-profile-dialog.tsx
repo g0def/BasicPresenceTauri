@@ -19,7 +19,7 @@ import {
   type BundleSelection,
 } from "@/features/profile-transfer/domain/entities/bundle";
 import { useProfileTransfer } from "@/features/profile-transfer/presentation/hooks/use-profile-transfer";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { useProfile } from "@/entities/profile/model/use-profile";
 
 interface ExportProfileDialogProps {
   open: boolean;
@@ -84,9 +84,14 @@ export function ExportProfileDialog({
         <DialogHeader>
           <DialogTitle>{t("transfer.export.title")}</DialogTitle>
           {stage === "idle" && (
-            <DialogDescription>
-              {t("transfer.export.description")}
-            </DialogDescription>
+            <>
+              <DialogDescription>
+                {t("transfer.export.description")}
+              </DialogDescription>
+              <p className="text-xs text-warning">
+                {t("export.unencryptedWarning")}
+              </p>
+            </>
           )}
         </DialogHeader>
 

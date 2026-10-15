@@ -2,6 +2,12 @@
   "common": {
     "loading": "Loading…"
   },
+  "errors": {
+    "generic": "Something went wrong",
+    "unknown": "An unknown error occurred",
+    "loginFailed": "Sign-in failed",
+    "registerFailed": "Account creation failed"
+  },
   "auth": {
     "loginSubtitle": "Enter your password to unlock your data.",
     "registerSubtitle": "First time here: create your owner account.",
@@ -12,7 +18,30 @@
     "submitLogin": "Sign in",
     "tagline": "Track your presence, measure your carbon footprint.",
     "carbon": "CO₂",
-    "local": "100% local · encrypted"
+    "local": "100% local · encrypted",
+    "noRecoveryWarning": "Your data is encrypted with this password: if you lose it, the data cannot be recovered. Keep it somewhere safe (a password manager).",
+    "changePassword": {
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm the new password",
+      "submit": "Change password",
+      "done": "Password changed.",
+      "mismatch": "The two new passwords do not match.",
+      "tooShort": "The password must be at least {{min}} characters long."
+    },
+    "securityNotice": {
+      "title": "Since your last sign-in",
+      "failedAttempts_one": "{{count}} failed sign-in attempt",
+      "failedAttempts_other": "{{count}} failed sign-in attempts",
+      "dismiss": "Got it",
+      "kinds": {
+        "account_locked": "Account locked after too many attempts",
+        "unclean_shutdown": "The app stopped without closing cleanly (crash, power loss)",
+        "tamper_detected": "A modification of the encrypted storage was detected",
+        "tamper_tolerated": "A modification of the encrypted storage was tolerated",
+        "password_changed": "Password changed"
+      }
+    }
   },
   "home": {
     "logout": "Log out"
@@ -63,7 +92,8 @@
         "DE": "Germany",
         "EU": "Europe"
       }
-    }
+    },
+    "securitySection": "Security"
   },
   "profile": {
     "menu": "Account menu",
@@ -241,7 +271,8 @@
     "result": "Export complete: {{days}} day(s), {{tasks}} task(s), {{trips}} trip(s).",
     "errors": {
       "failed": "Export failed: the file could not be written."
-    }
+    },
+    "unencryptedWarning": "The exported file is not encrypted: keep it somewhere safe and delete it once you no longer need it."
   },
   "commute": {
     "menuItem": "Commute modes",

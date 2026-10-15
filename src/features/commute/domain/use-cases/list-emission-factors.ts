@@ -1,4 +1,4 @@
-import type { EmissionFactor } from "@/features/commute/domain/entities/commute";
+import type { EmissionFactor } from "@/entities/commute/model/commute";
 import type { EmissionFactorRepository } from "@/features/commute/domain/repositories/emission-factor-repository";
 
 export type ListEmissionFactorsUseCase = () => Promise<EmissionFactor[]>;

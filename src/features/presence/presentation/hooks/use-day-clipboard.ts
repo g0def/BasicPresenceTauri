@@ -4,18 +4,13 @@ import type {
   Presence,
   PresenceTrip,
   PresenceType,
-} from "@/features/presence/domain/entities/presence";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+} from "@/entities/presence/model/presence";
+import { usePresence } from "@/entities/presence/model/use-presence";
 import {
   toWorkEntryInput,
   type WorkEntryInput,
-} from "@/features/work-hours/domain/entities/work-hours";
-import {
-  getWorkEntries,
-  getWorkSchedule,
-  setWorkEntries,
-  setWorkSchedule,
-} from "@/features/work-hours/presentation/work-day-actions";
+} from "@/entities/work-day/model/work-hours";
+import { useWorkDayActions } from "@/entities/work-day/api/work-day-actions";
 
 /** Office/remote days carry a commute, a schedule and work entries; the other
  * types are just a presence stamp. */
@@ -72,6 +67,8 @@ export interface UseDayClipboardValue {
 export function useDayClipboard(): UseDayClipboardValue {
   const { presencesByDay, setPresence, getPresenceTrips, reload } =
     usePresence();
+  const { getWorkEntries, getWorkSchedule, setWorkEntries, setWorkSchedule } =
+    useWorkDayActions();
   const [mode, setMode] = useState<ClipboardMode>("idle");
   const [copied, setCopied] = useState<CopiedDay | null>(null);
   const [overwriteApproved, setOverwriteApproved] = useState(false);
@@ -109,7 +106,7 @@ export function useDayClipboard(): UseDayClipboardValue {
         // Best-effort: stay armed so another source day can be tried.
       }
     },
-    [getPresenceTrips],
+    [getPresenceTrips, getWorkSchedule, getWorkEntries],
   );
 
   const pasteOnto = useCallback(
@@ -146,7 +143,14 @@ export function useDayClipboard(): UseDayClipboardValue {
       // Re-pull so the calendar reflects the recomputed work minutes / CO2.
       await reload();
     },
-    [copied, presencesByDay, setPresence, reload],
+    [
+      copied,
+      presencesByDay,
+      setPresence,
+      reload,
+      setWorkSchedule,
+      setWorkEntries,
+    ],
   );
 
   return {

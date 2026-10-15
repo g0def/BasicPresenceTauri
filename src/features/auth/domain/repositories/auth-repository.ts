@@ -12,4 +12,7 @@ export interface AuthRepository {
   login(credentials: Credentials): Promise<AuthSession>;
   checkSession(token: string): Promise<SessionStatus>;
   logout(token: string): Promise<void>;
+  /** Re-wrap the vault keys under a new password (requires an open session;
+   *  the current password is re-verified). */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }

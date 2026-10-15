@@ -1,4 +1,4 @@
-import type { PresenceType } from "@/features/presence/domain/entities/presence";
+import type { PresenceType } from "@/entities/presence/model/presence";
 
 /** Wire shape returned by the Rust commands (serialized camelCase). */
 export interface PresenceDto {

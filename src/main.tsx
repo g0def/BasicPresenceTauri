@@ -3,9 +3,14 @@ import ReactDOM from "react-dom/client";
 
 import "@/index.css";
 import "@/core/i18n";
+import { QueryClientProvider } from "@tanstack/react-query";
+
 import App from "@/App";
+import { createTauriContainer } from "@/app/container";
+import { queryClient } from "@/app/query-client";
+import { ContainerProvider } from "@/core/container-provider";
 import { AuthProvider } from "@/features/auth/presentation/providers/auth-provider";
-import { UpdaterProvider } from "@/features/updater/presentation/providers/updater-provider";
+import { SessionAwareUpdaterProvider } from "@/app/session-aware-updater";
 import { UpdateDialog } from "@/features/updater/presentation/components/update-dialog";
 import { applyStoredNoteFont } from "@/shared/note-font/use-note-font";
 import { applyStoredTheme } from "@/shared/theme/use-theme";
@@ -17,11 +22,15 @@ applyStoredNoteFont();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <AuthProvider>
-      <UpdaterProvider>
-        <App />
-        <UpdateDialog />
-      </UpdaterProvider>
-    </AuthProvider>
+    <ContainerProvider value={createTauriContainer()}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <SessionAwareUpdaterProvider>
+            <App />
+            <UpdateDialog />
+          </SessionAwareUpdaterProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ContainerProvider>
   </React.StrictMode>,
 );

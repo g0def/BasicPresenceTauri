@@ -5,7 +5,7 @@ import type {
 import type {
   TaskPreset,
   WorkEntry,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 
 export function toTaskPreset(dto: TaskPresetDto): TaskPreset {
   return {

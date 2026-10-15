@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 
-import { MODE_LABEL_KEYS } from "@/features/commute/presentation/mode-labels";
+import { MODE_LABEL_KEYS } from "@/entities/commute/lib/mode-labels";
 import type { ExportLabels } from "@/features/export/domain/entities/export";
 
 /**

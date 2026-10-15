@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useUpdater } from "../hooks/use-updater";
+import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
 
 export function UpdateDialog() {
   const { t } = useTranslation();

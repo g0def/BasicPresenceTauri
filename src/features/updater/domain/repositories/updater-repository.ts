@@ -1,4 +1,7 @@
-import type { AvailableUpdate, DownloadProgress } from "../entities/update";
+import type {
+  AvailableUpdate,
+  DownloadProgress,
+} from "@/features/updater/domain/entities/update";
 
 export interface UpdaterRepository {
   check(): Promise<AvailableUpdate | null>;

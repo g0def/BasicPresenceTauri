@@ -1,7 +1,7 @@
 import type {
   Profile,
   UpdateProfileInput,
-} from "@/features/profile/domain/entities/profile";
+} from "@/entities/profile/model/profile";
 import type { ProfileRepository } from "@/features/profile/domain/repositories/profile-repository";
 
 export type UpdateProfileUseCase = (

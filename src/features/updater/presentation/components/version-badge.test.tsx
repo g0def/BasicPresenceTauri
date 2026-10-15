@@ -2,10 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AvailableUpdate } from "../../domain/entities/update";
-import { UpdaterContext } from "../context/updater-context";
-import type { UpdaterContextValue } from "../context/updater-context";
-import { VersionBadge } from "./version-badge";
+import type { AvailableUpdate } from "@/features/updater/domain/entities/update";
+import { UpdaterContext } from "@/features/updater/presentation/context/updater-context";
+import type { UpdaterContextValue } from "@/features/updater/presentation/context/updater-context";
+import { VersionBadge } from "@/features/updater/presentation/components/version-badge";
 
 /** Render the badge under a fake updater context so we drive its state directly
  * (no Tauri IPC). Returns the spies for click assertions. */

@@ -8,11 +8,11 @@ import {
   MIN_MINUTES,
   STEP_MINUTES,
   type WorkEntry,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 import {
   formatClockTime,
   formatMinutes,
-} from "@/features/work-hours/presentation/duration-format";
+} from "@/shared/format/duration-format";
 import { cn } from "@/lib/utils";
 
 interface WorkEntryListProps {

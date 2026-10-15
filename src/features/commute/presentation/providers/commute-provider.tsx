@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { isAppError } from "@/core/errors";
-import { TauriCommuteRepository } from "@/features/commute/data/repositories/tauri-commute.repository";
-import { TauriEmissionFactorRepository } from "@/features/commute/data/repositories/tauri-emission-factor.repository";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import type {
   Commute,
   CreateCommuteInput,
   EmissionFactor,
   UpdateCommuteInput,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 import { makeCreateCommuteUseCase } from "@/features/commute/domain/use-cases/create-commute";
 import { makeDeleteCommuteUseCase } from "@/features/commute/domain/use-cases/delete-commute";
 import { makeListCommutesUseCase } from "@/features/commute/domain/use-cases/list-commutes";
@@ -19,162 +21,110 @@ import {
   CommuteContext,
   type CommuteContextValue,
 } from "@/features/commute/presentation/context/commute-context";
-import { useProfile } from "@/features/profile/presentation/hooks/use-profile";
+import { useProfile } from "@/entities/profile/model/use-profile";
 
-// Composition root for the commute feature: wire repositories to use cases.
-const commuteRepo = new TauriCommuteRepository();
-const factorRepo = new TauriEmissionFactorRepository();
-const listCommutesUseCase = makeListCommutesUseCase(commuteRepo);
-const createCommuteUseCase = makeCreateCommuteUseCase(commuteRepo);
-const updateCommuteUseCase = makeUpdateCommuteUseCase(commuteRepo);
-const deleteCommuteUseCase = makeDeleteCommuteUseCase(commuteRepo);
-const listEmissionFactorsUseCase = makeListEmissionFactorsUseCase(factorRepo);
+const NO_COMMUTES: Commute[] = [];
+const NO_FACTORS: EmissionFactor[] = [];
 
-interface CommuteProviderProps {
-  children: ReactNode;
-  /** Called when a command reports a locked vault (SESSION_EXPIRED). Injected
-   * by the composition root (App) so the feature stays independent of auth. */
-  onSessionExpired?: () => void;
-}
+const commuteKeys = {
+  byProfile: (profileId: string | null) => ["commutes", profileId] as const,
+  factors: ["emission-factors"] as const,
+};
 
-export function CommuteProvider({
-  children,
-  onSessionExpired,
-}: CommuteProviderProps) {
+export function CommuteProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? null;
 
-  const [commutes, setCommutes] = useState<Commute[]>([]);
-  const [emissionFactors, setEmissionFactors] = useState<EmissionFactor[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { commuteRepository, emissionFactorRepository } = useContainer();
+  const useCases = useMemo(
+    () => ({
+      list: makeListCommutesUseCase(commuteRepository),
+      create: makeCreateCommuteUseCase(commuteRepository),
+      update: makeUpdateCommuteUseCase(commuteRepository),
+      remove: makeDeleteCommuteUseCase(commuteRepository),
+      factors: makeListEmissionFactorsUseCase(emissionFactorRepository),
+    }),
+    [commuteRepository, emissionFactorRepository],
+  );
+  const queryClient = useQueryClient();
+  const { run, isPending: isSubmitting } = useCommand();
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback(
+  const reportError = useCallback(
     (e: unknown) => {
-      if (isAppError(e) && e.code === "SESSION_EXPIRED") {
-        onSessionExpired?.();
-        return;
-      }
-      setError(isAppError(e) ? e.message : "Une erreur est survenue");
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
     },
-    [onSessionExpired],
+    [t],
   );
 
-  // The referential is profile-independent but needs an unlocked vault, so load
-  // it once a profile (hence a session) is available.
-  useEffect(() => {
-    if (!profileId) {
-      setEmissionFactors([]);
-      return;
-    }
-    let cancelled = false;
-    listEmissionFactorsUseCase()
-      .then((factors) => {
-        if (!cancelled) setEmissionFactors(factors);
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, handleError]);
+  // The referential is profile-independent but needs an unlocked vault, so it
+  // loads once a profile (hence a session) is available.
+  const factorsQuery = useQuery({
+    queryKey: commuteKeys.factors,
+    enabled: profileId !== null,
+    queryFn: () => useCases.factors(),
+  });
 
+  // Reloads whenever the active profile changes (the key carries it).
+  const commutesQuery = useQuery({
+    queryKey: commuteKeys.byProfile(profileId),
+    enabled: profileId !== null,
+    queryFn: () => useCases.list(profileId as string),
+  });
+
+  useEffect(() => {
+    const e = factorsQuery.error ?? commutesQuery.error;
+    if (e) reportError(e);
+  }, [factorsQuery.error, commutesQuery.error, reportError]);
+
+  // Refresh after a write so the indicative CO2 is recomputed by the backend.
   const reload = useCallback(async (): Promise<void> => {
-    if (!profileId) {
-      setCommutes([]);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      setCommutes(await listCommutesUseCase(profileId));
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [profileId, handleError]);
+    if (!profileId) return;
+    await queryClient.invalidateQueries({
+      queryKey: commuteKeys.byProfile(profileId),
+    });
+  }, [profileId, queryClient]);
 
-  // Reload commutes whenever the active profile changes.
-  useEffect(() => {
-    if (!profileId) {
-      setCommutes([]);
-      return;
-    }
-    let cancelled = false;
-    setIsLoading(true);
-    listCommutesUseCase(profileId)
-      .then((list) => {
-        if (!cancelled) setCommutes(list);
-      })
-      .catch((e) => {
-        if (!cancelled) handleError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [profileId, handleError]);
+  const mutate = useCallback(
+    async (work: () => Promise<unknown>): Promise<boolean> => {
+      setError(null);
+      try {
+        await run(work);
+        await reload();
+        return true;
+      } catch (e) {
+        reportError(e);
+        return false;
+      }
+    },
+    [run, reload, reportError],
+  );
 
   const createCommute = useCallback(
     async (input: CreateCommuteInput): Promise<boolean> => {
       if (!profileId) return false;
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await createCommuteUseCase(profileId, input);
-        await reload(); // refresh so the indicative CO2 is recomputed
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
+      return mutate(() => useCases.create(profileId, input));
     },
-    [profileId, reload, handleError],
+    [profileId, mutate, useCases],
   );
 
   const updateCommute = useCallback(
-    async (input: UpdateCommuteInput): Promise<boolean> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await updateCommuteUseCase(input);
-        await reload();
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [reload, handleError],
+    (input: UpdateCommuteInput) => mutate(() => useCases.update(input)),
+    [mutate, useCases],
   );
 
   const deleteCommute = useCallback(
-    async (id: string): Promise<boolean> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        await deleteCommuteUseCase(id);
-        setCommutes((prev) => prev.filter((c) => c.id !== id));
-        return true;
-      } catch (e) {
-        handleError(e);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [handleError],
+    (id: string) => mutate(() => useCases.remove(id)),
+    [mutate, useCases],
   );
 
   const clearError = useCallback(() => setError(null), []);
+
+  const commutes = (profileId && commutesQuery.data) || NO_COMMUTES;
+  const emissionFactors = (profileId && factorsQuery.data) || NO_FACTORS;
+  const isLoading =
+    profileId !== null && (commutesQuery.isPending || commutesQuery.isFetching);
 
   const value = useMemo<CommuteContextValue>(
     () => ({

@@ -2,7 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
+import { usePresence } from "@/entities/presence/model/use-presence";
 import { WorkHoursPage } from "@/features/work-hours/presentation/pages/work-hours-page";
 
 export const Route = createFileRoute("/_authenticated/work-hours/$day")({

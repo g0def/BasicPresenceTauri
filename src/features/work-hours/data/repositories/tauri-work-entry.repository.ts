@@ -1,17 +1,13 @@
 import { COMMANDS } from "@/core/config";
 import { invoke } from "@/core/ipc";
-import type {
-  WorkDayDto,
-  WorkDayScheduleDto,
-  WorkEntryDto,
-} from "@/features/work-hours/data/dto/work-hours.dto";
+import type { WorkDayScheduleDto } from "@/features/work-hours/data/dto/work-hours.dto";
 import { toWorkEntry } from "@/features/work-hours/data/mappers/work-hours.mapper";
 import type {
   WorkDay,
   WorkDaySchedule,
   WorkEntry,
   WorkEntryInput,
-} from "@/features/work-hours/domain/entities/work-hours";
+} from "@/entities/work-day/model/work-hours";
 import type { WorkEntryRepository } from "@/features/work-hours/domain/repositories/work-entry-repository";
 
 function toSchedule(dto: WorkDayScheduleDto): WorkDaySchedule {
@@ -21,7 +17,7 @@ function toSchedule(dto: WorkDayScheduleDto): WorkDaySchedule {
 /** WorkEntryRepository implementation backed by Tauri IPC commands. */
 export class TauriWorkEntryRepository implements WorkEntryRepository {
   async listByPresence(presenceId: string): Promise<WorkEntry[]> {
-    const dtos = await invoke<WorkEntryDto[]>(COMMANDS.getWorkEntries, {
+    const dtos = await invoke(COMMANDS.getWorkEntries, {
       presenceId,
     });
     return dtos.map(toWorkEntry);
@@ -31,7 +27,7 @@ export class TauriWorkEntryRepository implements WorkEntryRepository {
     presenceId: string,
     entries: WorkEntryInput[],
   ): Promise<WorkDay> {
-    const dto = await invoke<WorkDayDto>(COMMANDS.setWorkEntries, {
+    const dto = await invoke(COMMANDS.setWorkEntries, {
       presenceId,
       entries: entries.map((e) => ({
         title: e.title,
@@ -47,10 +43,7 @@ export class TauriWorkEntryRepository implements WorkEntryRepository {
   }
 
   async getSchedule(presenceId: string): Promise<WorkDaySchedule | null> {
-    const dto = await invoke<WorkDayScheduleDto | null>(
-      COMMANDS.getWorkSchedule,
-      { presenceId },
-    );
+    const dto = await invoke(COMMANDS.getWorkSchedule, { presenceId });
     return dto ? toSchedule(dto) : null;
   }
 
@@ -58,7 +51,7 @@ export class TauriWorkEntryRepository implements WorkEntryRepository {
     presenceId: string,
     startMinutes: number,
   ): Promise<WorkDaySchedule> {
-    const dto = await invoke<WorkDayScheduleDto>(COMMANDS.setWorkSchedule, {
+    const dto = await invoke(COMMANDS.setWorkSchedule, {
       presenceId,
       startMinutes,
     });

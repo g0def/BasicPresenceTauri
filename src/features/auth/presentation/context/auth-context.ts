@@ -1,6 +1,9 @@
 import { createContext } from "react";
 
-import type { Credentials } from "@/features/auth/domain/entities/auth-session";
+import type {
+  Credentials,
+  SecurityNotice,
+} from "@/features/auth/domain/entities/auth-session";
 import type { User } from "@/features/auth/domain/entities/user";
 
 export type AuthStatus = "unauthenticated" | "authenticated";
@@ -19,6 +22,9 @@ export interface AuthContextValue {
   register: (credentials: Credentials) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  /** Security events to show once after login (`null` when nothing to say). */
+  securityNotice: SecurityNotice | null;
+  dismissSecurityNotice: () => void;
 }
 
 // The session token is intentionally NOT exposed here — it stays inside the

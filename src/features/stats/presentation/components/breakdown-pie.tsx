@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PresenceType } from "@/features/presence/domain/entities/presence";
-import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
+import type { PresenceType } from "@/entities/presence/model/presence";
+import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import type { BreakdownSlice } from "@/features/stats/domain/aggregate";
 import { EChart } from "@/features/stats/presentation/components/echart";
 import type { ECOption } from "@/features/stats/presentation/echarts-setup";
@@ -55,5 +55,7 @@ export function BreakdownPie({ slices, ariaLabel }: BreakdownPieProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slices, t, themeTick]);
 
-  return <EChart option={option} className="h-72 w-full" ariaLabel={ariaLabel} />;
+  return (
+    <EChart option={option} className="h-72 w-full" ariaLabel={ariaLabel} />
+  );
 }

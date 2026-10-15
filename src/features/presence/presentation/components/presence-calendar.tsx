@@ -31,14 +31,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatCo2 } from "@/features/commute/presentation/commute-format";
-import { PRESENCE_TYPES } from "@/features/presence/domain/entities/presence";
-import { dayKey } from "@/features/presence/presentation/day-key";
+import { formatCo2 } from "@/entities/commute/lib/commute-format";
+import { PRESENCE_TYPES } from "@/entities/presence/model/presence";
+import { dayKey } from "@/entities/presence/lib/day-key";
 import { PresenceDayDialog } from "@/features/presence/presentation/components/presence-day-dialog";
-import { PRESENCE_STYLES } from "@/features/presence/presentation/components/presence-colors";
+import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import { useDayClipboard } from "@/features/presence/presentation/hooks/use-day-clipboard";
-import { usePresence } from "@/features/presence/presentation/hooks/use-presence";
-import { formatMinutes } from "@/features/work-hours/presentation/duration-format";
+import { usePresence } from "@/entities/presence/model/use-presence";
+import { formatMinutes } from "@/shared/format/duration-format";
 import { useCellDisplayMode } from "@/shared/cell-display/use-cell-display-mode";
 import { cn } from "@/lib/utils";
 

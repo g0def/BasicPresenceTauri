@@ -1,4 +1,4 @@
-import type { Presence } from "@/features/presence/domain/entities/presence";
+import type { Presence } from "@/entities/presence/model/presence";
 import type { PresenceRepository } from "@/features/presence/domain/repositories/presence-repository";
 
 export type ListPresencesUseCase = (profileId: string) => Promise<Presence[]>;

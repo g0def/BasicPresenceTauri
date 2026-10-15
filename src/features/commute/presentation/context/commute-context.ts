@@ -5,7 +5,7 @@ import type {
   CreateCommuteInput,
   EmissionFactor,
   UpdateCommuteInput,
-} from "@/features/commute/domain/entities/commute";
+} from "@/entities/commute/model/commute";
 
 export interface CommuteContextValue {
   /** Saved commutes of the active profile. */

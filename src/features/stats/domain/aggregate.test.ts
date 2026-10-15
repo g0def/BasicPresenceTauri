@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   Presence,
   PresenceType,
-} from "@/features/presence/domain/entities/presence";
+} from "@/entities/presence/model/presence";
 import {
   breakdownByType,
   bucketPresences,
@@ -47,7 +47,11 @@ describe("bucketPresences", () => {
     );
 
     expect(buckets).toHaveLength(1);
-    expect(buckets[0]).toMatchObject({ co2Kg: 10, workMinutes: 540, dayCount: 2 });
+    expect(buckets[0]).toMatchObject({
+      co2Kg: 10,
+      workMinutes: 540,
+      dayCount: 2,
+    });
   });
 
   it("gap-fills empty months between the first and last bucket", () => {
@@ -81,7 +85,11 @@ describe("bucketPresences", () => {
   it("excludes null co2Kg from the CO2 sum but still counts the day", () => {
     const buckets = bucketPresences(
       [
-        presence(utc(2026, 2, 3), { type: "office", co2Kg: 5, workMinutes: 480 }),
+        presence(utc(2026, 2, 3), {
+          type: "office",
+          co2Kg: 5,
+          workMinutes: 480,
+        }),
         presence(utc(2026, 2, 4), {
           type: "vacation",
           co2Kg: null,
@@ -135,7 +143,12 @@ describe("periodKey", () => {
 });
 
 describe("breakdownByType", () => {
-  const all = new Set<PresenceType>(["office", "remote", "vacation", "holiday"]);
+  const all = new Set<PresenceType>([
+    "office",
+    "remote",
+    "vacation",
+    "holiday",
+  ]);
 
   it("counts days per type in canonical order", () => {
     const slices = breakdownByType(

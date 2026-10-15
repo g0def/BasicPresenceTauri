@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import {
   formatClockTime,
   parseClockTime,
-} from "@/features/work-hours/presentation/duration-format";
+} from "@/shared/format/duration-format";
 
 /** Arrow-key step (minutes); Shift steps a full hour. */
 const STEP_MINUTES = 5;
