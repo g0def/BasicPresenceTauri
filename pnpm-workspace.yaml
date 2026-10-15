@@ -1,10 +1,121 @@
+# Supply-chain hardening (pnpm 11). See documentation/audit-securite-2026-10.md.
+
+# Never install a version published less than 7 days ago: most malicious
+# releases (Shai-Hulud-style worms, hijacked maintainer accounts) are detected
+# and unpublished within hours or days. Stricter than the pnpm 11 default (1 day).
+minimumReleaseAge: 10080
+
+# Dependency lifecycle scripts are blocked unless explicitly listed below, and an
+# unlisted package that wants to run one fails the install instead of being
+# silently skipped — so a new build script is always a reviewed decision.
+# Versions published less than 7 days before the security update of 2026-10-14
+# (audit n°2), reviewed and accepted explicitly. Exact versions only: any newer
+# release of these packages is still subject to the 7-day rule.
+minimumReleaseAgeExclude:
+  - '@milkdown/components@7.22.3'
+  - '@milkdown/core@7.22.3'
+  - '@milkdown/crepe@7.22.3'
+  - '@milkdown/ctx@7.22.3'
+  - '@milkdown/exception@7.22.3'
+  - '@milkdown/kit@7.22.3'
+  - '@milkdown/plugin-block@7.22.3'
+  - '@milkdown/plugin-clipboard@7.22.3'
+  - '@milkdown/plugin-cursor@7.22.3'
+  - '@milkdown/plugin-diff@7.22.3'
+  - '@milkdown/plugin-history@7.22.3'
+  - '@milkdown/plugin-indent@7.22.3'
+  - '@milkdown/plugin-listener@7.22.3'
+  - '@milkdown/plugin-slash@7.22.3'
+  - '@milkdown/plugin-streaming@7.22.3'
+  - '@milkdown/plugin-tooltip@7.22.3'
+  - '@milkdown/plugin-trailing@7.22.3'
+  - '@milkdown/plugin-upload@7.22.3'
+  - '@milkdown/preset-commonmark@7.22.3'
+  - '@milkdown/preset-gfm@7.22.3'
+  - '@milkdown/prose@7.22.3'
+  - '@milkdown/transformer@7.22.3'
+  - '@milkdown/utils@7.22.3'
+  - '@ocavue/utils@1.9.0'
+  - '@rollup/rollup-android-arm-eabi@4.64.6'
+  - '@rollup/rollup-android-arm64@4.64.6'
+  - '@rollup/rollup-darwin-arm64@4.64.6'
+  - '@rollup/rollup-darwin-x64@4.64.6'
+  - '@rollup/rollup-freebsd-arm64@4.64.6'
+  - '@rollup/rollup-freebsd-x64@4.64.6'
+  - '@rollup/rollup-linux-arm-gnueabihf@4.64.6'
+  - '@rollup/rollup-linux-arm-musleabihf@4.64.6'
+  - '@rollup/rollup-linux-arm64-gnu@4.64.6'
+  - '@rollup/rollup-linux-arm64-musl@4.64.6'
+  - '@rollup/rollup-linux-loong64-gnu@4.64.6'
+  - '@rollup/rollup-linux-loong64-musl@4.64.6'
+  - '@rollup/rollup-linux-ppc64-gnu@4.64.6'
+  - '@rollup/rollup-linux-ppc64-musl@4.64.6'
+  - '@rollup/rollup-linux-riscv64-gnu@4.64.6'
+  - '@rollup/rollup-linux-riscv64-musl@4.64.6'
+  - '@rollup/rollup-linux-s390x-gnu@4.64.6'
+  - '@rollup/rollup-linux-x64-gnu@4.64.6'
+  - '@rollup/rollup-linux-x64-musl@4.64.6'
+  - '@rollup/rollup-openbsd-x64@4.64.6'
+  - '@rollup/rollup-openharmony-arm64@4.64.6'
+  - '@rollup/rollup-win32-arm64-msvc@4.64.6'
+  - '@rollup/rollup-win32-ia32-msvc@4.64.6'
+  - '@rollup/rollup-win32-x64-gnu@4.64.6'
+  - '@rollup/rollup-win32-x64-msvc@4.64.6'
+  - '@tanstack/history@1.162.5'
+  - '@tanstack/react-router@1.170.44'
+  - '@tanstack/router-core@1.171.37'
+  - '@tanstack/router-generator@1.167.44'
+  - '@tanstack/router-plugin@1.168.46'
+  - '@tanstack/router-utils@1.162.4'
+  - '@tauri-apps/api@2.12.4'
+  - '@tauri-apps/cli-darwin-arm64@2.12.3'
+  - '@tauri-apps/cli-darwin-x64@2.12.3'
+  - '@tauri-apps/cli-linux-arm-gnueabihf@2.12.3'
+  - '@tauri-apps/cli-linux-arm64-gnu@2.12.3'
+  - '@tauri-apps/cli-linux-arm64-musl@2.12.3'
+  - '@tauri-apps/cli-linux-riscv64-gnu@2.12.3'
+  - '@tauri-apps/cli-linux-x64-gnu@2.12.3'
+  - '@tauri-apps/cli-linux-x64-musl@2.12.3'
+  - '@tauri-apps/cli-win32-arm64-msvc@2.12.3'
+  - '@tauri-apps/cli-win32-ia32-msvc@2.12.3'
+  - '@tauri-apps/cli-win32-x64-msvc@2.12.3'
+  - '@tauri-apps/cli@2.12.3'
+  - '@tauri-apps/plugin-dialog@2.8.3'
+  - '@tauri-apps/plugin-opener@2.7.2'
+  - '@tauri-apps/plugin-updater@2.14.0'
+  - '@types/lodash@4.17.26'
+  - '@vue/compiler-core@3.5.44'
+  - '@vue/compiler-dom@3.5.44'
+  - '@vue/compiler-sfc@3.5.44'
+  - '@vue/compiler-ssr@3.5.44'
+  - '@vue/reactivity@3.5.44'
+  - '@vue/runtime-core@3.5.44'
+  - '@vue/runtime-dom@3.5.44'
+  - '@vue/server-renderer@3.5.44'
+  - '@vue/shared@3.5.44'
+  - 'baseline-browser-mapping@2.11.28'
+  - 'caniuse-lite@1.0.30001816'
+  - 'dompurify@3.4.17'
+  - 'electron-to-chromium@1.5.456'
+  - 'node-releases@2.0.58'
+  - 'postcss@8.5.30'
+  - 'prettier@3.9.10'
+  - 'rollup@4.64.6'
+  - 'seroval-plugins@1.6.9'
+  - 'seroval@1.6.9'
+  - 'vue@3.5.44'
+  - 'zod@4.6.7'
+
+strictDepBuilds: true
 allowBuilds:
   esbuild: false
 
-# Relèvements de sécurité de dépendances transitives — à retirer quand les
-# parents les embarqueront (vérifier avec `pnpm why <paquet>`).
+# Relèvements de sécurité de dépendances transitives — épinglés à la version
+# exacte vérifiée (pas de borne ouverte `>=` qui accepterait n'importe quelle
+# future version). À retirer quand les parents les embarqueront
+# (vérifier avec `pnpm why <paquet>`).
 overrides:
-  dompurify: '>=3.4.16' # GHSA-cmwh-pvxp-8882, GHSA-c2j3-45gr-mqc4, GHSA-6688-9rhm-gjv2 (via @milkdown/crepe)
-  esbuild: '>=0.28.1' # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)
-  katex: '>=0.18.2' # GHSA-238p-pmpm-9mq7 (via @milkdown/crepe > remark-math)
-  postcss-selector-parser: '>=7.1.6' # CPU DoS (via @tailwindcss/typography, build uniquement)
+  dompurify: 3.4.17 # GHSA-cmwh-pvxp-8882, GHSA-c2j3-45gr-mqc4, GHSA-6688-9rhm-gjv2 (via @milkdown/crepe)
+  esbuild: 0.28.2 # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)
+  katex: 0.19.0 # GHSA-238p-pmpm-9mq7 (via @milkdown/crepe > remark-math)
+  postcss-selector-parser: 7.1.6 # CPU DoS (via @tailwindcss/typography, build uniquement)
