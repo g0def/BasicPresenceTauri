@@ -30,7 +30,7 @@ système direct au _Shell_ (la WebView). Tout passe par des commandes validées.
 | Persistance | **libSQL** (moteur de Turso), local + **chiffré au repos** (AES-256-CBC)      |
 | Crypto      | **Argon2id** (hash + dérivation de clé), **XChaCha20-Poly1305** (envelope)   |
 | Tests       | `cargo test` (Rust), **Vitest** + Testing Library (front)                    |
-| Outillage   | **pnpm 11** (âge minimum 7 j, builds bloqués), ESLint 9 (typé + frontières de couches + jsx-a11y), Prettier, cargo-deny, zizmor |
+| Outillage   | **pnpm 11** (âge minimum 7 j, builds bloqués), ESLint 9 (typé + frontières de couches + jsx-a11y), Prettier, cargo-deny |
 
 ---
 

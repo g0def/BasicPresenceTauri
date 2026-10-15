@@ -56,7 +56,7 @@ Tous les constats ouverts sont **corrigés ou tranchés par une décision docume
 | `cargo audit` installé sans version | `cargo-deny` (advisories, licences, sources) via action épinglée. |
 | Édition 2021 | Édition 2024. |
 | pnpm sans garde-fous | `packageManager`, `minimumReleaseAge` 7 jours (exceptions nominatives pour les correctifs de l'audit n°2), `strictDepBuilds`, dépendances et overrides en version exacte, `cooldown` Dependabot. |
-| **E1** clé de signature + release | Job dans un environnement `release` protégé, permissions par job, **pas de cache** dans le job qui signe, revérification complète du commit tagué, attestation de provenance, SBOM CycloneDX, `SHA256SUMS`, garde contre la config de test (**I3**), `zizmor` en CI. **Réglages GitHub à faire** : voir [release.md](release.md#protecting-the-signing-key-audit-finding-e1). |
+| **E1** clé de signature + release | Job dans un environnement `release` protégé, permissions par job, **pas de cache** dans le job qui signe, revérification complète du commit tagué, attestation de provenance, SBOM CycloneDX, `SHA256SUMS`, garde contre la config de test (**I3**). **Réglages GitHub à faire** : voir [release.md](release.md#protecting-the-signing-key-audit-finding-e1). |
 | PKGBUILD sans vérification | sha256 épinglé ; licence corrigée (n'était pas MIT). |
 | Pattern d'isolation absent | Activé : liste blanche des commandes, synchronisée avec `lib.rs` par un test. |
 | CSP / config Tauri | `form-action 'none'`, `removeUnusedCommands`, label de fenêtre explicite. `freezePrototype` **non activé** : il casse echarts et Milkdown (`tslib.__extends`), vérifié. `style-src 'unsafe-inline'` conservé (**F6**) : requis par le surligneur syntaxique et Radix ; `script-src 'self'` reste strict. |

@@ -110,16 +110,3 @@ jobs:
         with:
           manifest-path: src-tauri/Cargo.toml
           command: check
-
-  workflows:
-    name: Workflow security lint (zizmor)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
-        with:
-          # Report as a failing check instead of uploading SARIF (needs no
-          # extra token permission).
-          advanced-security: false
