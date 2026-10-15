@@ -43,7 +43,7 @@ chacha20poly1305 = "0.10"
 # Évidence d'altération du vault au repos (HMAC-SHA256 sur le fichier + comparaison
 # constant-time). libSQL 0.9 ne chiffre qu'en AES-256-CBC non authentifié.
 hmac = "0.12"
-sha2 = "0.10"
+sha2 = "0.11"
 subtle = "2"
 
 # Scellement du keystore : clé de device stockée dans le trousseau OS.
