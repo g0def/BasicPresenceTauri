@@ -38,9 +38,9 @@ Tant que ça ne passe pas, inutile de relire le fond.
 
 - [ ] ⛔ Le **`domain`** n'importe **rien** de `application`, `infrastructure`/`data`, `presentation`, **React** ni **Tauri**. (Backend : aucun `use crate::infrastructure::…` dans `domain/`. Front : aucun import depuis `data/`, `presentation/`, `@tauri-apps/*` ou React dans `domain/`.)
 - [ ] L'**inversion de dépendance** passe par des **traits** (Rust) / **interfaces** (TS), jamais par des types concrets.
-- [ ] L'injection des implémentations concrètes se fait **uniquement au point de composition** (`lib.rs` côté Rust ; `AuthProvider` et le layout [routes/\_authenticated.tsx](../src/routes/_authenticated.tsx) qui monte les providers de features côté React) — jamais dans le domaine ni les use cases.
+- [ ] L'injection des implémentations concrètes se fait **uniquement au point de composition** (`lib.rs` côté Rust ; [app/container.ts](../src/app/container.ts) côté React, fourni par `ContainerProvider` et lu via `useContainer()`) — jamais dans le domaine, les use cases ni la présentation (aucun `new Tauri…Repository()` ailleurs).
 - [ ] Le sens des `use`/`import` respecte le schéma : `presentation → application → domain` et `infrastructure → domain`. Aucune flèche ne sort du domaine.
-- [ ] Une feature ne dépend pas d'une autre via ses couches internes (`features/profile` n'importe pas `features/auth/data/...`). Le transverse vit dans `core/` / `shared/`.
+- [ ] Une feature n'importe **aucune** autre feature (seule dérogation : `presence` → `commute`). Le partagé métier vit dans `entities/`, le générique dans `shared/`/`core/`, la composition de plusieurs features dans `pages/`. Vérifié par ESLint (`no-restricted-imports` par couche et par feature, [eslint.config.js](../eslint.config.js)).
 
 ---
 
@@ -65,6 +65,8 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Renvoie un `Result<…, DomainError>` ; aucune dépendance Tauri/HTTP.
 - [ ] **DTOs** dans `application/dto/` en `#[serde(rename_all = "camelCase")]` (frontière JS). 🔒 Un DTO **n'expose jamais** `password_hash`, `wrapped_dek`, `kek_salt`, `dek_nonce`, ni le DEK/KEK/token brut.
 - [ ] Pas de logique technique (SQL, chiffrement) dans le use case — ça vit dans l'infra.
+- [ ] Les règles de validation viennent de [domain/rules.rs](../src-tauri/src/domain/rules.rs) / [policy.rs](../src-tauri/src/domain/policy.rs), jamais d'un autre use case ; un helper partagé entre use cases va dans `application/services/`.
+- [ ] Un use case qui écrit via **plus d'un** appel de dépôt passe par le port `UnitOfWork` (tout ou rien).
 
 ### 2.3 Infrastructure — implémente les ports
 
@@ -74,7 +76,9 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] Les bibliothèques tierces (libsql, argon2, getrandom) sont **enveloppées** ici et ne fuitent pas vers le haut.
 - [ ] Erreurs techniques **mappées** vers `DomainError` (les détails SQL/crypto ne remontent pas tels quels).
 - [ ] Migrations SQL embarquées et **versionnées** dans [../src-tauri/migrations/](../src-tauri/migrations/) (`keystore/` clair, `vault/` chiffré). Nouvelle migration = nouveau fichier numéroté, **jamais** d'édition d'une migration déjà livrée.
-- [ ] Le choix keystore (clair) vs vault (chiffré) est respecté : 🔒 toute donnée de présence/CO₂ va dans `vault/`, jamais dans `keystore/`.
+- [ ] Le choix keystore (scellé par la clé de device) vs vault (chiffré par le DEK) est respecté : 🔒 toute donnée de présence/CO₂ va dans `vault/`, jamais dans `keystore/`.
+- [ ] ⛔ Aucune écriture du coffre hors de `LibsqlVaultManager::write` / `execute_write` / `unit_of_work` ; **jamais** de `execute("BEGIN")` manuel (garde CI).
+- [ ] Travail bloquant (Argon2, gros fichiers) via `spawn_blocking`, pas sur l'exécuteur async. Fichier écrit pour l'utilisateur → écriture atomique ([infrastructure/fs](../src-tauri/src/infrastructure/fs/mod.rs)).
 
 ### 2.4 Presentation — commandes Tauri (frontière IPC)
 
@@ -83,7 +87,9 @@ Tant que ça ne passe pas, inutile de relire le fond.
 - [ ] ⛔ **Aucune logique métier** dans une `#[tauri::command]` : elle récupère le `State`, appelle le use case, mappe l'erreur. C'est tout.
 - [ ] Commandes `async` renvoyant un `Result`. `DomainError → AppError` sérialisable `{ code, message }` ([error.rs](../src-tauri/src/presentation/commands/error.rs)) — 🔒 détails internes masqués (`INTERNAL`).
 - [ ] 🔒 Toutes les entrées venant du front sont **validées/normalisées** (trim, longueurs) — côté domaine de préférence.
-- [ ] Nouvelle commande = enregistrée dans le `invoke_handler` de [lib.rs](../src-tauri/src/lib.rs) **et** son nom ajouté côté front dans [config.ts](../src/core/config.ts).
+- [ ] Nouvelle commande = enregistrée dans le `invoke_handler` de [lib.rs](../src-tauri/src/lib.rs), ajoutée à la **liste blanche d'isolation** ([isolation/index.js](../src-tauri/isolation/index.js) — un test le vérifie), déclarée dans le `commands.ts` de sa feature (registre typé) et nommée dans [config.ts](../src/core/config.ts) (exhaustivité vérifiée à la compilation).
+- [ ] 🔒 ⛔ Aucun **chemin de fichier** en paramètre de commande : le dialogue natif s'ouvre côté Rust ([file_dialogs.rs](../src-tauri/src/presentation/file_dialogs.rs)).
+- [ ] 🔒 Toute commande du coffre appelle `require_session` en première ligne (et à nouveau après un dialogue natif).
 
 ### 2.5 Composition root & qualité Rust
 
@@ -102,7 +108,7 @@ Tant que ça ne passe pas, inutile de relire le fond.
 [../src/core/](../src/core/)
 
 - [ ] ⛔ **Seul** [core/ipc.ts](../src/core/ipc.ts) importe `@tauri-apps/api` (règle ESLint `no-restricted-imports`). Tout le reste passe par les repositories.
-- [ ] Les noms de commandes IPC sont centralisés dans [config.ts](../src/core/config.ts) (pas de chaîne magique `invoke('login')` dispersée).
+- [ ] Les noms de commandes IPC sont centralisés dans [config.ts](../src/core/config.ts) et typés par le registre `CommandRegistry` ([ipc.ts](../src/core/ipc.ts)) : pas de `invoke<T>` à type deviné, pas de chaîne magique.
 - [ ] Les erreurs IPC sont normalisées via [errors.ts](../src/core/errors.ts) (`AppError` / `normalizeError`).
 
 ### 3.2 domain/ (feature) — entités, interfaces, use cases purs
@@ -126,8 +132,8 @@ ex. [../src/features/profile/data/](../src/features/profile/data/)
 ex. [../src/features/profile/presentation/](../src/features/profile/presentation/)
 
 - [ ] ⛔ Les **composants** ne font ni appel IPC, ni logique métier : ils consomment des hooks. UI séparée de la logique.
-- [ ] Les **hooks** (`useAuth`, `useProfile`) orchestrent les use cases ; le **provider** est la composition root front (instancie repository + use cases et les fournit par contexte).
-- [ ] État : local pour l'UI, contexte React pour le partagé (pas de lib d'état externe — décision projet, cf. [Claude.md §2](../Claude.md)).
+- [ ] Les **hooks** (`useAuth`, `useProfile`) orchestrent les use cases ; les dépôts viennent de `useContainer()`, jamais d'un `new` local.
+- [ ] État serveur via **TanStack Query** (clés incluant le `profileId`), écritures via `useCommand()` ; `SESSION_EXPIRED` n'est **jamais** traité localement (géré une fois par le query client). État d'UI : local ou contexte ([ADR 0003](adr/0003-tanstack-query.md)).
 - [ ] Composant nettoie ses effets (`useEffect` cleanup : timers, listeners — cf. [use-session-timer.ts](../src/features/auth/presentation/hooks/use-session-timer.ts)).
 
 ### 3.5 Routing (TanStack Router, file-based)
@@ -165,6 +171,9 @@ ex. [../src/features/profile/presentation/](../src/features/profile/presentation
 - [ ] Anti-bruteforce préservé (verrouillage, erreur **générique** `InvalidCredentials`, timing égalisé pour username inconnu — cf. [login.rs](../src-tauri/src/application/use_cases/login.rs)).
 - [ ] **Tauri capabilities** : moindre privilège — toute nouvelle permission dans [../src-tauri/capabilities/](../src-tauri/capabilities/) est justifiée et minimale (rappel : une `#[tauri::command]` applicative ne nécessite **pas** d'entrée capability).
 - [ ] Mémoire sensible zeroïsée ; pas de copie persistante du mot de passe.
+- [ ] Entrées bornées (longueurs, nombres, tailles) via `domain/rules.rs` — y compris pour l'import de fichiers.
+- [ ] `dangerouslySetInnerHTML` uniquement sur du HTML assaini côté Rust (règle ESLint).
+- [ ] Aucun test ne « prouve » une protection uniquement sur le cas nominal : tester aussi le **contournement** (fichiers annexes supprimés/créés, appels concurrents, entrées géantes).
 
 ---
 
@@ -213,6 +222,8 @@ Pour une nouvelle entité (ex. `Presence`), l'ordre **domain → application →
 - 🚩 Un type tiers (libsql, argon2, axum-like) dans une signature de trait/interface du domaine.
 - 🚩 `unwrap()`/`panic!` (Rust) ou `any`/`../../../` (TS) qui se glissent dans le diff.
 - 🚩 `invoke(...)` ou `@tauri-apps/api` ailleurs que dans `core/ipc.ts`.
+- 🚩 Un `path: String` dans une commande Tauri, un `execute("BEGIN")` dans un dépôt, un `new Tauri…Repository()` hors de `app/container.ts`.
+- 🚩 Un état de sécurité (marqueur, empreinte, compteur) stocké dans un fichier non authentifié.
 - 🚩 Un champ sensible (hash, clé, token) dans un DTO renvoyé au front.
 - 🚩 Édition d'une migration déjà livrée au lieu d'en ajouter une nouvelle.
 - 🚩 Chaîne UI en dur (sans i18n) ou clé présente dans `en` mais pas `fr`.

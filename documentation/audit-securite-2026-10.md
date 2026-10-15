@@ -8,6 +8,8 @@
 | **Périmètre** | Suivi des constats de l'[audit du 3 juillet](audit-securite-architecture.md) ; code ajouté depuis `cde8ddb` (export ODS « description des transports », +1 659 lignes) ; dépendances npm et crates ; CI/CD ; état du dossier de données sur disque |
 | **Méthode** | `pnpm audit`, `cargo audit` + requêtes OSV sur les 718 crates du `Cargo.lock`, traçage des chemins de dépendance (`pnpm why`, `cargo tree -i`), revue manuelle des nouveaux fichiers et des surfaces d'entrée (Markdown, import de bundle, export ODS), inspection des permissions des fichiers de données |
 
+> **Suivi :** les constats encore ouverts ici (E1, M1, M2, M5, F6, I1, I4, I6) et de nouveaux défauts ont été traités le 15 octobre 2026 — voir [audit-securite-2026-10-remediation.md](audit-securite-2026-10-remediation.md).
+
 ---
 
 ## 1. Synthèse exécutive

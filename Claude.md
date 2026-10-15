@@ -16,7 +16,7 @@ Contexte projet pour Claude Code. Application desktop **Tauri v2** avec un backe
 Tauri suit un modèle **Core-Shell** : le _Core_ Rust ne doit jamais exposer d'accès
 système direct au _Shell_ (la WebView). Tout passe par des commandes validées.
 
-> 📚 Documentation détaillée : [documentation/auth.md](documentation/auth.md) (sécurité / authentification) et [documentation/turso.md](documentation/turso.md) (persistance libSQL / Turso).
+> 📚 Documentation détaillée : [documentation/auth.md](documentation/auth.md) (sécurité / authentification), [documentation/turso.md](documentation/turso.md) (persistance libSQL / Turso), [documentation/adr/](documentation/adr/README.md) (décisions d'architecture) et [documentation/audit-securite-2026-10-remediation.md](documentation/audit-securite-2026-10-remediation.md) (dernier audit).
 
 ---
 
@@ -24,13 +24,13 @@ système direct au _Shell_ (la WebView). Tout passe par des commandes validées.
 
 | Couche      | Technologies                                                                 |
 | ----------- | ---------------------------------------------------------------------------- |
-| Frontend    | React 19, TypeScript, Vite 7, **TanStack Router** (file-based), état via **React Context** (pas de lib externe) |
+| Frontend    | React 19, TypeScript, Vite 7, **TanStack Router** (file-based), **TanStack Query** (état serveur) + React Context (état d'UI), conteneur d'injection (`core/di`) |
 | Bridge      | `@tauri-apps/api` (core)                                                      |
-| Backend     | Rust (édition 2021), Tauri v2                                                 |
+| Backend     | Rust (édition 2024), Tauri v2 (**pattern d'isolation**)                       |
 | Persistance | **libSQL** (moteur de Turso), local + **chiffré au repos** (AES-256-CBC)      |
 | Crypto      | **Argon2id** (hash + dérivation de clé), **XChaCha20-Poly1305** (envelope)   |
 | Tests       | `cargo test` (Rust), **Vitest** + Testing Library (front)                    |
-| Outillage   | **pnpm**, ESLint 9 (flat config), Prettier                                   |
+| Outillage   | **pnpm 11** (âge minimum 7 j, builds bloqués), ESLint 9 (typé + frontières de couches + jsx-a11y), Prettier, cargo-deny, zizmor |
 
 ---
 
@@ -58,6 +58,7 @@ cargo check        # vérification rapide
 cargo test         # tests unitaires + intégration
 cargo clippy -- -D warnings   # lint Rust (zéro warning)
 cargo fmt          # formatage
+cargo deny check   # advisories, licences, sources des crates
 ```
 
 > Privilégie l'exécution d'un **test ciblé** plutôt que toute la suite pendant le dev.
@@ -100,15 +101,21 @@ src-tauri/
     ├── lib.rs                   # POINT DE COMPOSITION : setup, DI (build_state), commandes
     ├── integration_tests.rs     # Test e2e backend (register→login→session + chiffrement)
     ├── domain/                  # ── Domain (pur, aucune dépendance externe)
+    │   ├── policy.rs            #    AuthPolicy, KdfParams, règles de mot de passe (politiques de sécurité)
+    │   ├── rules.rs             #    TOUTES les règles de validation/bornes des entrées (commandes + import)
     │   ├── entities/            #    user, account, session, profile, profile_settings, presence, commute,
-    │   │                        #    trip, emission_factor, co2_settings, task_preset, work_entry, work_day_schedule
+    │   │                        #    trip, emission_factor, co2_settings, task_preset, work_entry, work_day_schedule,
+    │   │                        #    security_event
     │   ├── repositories/        #    traits AccountRepository, ProfileRepository, ProfileSettingsRepository,
     │   │                        #    PresenceRepository, CommuteRepository, EmissionFactorRepository,
     │   │                        #    TaskPresetRepository, WorkEntryRepository
     │   ├── services/            #    ports : PasswordHasher, KeyService, TokenGenerator, SessionStore,
-    │   │                        #    VaultManager, Clock + service pur Co2Calculator
+    │   │                        #    VaultManager, UnitOfWork, Clock + service pur Co2Calculator
+    │   │                        #    (+ repositories/security_log : journal de sécurité)
     │   └── error.rs             #    DomainError
     ├── application/             # ── Application (dépend du Domain)
+    │   ├── services/            #    helpers partagés entre use cases : credentials (unlock/seal des clés,
+    │   │                        #    verrouillage), commute_builder, factor_maps
     │   ├── use_cases/           #    auth + profils + présences (set/list/delete/import) +
     │   │                        #    commute (create/update/delete/list), emission_factors, presence_trips +
     │   │                        #    task_preset (create/list/update/delete), work_entries/work_schedule (get/set),
@@ -116,23 +123,33 @@ src-tauri/
     │   └── dto/                 #    *Dto (serde camelCase) : user/login/session/profile/profile_settings/
     │                            #    presence/commute/trip/emission_factor/task_preset/work_entry
     ├── infrastructure/          # ── Infrastructure (implémente les ports)
-    │   ├── crypto/              #    Argon2PasswordHasher, Argon2KeyService, RandomTokenGenerator
-    │   ├── persistence/         #    db (libsql), migrations, *_repository (account/profile/presence/
-    │   │                        #    commute/emission_factor/profile_settings/task_preset/work_entry), vault
+    │   ├── crypto/              #    Argon2PasswordHasher, Argon2KeyService (AAD v2), RandomTokenGenerator,
+    │   │                        #    device_key (trousseau OS), run_blocking (spawn_blocking)
+    │   ├── persistence/         #    db (libsql), migrations (transactionnelles), *_repository,
+    │   │                        #    vault (write/unit_of_work), vault_integrity + integrity_store (état scellé
+    │   │                        #    dans le keystore), security_log_repository, keystore_bootstrap
+    │   ├── fs/                  #    écriture atomique (temp + fsync + rename)
     │   ├── session/             #    InMemorySessionStore
     │   ├── clock.rs             #    SystemClock
     │   └── config.rs            #    AppConfig (chemins, params Argon2, politique session/lockout)
     └── presentation/            # ── Presentation (frontière IPC)
-        ├── commands/            #    auth.rs, profile.rs, settings.rs, presence.rs, commute.rs, work_hours.rs (fines) + error.rs (AppError)
+        ├── commands/            #    auth.rs, profile.rs, settings.rs, presence.rs, commute.rs, work_hours.rs,
+        │                        #    export.rs, transfer.rs, legal.rs (fines) + error.rs (AppError)
+        ├── file_dialogs.rs      #    dialogues natifs ouverts CÔTÉ RUST + handles d'import (aucun chemin dans l'IPC)
         └── state.rs             #    AppState injecté via .manage()
 ```
+
+`src-tauri/isolation/` = application d'isolation Tauri (HTML + JS sans dépendance) : **liste blanche
+des commandes** ; toute nouvelle commande doit y être ajoutée (un test le vérifie).
 
 ### Conventions backend
 
 - `main.rs` reste minimal. Toute la configuration vit dans `lib.rs` via `run()`.
 - **Composition root** dans `lib.rs` (`build_state`) : construire les impls d'infrastructure, les injecter dans les use cases (`Arc<dyn Trait>`), assembler l'`AppState`, puis `.manage(state)`.
 - Une **commande Tauri** ne contient pas de logique métier : elle récupère le `State`, appelle le use case, et mappe `DomainError` → `AppError` sérialisable (`{ code, message }`, détails internes masqués).
-- Les commandes sont `async` et renvoient un `Result`.
+- Les commandes sont `async` et renvoient un `Result`. **Aucun chemin de fichier** en paramètre : les dialogues natifs sont ouverts côté Rust (`presentation/file_dialogs.rs`).
+- **Écritures du coffre** : uniquement via `LibsqlVaultManager::write` / `execute_write` / `unit_of_work` (connexion dédiée + verrou). Jamais de `execute("BEGIN")` manuel. Plusieurs écritures dans un use case → port `UnitOfWork`.
+- **Validation** : règles dans `domain/rules.rs` (ou `policy.rs`), jamais importées d'un autre use case.
 - Pas d'`unwrap()` / `panic!` dans les chemins d'exécution. `cargo fmt` + `cargo clippy -- -D warnings` doivent passer **sans warning**.
 - Matériel sensible (mot de passe, KEK, DEK) effacé via `zeroize` / `Zeroizing`.
 
@@ -144,56 +161,37 @@ Organisation **feature-first** : chaque feature porte ses propres couches `domai
 
 ```
 src/
-├── main.tsx                     # Entrée React — monte <AuthProvider> puis <App>
-├── App.tsx                      # Bridge AuthContext → routeur (RouterProvider + invalidate)
+├── main.tsx                     # Entrée React — ContainerProvider > QueryClientProvider > AuthProvider > updater > App
+├── App.tsx                      # Bridge AuthContext → routeur + logout central (SESSION_EXPIRED) + purge du cache
 ├── router.ts                    # Singleton createRouter (hash history, contexte { auth })
 ├── routeTree.gen.ts             # GÉNÉRÉ par @tanstack/router-plugin — committé, jamais édité
+├── app/                         # COMPOSITION ROOT : container.ts (SEUL lieu des `new Tauri…Repository()`),
+│                                #    query-client.ts, session-aware-updater.tsx, __tests__/ (tests app complète)
 ├── routes/                      # Routes file-based (fichiers MINCES : composition seulement)
-│   ├── __root.tsx               #    racine typée createRootRouteWithContext<{ auth }> + devtools (dev)
-│   ├── login.tsx                #    /login — beforeLoad: connecté → redirect "/"
-│   ├── _authenticated.tsx       #    garde (beforeLoad → /login) + providers features + shell (header)
-│   └── _authenticated/          #    / (calendrier), /commutes, /commutes/new, /commutes/$id/edit, /work-hours/$day
-├── core/                        # Transverse : config, erreurs, wrapper IPC
-│   ├── ipc.ts                   #    encapsule invoke() — SEUL à importer @tauri-apps/api
-│   ├── errors.ts                #    AppError + normalizeError
-│   └── config.ts                #    constantes + noms de commandes
-└── features/
-    ├── auth/
-    │   ├── domain/              #    entities, repositories (interfaces), use-cases (purs)
-    │   ├── data/                #    dto, mappers, TauriAuthRepository (→ core/ipc)
-    │   └── presentation/        #    AuthProvider (composition root front), hooks, écrans
-    ├── profile/                 #    Gestion des profils de présence (multi-profils)
-    │   ├── domain/              #    Profile, ProfileRepository, use-cases purs
-    │   ├── data/                #    dto, mapper, TauriProfileRepository (→ core/ipc)
-    │   └── presentation/        #    ProfileProvider, useProfile, formulaire (Dialog),
-    │                            #    badge = menu compte (profils + langue + thème + déconnexion)
-    ├── presence/                #    Calendrier des présences (PresenceProvider, usePresence)
-    ├── commute/                 #    Trajets domicile-travail + facteurs d'émission CO₂
-    │   ├── domain/              #    Commute, EmissionFactor, commuteToTrips, repositories, use-cases
-    │   ├── data/                #    dto, mappers, TauriCommuteRepository / TauriEmissionFactorRepository
-    │   └── presentation/        #    CommuteProvider, useCommute, SegmentEditor (mutualisé)
-    │       └── pages/           #    écrans routés : CommuteListPage, CommuteFormPage
-    ├── export/                  #    Export tableur .ods (ExportDialog → export_profile_data)
-    ├── profile-transfer/        #    Partage de profil .json : export / inspect / import bundle
-    │   ├── domain/              #    bundle (types), TransferRepository
-    │   ├── data/                #    TauriTransferRepository (→ core/ipc + plugin-dialog)
-    │   └── presentation/        #    useProfileTransfer, ExportProfileDialog, ImportProfileDialog
-    └── work-hours/              #    Encodage des heures d'un jour office/remote (page /work-hours/$day)
-        ├── domain/              #    TaskPreset, WorkEntry/WorkDaySchedule, repositories, use-cases purs
-        ├── data/                #    dto, mappers, TauriTaskPresetRepository / TauriWorkEntryRepository
-        └── presentation/        #    TaskPresetProvider, useWorkDay (persistance live), DayDonut,
-                                 #    WorkEntryList, DayScheduleEditor + page WorkHoursPage
+├── pages/                       # Écrans composant plusieurs features (settings/ + sections/)
+├── features/<feature>/          # Une capacité métier ; n'importe AUCUNE autre feature (sauf presence → commute)
+│   ├── domain/                  #    entités, ports (interfaces), use cases purs
+│   ├── data/                    #    dto, mappers, Tauri*Repository, commands.ts (déclaration IPC typée)
+│   ├── presentation/            #    providers (TanStack Query), hooks, composants, pages
+│   └── di.ts                    #    ports pris dans le conteneur (augmentation de `Container`)
+├── entities/                    # Modèles/contextes partagés entre features : profile (actif), presence,
+│                                #    commute (formats, libellés), work-day (actions jour)
+├── shared/ components/ lib/     # UI kit, hooks et formats génériques
+└── core/                        # ipc.ts (SEUL import @tauri-apps/api, registre typé), di.ts, query.ts,
+                                 #    errors.ts, i18n, config.ts (COMMANDS, vérifié exhaustif)
 ```
 
-> **Dépendances dirigées assumées vers `commute`** — deux niveaux, la règle commune étant
-> l'**absence de cycle** (rien dans `commute` n'importe un de ses consommateurs) :
+Features : `auth`, `profile`, `profile-settings`, `presence`, `commute`, `work-hours`, `export`,
+`profile-transfer`, `stats`, `methodology`, `licence`, `updater`.
+
+> **Frontières vérifiées par ESLint** ([eslint.config.js](eslint.config.js)) : une couche n'importe
+> que celles du dessous (`app` > `routes` > `pages` > `features` > `entities` > `shared` > `core`),
+> une feature n'importe aucune autre feature, le `domain` reste pur, les imports relatifs parents
+> (`../`) sont interdits (alias `@/` obligatoire).
 >
-> - **Vocabulaire de présentation, ouvert à toutes les features.** Deux modules feuilles, sans état
->   ni dépendance (hors le type `TFunction`) : `commute-format.ts` (`formatCo2`, `summarizeSegments`),
->   consommé par `presence`, `stats` et le shell `routes/_authenticated.tsx` ; et `mode-labels.ts`
->   (`MODE_LABEL_KEYS`, `modeLabel`), consommé par `methodology` et `export`. Les importer ne demande
->   pas de justification particulière.
-> - **Dépendance lourde, réservée à `presence`.** L'empreinte CO₂ étant attachée à un jour de présence,
+> - **Vocabulaire partagé** (`formatCo2`, `summarizeSegments`, libellés de modes, profil actif,
+>   présences, durée) : dans `entities/` ou `shared/`, importable par toutes les features.
+> - **Dérogation unique : `presence` → `commute`.** L'empreinte CO₂ étant attachée à un jour de présence,
 >   le dialog de présence consomme `SegmentEditor`/`useCommute`. Dérogation **délibérée** à l'isolation
 >   des features, justifiée par le couplage métier (détail dans [documentation/auth.md](documentation/auth.md))
 >   — à ne pas étendre à d'autres features sans le même niveau de justification.
@@ -222,7 +220,10 @@ src/
 
 ### Conventions frontend
 
-- **Seul `core/ipc.ts`** importe `@tauri-apps/api` (règle vérifiée par ESLint `no-restricted-imports`). Le reste passe par les repositories.
+- **Seul `core/ipc.ts`** importe `@tauri-apps/api` (règle ESLint) ; les plugins Tauri ne sont importés que par leur fichier frontière. Le reste passe par les repositories.
+- **IPC typé** : chaque commande est déclarée dans le `data/commands.ts` de sa feature (augmentation de `CommandRegistry`) ; `invoke(COMMANDS.x, args)` infère arguments et résultat.
+- **Injection** : les dépôts viennent de `useContainer()` ; nouvelle feature = `di.ts` + entrée dans `app/container.ts`.
+- **État serveur** : TanStack Query (clés avec `profileId`) ; écritures via `useCommand()`. Ne **jamais** traiter `SESSION_EXPIRED` localement (géré par le query client).
 - Une **impl de repository** (couche data) appelle `invoke('cmd', {...})` puis mappe le DTO → entité du domaine.
 - Les **composants** ne contiennent ni appel IPC, ni logique métier complexe ; ils consomment des données via des hooks.
 - Les **hooks** orchestrent les use cases (ex : `useAuth`).
@@ -236,7 +237,9 @@ src/
 - **Mot de passe** : haché en **Argon2id** (jamais stocké en clair, jamais envoyé au front).
 - **Chiffrement au repos** : _envelope encryption_ à clé dérivée du mot de passe. Un DEK aléatoire chiffre le coffre `vault.db` ; le DEK est enveloppé (XChaCha20-Poly1305) par un KEK dérivé du mot de passe. Le coffre ne s'ouvre qu'après login.
 - **Deux bases, toutes deux chiffrées au repos** : `keystore.db` (hash + DEK/clé MAC enveloppés) **scellé par une clé de device du trousseau OS** (libsecret/Keychain/Credential Manager) → fichier volé inutilisable hors de l'appareil ; `vault.db` chiffré par le DEK, avec **évidence d'altération** (HMAC-SHA256 sidecar, libSQL CBC n'étant pas authentifié) — politique **`HardFail` par défaut** (un mismatch après arrêt propre refuse l'ouverture).
-- **Session** : 15 min **absolue** + **timeout d'inactivité**, en mémoire uniquement (jamais persistée, tokens stockés **hachés SHA-256**) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** (verrouillage après échecs répétés). L'expiration est **appliquée côté Rust** : chaque commande touchant au coffre passe par `require_session` (révocation + verrouillage du coffre à l'expiration), sans dépendre du frontend.
+- **Session** : 15 min **absolue** + **inactivité** (UI 5 min, **backend 6 min**), en mémoire uniquement (jamais persistée, tokens stockés **hachés SHA-256**) → mot de passe redemandé à chaque démarrage. **Anti-bruteforce** progressif (verrouillage doublé à chaque échec, compteur atomique, tentatives sérialisées). L'expiration est **appliquée côté Rust** via `require_session`. Session globale assumée ([ADR 0001](documentation/adr/0001-session-globale.md)).
+- **KEK** dérivée avec un profil Argon2id dédié (64 MiB, t=3) stocké par compte ; clés enveloppées avec **AAD** (rôle + compte) ; `change_password` ré-enveloppe sans re-chiffrer le coffre.
+- **Intégrité du coffre** : référence HMAC et « session ouverte » **dans le keystore scellé** (jamais dans des fichiers annexes) ([ADR 0002](documentation/adr/0002-integrite-du-coffre.md)) ; journal de sécurité minimal montré après connexion.
 - **Aucun secret** (token Turso, clés) commité ni exposé au frontend — ils restent côté Rust.
 - ⚠️ **Contrainte runtime (Linux)** : un Secret Service (GNOME Keyring/KWallet) doit tourner pour ouvrir le keystore ; sinon le démarrage échoue explicitement.
 
@@ -249,7 +252,8 @@ src/
 - **Sécurité Tauri** : minimum de permissions dans `capabilities/` (moindre privilège). Valider toutes les entrées du frontend.
 - **Aucun secret** commité ni exposé au frontend. Les secrets restent côté Rust.
 - **Seul `core/ipc.ts`** (front) parle à `@tauri-apps/api`.
-- Épingler les versions de dépendances pour la production.
+- **Aucun chemin de fichier** venant de la WebView ; aucun `BEGIN` manuel ; aucun état de sécurité dans un fichier non authentifié.
+- Épingler les versions de dépendances (versions exactes, overrides exacts).
 
 ---
 
@@ -257,8 +261,8 @@ src/
 
 1. Implémenter en respectant les couches (domain → application → infra/presentation).
 2. Avant de terminer une série de changements :
-   - Rust : `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test`.
-   - Front : `pnpm typecheck`, `pnpm lint`, `pnpm test`.
+   - Rust : `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo deny check`.
+   - Front : `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 3. Préférer les tests ciblés pendant le dev ; lancer la suite complète avant un commit.
 4. Commits descriptifs (style Conventional Commits recommandé).
 
@@ -272,4 +276,4 @@ src/
 
 - **Synchronisation cloud Turso** (isolée dans `infrastructure/persistence/db.rs` ; arbitrer le compromis chiffrement-vs-sync de libSQL — voir [documentation/turso.md](documentation/turso.md)).
 - Projections annuelles CO₂ (`workingDaysPerYear`) et référentiel multi-millésime (`factorYear`, aujourd'hui figé à l'année seedée). _(La config CO₂ de base — pays réseau, forçage radiatif, énergie bâtiment — est désormais réglable par profil, cf. `profile_settings`.)_
-- `change_password`, intégrité-au-repos, idle-timeout, multi-comptes.
+- Chiffrement authentifié at-rest (crate `turso`, AEGIS-256) quand il sera stable ([ADR 0004](documentation/adr/0004-report-migration-turso.md)), multi-comptes.
