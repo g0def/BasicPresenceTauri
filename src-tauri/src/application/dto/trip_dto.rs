@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::entities::trip::{Trip, TripInput};
+use crate::domain::error::DomainError;
+use crate::domain::rules;
 
 /// One trip leg received FROM the frontend when setting an office/remote day.
 /// `occupants` falls back to the configured default when absent.
@@ -14,13 +16,21 @@ pub struct TripInputDto {
 }
 
 impl TripInputDto {
-    pub fn into_domain(self, default_occupancy: i64) -> TripInput {
-        TripInput {
-            mode_id: self.mode_id,
-            distance_km: self.distance_km,
+    /// Validate (bounded distance/occupants, known-shape mode id) and convert.
+    pub fn into_domain(
+        self,
+        position: usize,
+        default_occupancy: i64,
+    ) -> Result<TripInput, DomainError> {
+        Ok(TripInput {
+            mode_id: rules::mode_id(position, &self.mode_id)?,
+            distance_km: rules::distance_km(position, self.distance_km)?,
             round_trip: self.round_trip,
-            occupants: self.occupants.unwrap_or(default_occupancy).max(1),
-        }
+            occupants: rules::occupants(
+                position,
+                Some(self.occupants.unwrap_or(default_occupancy)),
+            )?,
+        })
     }
 }
 

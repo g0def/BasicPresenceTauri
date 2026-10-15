@@ -6,6 +6,7 @@ use crate::domain::entities::work_day_schedule::WorkDaySchedule;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
+use crate::domain::rules;
 
 /// Set (upsert) the start time of an office/remote presence day. The stored
 /// end time is recomputed here: start + sum of the day's entry durations.
@@ -27,13 +28,8 @@ impl SetWorkScheduleUseCase {
         presence_id: &str,
         start_minutes: i64,
     ) -> Result<WorkDayScheduleDto, DomainError> {
-        let presence_id = presence_id.trim();
-        if presence_id.is_empty() {
-            return Err(DomainError::Validation(
-                "presenceId is required".to_string(),
-            ));
-        }
-        validate_start(start_minutes)?;
+        let presence_id = rules::required_id("presenceId", presence_id)?;
+        let start_minutes = rules::start_minutes(start_minutes)?;
 
         let presence = self
             .presences
@@ -60,29 +56,5 @@ impl SetWorkScheduleUseCase {
         };
         self.entries.set_schedule(&schedule).await?;
         Ok(WorkDayScheduleDto::from(schedule))
-    }
-}
-
-/// The start must be a clock time inside one day.
-pub fn validate_start(start_minutes: i64) -> Result<(), DomainError> {
-    if !(0..1440).contains(&start_minutes) {
-        return Err(DomainError::Validation(
-            "startMinutes must be between 0 and 1439".to_string(),
-        ));
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn start_must_be_a_clock_time_inside_one_day() {
-        assert!(validate_start(0).is_ok());
-        assert!(validate_start(510).is_ok()); // 8h30
-        assert!(validate_start(1439).is_ok());
-        assert!(validate_start(-1).is_err());
-        assert!(validate_start(1440).is_err());
     }
 }

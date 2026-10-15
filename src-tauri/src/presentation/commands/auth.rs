@@ -48,12 +48,30 @@ pub async fn check_session(
     token: String,
     state: State<'_, AppState>,
 ) -> Result<SessionStatusDto, AppError> {
-    Ok(state.check_session.execute(&token)?)
+    Ok(state.check_session.execute(&token).await?)
 }
 
 /// Revoke the session and lock the vault.
 #[tauri::command]
 pub async fn logout(token: String, state: State<'_, AppState>) -> Result<(), AppError> {
-    state.logout.execute(&token)?;
+    state.logout.execute(&token).await?;
+    Ok(())
+}
+
+/// Change the owner's password (session-gated; the current password is
+/// re-verified and failures count towards the lockout).
+#[tauri::command]
+pub async fn change_password(
+    current_password: String,
+    new_password: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    state.require_session.execute().await?;
+    let current_password = Zeroizing::new(current_password);
+    let new_password = Zeroizing::new(new_password);
+    state
+        .change_password
+        .execute(current_password.as_str(), new_password.as_str())
+        .await?;
     Ok(())
 }

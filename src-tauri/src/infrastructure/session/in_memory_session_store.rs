@@ -33,7 +33,7 @@ impl SessionStore for InMemorySessionStore {
         let key = Self::key(&session.token);
         let redacted = Session {
             token: String::new(),
-            expires_at: session.expires_at,
+            ..session
         };
         self.sessions
             .lock()
@@ -71,6 +71,28 @@ impl SessionStore for InMemorySessionStore {
             .unwrap_or_else(|p| p.into_inner())
             .clear();
     }
+
+    fn touch(&self, token: &str, now_ms: i64) {
+        if let Some(s) = self
+            .sessions
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get_mut(&Self::key(token))
+        {
+            s.last_seen_ms = s.last_seen_ms.max(now_ms);
+        }
+    }
+
+    fn touch_all(&self, now_ms: i64) {
+        for s in self
+            .sessions
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .values_mut()
+        {
+            s.last_seen_ms = s.last_seen_ms.max(now_ms);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -81,6 +103,8 @@ mod tests {
         Session {
             token: token.to_string(),
             expires_at,
+            last_seen_ms: 0,
+            idle_timeout_ms: 1_000,
         }
     }
 
@@ -107,5 +131,18 @@ mod tests {
 
         store.clear();
         assert!(store.list().is_empty());
+    }
+
+    #[test]
+    fn touch_records_activity() {
+        let store = InMemorySessionStore::new();
+        store.insert(session("a", 10_000));
+        store.touch("a", 500);
+        assert_eq!(store.get("a").unwrap().last_seen_ms, 500);
+        store.touch_all(900);
+        assert_eq!(store.get("a").unwrap().last_seen_ms, 900);
+        // Never moves backwards.
+        store.touch("a", 100);
+        assert_eq!(store.get("a").unwrap().last_seen_ms, 900);
     }
 }

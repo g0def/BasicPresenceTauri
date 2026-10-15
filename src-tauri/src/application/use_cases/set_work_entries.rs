@@ -3,14 +3,13 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::application::dto::work_entry_dto::{WorkDayDto, WorkEntryDto, WorkEntryInputDto};
-use crate::application::use_cases::create_task_preset::{
-    normalize_description, validate_color, validate_minutes, validate_title,
-};
 use crate::domain::entities::presence::PresenceType;
 use crate::domain::entities::work_entry::WorkEntry;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
+use crate::domain::rules;
+use crate::domain::services::unit_of_work::UnitOfWork;
 
 /// Atomically replace the work entries of a presence day. Hours only exist on
 /// work days, so the target presence must be office/remote. Positions come
@@ -20,14 +19,20 @@ use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
 pub struct SetWorkEntriesUseCase {
     entries: Arc<dyn WorkEntryRepository>,
     presences: Arc<dyn PresenceRepository>,
+    uow: Arc<dyn UnitOfWork>,
 }
 
 impl SetWorkEntriesUseCase {
     pub fn new(
         entries: Arc<dyn WorkEntryRepository>,
         presences: Arc<dyn PresenceRepository>,
+        uow: Arc<dyn UnitOfWork>,
     ) -> Self {
-        Self { entries, presences }
+        Self {
+            entries,
+            presences,
+            uow,
+        }
     }
 
     pub async fn execute(
@@ -35,12 +40,7 @@ impl SetWorkEntriesUseCase {
         presence_id: &str,
         inputs: Vec<WorkEntryInputDto>,
     ) -> Result<WorkDayDto, DomainError> {
-        let presence_id = presence_id.trim();
-        if presence_id.is_empty() {
-            return Err(DomainError::Validation(
-                "presenceId is required".to_string(),
-            ));
-        }
+        let presence_id = rules::required_id("presenceId", presence_id)?;
         let presence = self
             .presences
             .find_by_id(presence_id)
@@ -52,33 +52,37 @@ impl SetWorkEntriesUseCase {
             ));
         }
 
+        rules::work_day_total(&inputs.iter().map(|i| i.minutes).collect::<Vec<_>>())?;
         let mut entries = Vec::with_capacity(inputs.len());
         for (i, input) in inputs.into_iter().enumerate() {
             entries.push(WorkEntry {
                 id: Uuid::now_v7().to_string(),
                 presence_id: presence_id.to_string(),
-                title: validate_title(&input.title)?,
-                description: normalize_description(input.description),
-                minutes: validate_minutes(input.minutes)?,
-                color: validate_color(&input.color)?,
+                title: rules::title(&input.title)?,
+                description: rules::description(input.description.as_deref())?,
+                minutes: rules::task_minutes(input.minutes)?,
+                color: rules::color(&input.color)?,
                 position: i as i64,
             });
         }
 
-        self.entries
-            .replace_for_presence(presence_id, &entries)
-            .await?;
-
-        // Keep the stored end time in sync with the new total.
+        // The entries and the end time derived from them commit together.
         let total: i64 = entries.iter().map(|e| e.minutes).sum();
-        let schedule = match self.entries.get_schedule(presence_id).await? {
-            Some(mut schedule) => {
-                schedule.end_minutes = schedule.start_minutes + total;
-                self.entries.set_schedule(&schedule).await?;
-                Some(schedule.into())
-            }
-            None => None,
-        };
+        let mut schedule = None;
+        self.uow
+            .run(Box::pin(async {
+                self.entries
+                    .replace_for_presence(presence_id, &entries)
+                    .await?;
+                // Keep the stored end time in sync with the new total.
+                if let Some(mut s) = self.entries.get_schedule(presence_id).await? {
+                    s.end_minutes = s.start_minutes + total;
+                    self.entries.set_schedule(&s).await?;
+                    schedule = Some(s.into());
+                }
+                Ok(())
+            }))
+            .await?;
 
         Ok(WorkDayDto {
             entries: entries.into_iter().map(WorkEntryDto::from).collect(),

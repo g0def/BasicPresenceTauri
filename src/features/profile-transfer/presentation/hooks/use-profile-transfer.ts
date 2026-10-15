@@ -1,18 +1,16 @@
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { isAppError } from "@/core/errors";
-import { TauriTransferRepository } from "@/features/profile-transfer/data/repositories/tauri-transfer.repository";
+import { useContainer } from "@/core/di";
+import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
 import type {
   BundleExportSummary,
   BundleImportSummary,
   BundleImportTarget,
-  BundleManifest,
+  InspectedBundle,
   BundleSelection,
   ConflictStrategy,
 } from "@/features/profile-transfer/domain/entities/bundle";
-
-// Single repository instance — the transfer actions are stateless on their own.
-const repo = new TauriTransferRepository();
 
 /**
  * Drives profile export/inspect/import: opens the native dialogs and invokes the
@@ -20,13 +18,22 @@ const repo = new TauriTransferRepository();
  * Each action returns `null` on cancel/failure (an error is set on failure only).
  */
 export function useProfileTransfer() {
+  const { t } = useTranslation();
+  const { transferRepository: repo } = useContainer();
+  // IPC goes through the command runner: SESSION_EXPIRED is handled globally.
+  const { run } = useCommand();
   const [isExporting, setIsExporting] = useState(false);
   const [isInspecting, setIsInspecting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toMessage = (e: unknown) =>
-    isAppError(e) ? e.message : "Une erreur est survenue";
+  // A locked vault is not an error to show here: the app logs out.
+  const report = useCallback(
+    (e: unknown) => {
+      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
+    },
+    [t],
+  );
 
   const exportBundle = useCallback(
     async (
@@ -37,40 +44,36 @@ export function useProfileTransfer() {
       setIsExporting(true);
       setError(null);
       try {
-        return await repo.exportProfileBundle(
-          profileId,
-          options,
-          defaultFileName,
+        return await run(() =>
+          repo.exportProfileBundle(profileId, options, defaultFileName),
         );
       } catch (e) {
-        setError(toMessage(e));
+        report(e);
         return null;
       } finally {
         setIsExporting(false);
       }
     },
-    [],
+    [repo, run, report],
   );
 
-  const inspectBundle = useCallback(async (): Promise<{
-    path: string;
-    manifest: BundleManifest;
-  } | null> => {
-    setIsInspecting(true);
-    setError(null);
-    try {
-      return await repo.pickAndInspect();
-    } catch (e) {
-      setError(toMessage(e));
-      return null;
-    } finally {
-      setIsInspecting(false);
-    }
-  }, []);
+  const inspectBundle =
+    useCallback(async (): Promise<InspectedBundle | null> => {
+      setIsInspecting(true);
+      setError(null);
+      try {
+        return await run(() => repo.pickAndInspect());
+      } catch (e) {
+        report(e);
+        return null;
+      } finally {
+        setIsInspecting(false);
+      }
+    }, [repo, run, report]);
 
   const importBundle = useCallback(
     async (
-      path: string,
+      handle: string,
       selection: BundleSelection,
       target: BundleImportTarget,
       conflictStrategy: ConflictStrategy,
@@ -78,20 +81,17 @@ export function useProfileTransfer() {
       setIsImporting(true);
       setError(null);
       try {
-        return await repo.importProfileBundle(
-          path,
-          selection,
-          target,
-          conflictStrategy,
+        return await run(() =>
+          repo.importProfileBundle(handle, selection, target, conflictStrategy),
         );
       } catch (e) {
-        setError(toMessage(e));
+        report(e);
         return null;
       } finally {
         setIsImporting(false);
       }
     },
-    [],
+    [repo, run, report],
   );
 
   const clearError = useCallback(() => setError(null), []);

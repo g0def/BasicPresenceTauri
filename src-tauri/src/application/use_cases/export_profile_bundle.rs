@@ -2,6 +2,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::application::dto::profile_bundle_dto::{BundleExportOptionsDto, BundleExportSummaryDto};
+use crate::application::services::count;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::commute_repository::CommuteRepository;
 use crate::domain::repositories::presence_repository::PresenceRepository;
@@ -9,6 +10,7 @@ use crate::domain::repositories::profile_repository::ProfileRepository;
 use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
+use crate::domain::rules;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::profile_bundle::{
     BundleDay, BundleOptions, ProfileBundleCodec, ProfileBundleData,
@@ -57,16 +59,9 @@ impl ExportProfileBundleUseCase {
         &self,
         profile_id: &str,
         options: BundleExportOptionsDto,
-        path: &str,
+        path: &Path,
     ) -> Result<BundleExportSummaryDto, DomainError> {
-        let profile_id = profile_id.trim();
-        if profile_id.is_empty() {
-            return Err(DomainError::Validation("profileId is required".to_string()));
-        }
-        let path = path.trim();
-        if path.is_empty() {
-            return Err(DomainError::Validation("path is required".to_string()));
-        }
+        let profile_id = rules::required_id("profileId", profile_id)?;
 
         let profile = self
             .profiles
@@ -74,21 +69,25 @@ impl ExportProfileBundleUseCase {
             .await?
             .ok_or(DomainError::ProfileNotFound)?;
 
+        // A handful of profile-wide queries, joined in memory (no per-day N+1).
         let presences = self.presences.list_by_profile(profile_id).await?;
-        let mut days = Vec::with_capacity(presences.len());
-        for presence in presences {
-            let trips = self.presences.list_trips(&presence.id).await?;
-            let work_entries = self.work_entries.list_by_presence(&presence.id).await?;
-            let schedule = self.work_entries.get_schedule(&presence.id).await?;
-            let note = self.presences.get_note(&presence.id).await?;
-            days.push(BundleDay {
+        let mut trips = self.presences.list_trips_by_profile(profile_id).await?;
+        let mut notes = self.presences.list_notes_by_profile(profile_id).await?;
+        let mut entries = self.work_entries.list_by_profile(profile_id).await?;
+        let mut schedules = self
+            .work_entries
+            .list_schedules_by_profile(profile_id)
+            .await?;
+        let days = presences
+            .into_iter()
+            .map(|presence| BundleDay {
+                trips: trips.remove(&presence.id).unwrap_or_default(),
+                work_entries: entries.remove(&presence.id).unwrap_or_default(),
+                schedule: schedules.remove(&presence.id),
+                note: notes.remove(&presence.id),
                 presence,
-                trips,
-                work_entries,
-                schedule,
-                note,
-            });
-        }
+            })
+            .collect::<Vec<_>>();
         let task_presets = self.task_presets.list_by_profile(profile_id).await?;
         let commutes = self.commutes.list_by_profile(profile_id).await?;
         let settings = Some(self.profile_settings.load(profile_id).await?);
@@ -106,17 +105,17 @@ impl ExportProfileBundleUseCase {
         // Counts reflect what the codec writes under `opts`.
         let summary = BundleExportSummaryDto {
             days: if opts.include_days {
-                data.days.len() as u32
+                count(data.days.len())
             } else {
                 0
             },
             trips: if opts.include_days && opts.include_trips {
-                data.days.iter().map(|d| d.trips.len() as u32).sum()
+                data.days.iter().map(|d| count(d.trips.len())).sum()
             } else {
                 0
             },
             work_entries: if opts.include_days && opts.include_work_hours {
-                data.days.iter().map(|d| d.work_entries.len() as u32).sum()
+                data.days.iter().map(|d| count(d.work_entries.len())).sum()
             } else {
                 0
             },
@@ -136,20 +135,20 @@ impl ExportProfileBundleUseCase {
                 0
             },
             task_presets: if opts.include_task_presets {
-                data.task_presets.len() as u32
+                count(data.task_presets.len())
             } else {
                 0
             },
             commutes: if opts.include_commutes {
-                data.commutes.len() as u32
+                count(data.commutes.len())
             } else {
                 0
             },
             settings: opts.include_settings && data.settings.is_some(),
-            path: path.to_string(),
+            path: path.display().to_string(),
         };
 
-        self.codec.write(&data, &opts, Path::new(path))?;
+        self.codec.write(&data, &opts, path)?;
         Ok(summary)
     }
 }

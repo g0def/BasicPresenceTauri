@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::domain::error::DomainError;
+use crate::domain::rules;
 use crate::domain::services::spreadsheet_exporter::{ExportLabels, ExportOptions};
 
 /// Export field selection received FROM the frontend (serialized camelCase).
@@ -76,6 +78,61 @@ pub struct ExportLabelsDto {
     /// renames struct *fields* — the map's own keys stay `car_petrol`,
     /// `train_sncb`, … which is exactly what the lookup needs.
     pub mode_names: HashMap<String, String>,
+}
+
+impl ExportLabelsDto {
+    /// Labels come from the WebView: bound their size like any other input.
+    pub fn validate(&self) -> Result<(), DomainError> {
+        let labels = [
+            &self.sheet_presences,
+            &self.sheet_tasks,
+            &self.sheet_trips,
+            &self.sheet_notes,
+            &self.date,
+            &self.yes,
+            &self.no,
+            &self.co2,
+            &self.presence_type,
+            &self.estimated,
+            &self.trip_summary,
+            &self.hours,
+            &self.created,
+            &self.updated,
+            &self.type_office,
+            &self.type_remote,
+            &self.type_vacation,
+            &self.type_holiday,
+            &self.title,
+            &self.description,
+            &self.minutes,
+            &self.color,
+            &self.order,
+            &self.mode,
+            &self.mode_label,
+            &self.distance_one_way,
+            &self.round_trip,
+            &self.distance_counted,
+            &self.occupants,
+            &self.factor_year,
+            &self.trip_join,
+            &self.unit_km,
+            &self.round_trip_suffix,
+            &self.one_way_suffix,
+            &self.decimal_separator,
+            &self.note,
+        ];
+        let too_long = |s: &String| s.chars().count() > rules::MAX_TITLE_LEN;
+        if labels.into_iter().any(too_long)
+            || self.mode_names.len() > rules::MAX_EXPORT_LABELS
+            || self
+                .mode_names
+                .iter()
+                .any(|(k, v)| k.len() > rules::MAX_ID_LEN || too_long(v))
+        {
+            return Err(DomainError::Validation("export labels too long".into()));
+        }
+        Ok(())
+    }
 }
 
 impl From<ExportLabelsDto> for ExportLabels {

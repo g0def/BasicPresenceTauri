@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use crate::application::dto::commute_dto::{CommuteDto, CommuteSegmentInputDto};
-use crate::application::use_cases::create_commute::build_commute;
+use crate::application::services::commute_builder::build_commute;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::commute_repository::CommuteRepository;
+use crate::domain::rules;
 use crate::domain::services::clock::Clock;
 
 /// Update a saved commute (name, round-trip flag, and full segment set).
@@ -24,6 +25,7 @@ impl UpdateCommuteUseCase {
         round_trip: bool,
         segments: Vec<CommuteSegmentInputDto>,
     ) -> Result<CommuteDto, DomainError> {
+        let id = rules::required_id("id", id)?;
         let existing = self
             .commutes
             .find_by_id(id)
@@ -35,7 +37,9 @@ impl UpdateCommuteUseCase {
             &existing.profile_id,
             name,
             round_trip,
-            segments,
+            segments
+                .iter()
+                .map(CommuteSegmentInputDto::as_segment_input),
             existing.created_at,
             self.clock.now_ms(),
         )?;

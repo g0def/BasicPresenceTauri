@@ -39,6 +39,7 @@ impl From<DomainError> for AppError {
                 AppError::new("SESSION_EXPIRED", "Session expirée. Reconnectez-vous.")
             }
             DomainError::ProfileNotFound => AppError::new("NOT_FOUND", "Profil introuvable"),
+            DomainError::NotFound => AppError::new("NOT_FOUND", "Élément introuvable"),
             DomainError::Validation(m) => AppError::new("VALIDATION", m),
             DomainError::KeystoreUnrecoverable => AppError::new(
                 "KEYSTORE_UNRECOVERABLE",

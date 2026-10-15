@@ -3,6 +3,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::application::dto::profile_bundle_dto::BundleManifestDto;
+use crate::application::services::count;
 use crate::domain::entities::co2_settings::Co2Settings;
 use crate::domain::error::DomainError;
 use crate::domain::repositories::emission_factor_repository::EmissionFactorRepository;
@@ -27,19 +28,15 @@ impl InspectProfileBundleUseCase {
         Self { codec, factors }
     }
 
-    pub async fn execute(&self, path: &str) -> Result<BundleManifestDto, DomainError> {
-        let path = path.trim();
-        if path.is_empty() {
-            return Err(DomainError::Validation("path is required".to_string()));
-        }
-        let bundle = self.codec.read(Path::new(path))?;
+    pub async fn execute(&self, path: &Path) -> Result<BundleManifestDto, DomainError> {
+        let bundle = self.codec.read(path)?;
 
-        let days = bundle.days.len() as u32;
-        let trips: u32 = bundle.days.iter().map(|d| d.trips.len() as u32).sum();
+        let days = count(bundle.days.len());
+        let trips: u32 = bundle.days.iter().map(|d| count(d.trips.len())).sum();
         let work_entries: u32 = bundle
             .days
             .iter()
-            .map(|d| d.work_entries.len() as u32)
+            .map(|d| count(d.work_entries.len()))
             .sum();
         let notes: u32 = bundle
             .days
@@ -51,8 +48,8 @@ impl InspectProfileBundleUseCase {
                     .unwrap_or(false)
             })
             .count() as u32;
-        let task_presets = bundle.task_presets.len() as u32;
-        let commutes = bundle.commutes.len() as u32;
+        let task_presets = count(bundle.task_presets.len());
+        let commutes = count(bundle.commutes.len());
         let has_settings = bundle.settings.is_some();
 
         // Resolve unknown modes while the whole bundle is still borrowable, before

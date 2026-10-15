@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::application::dto::presence_dto::PresenceDto;
 use crate::application::dto::trip_dto::TripInputDto;
-use crate::application::use_cases::factor_maps::load_factor_maps;
+use crate::application::services::factor_maps::load_factor_maps;
 use crate::domain::entities::presence::{Presence, PresenceType};
 use crate::domain::entities::trip::{Trip, TripInput};
 use crate::domain::entities::work_day_schedule::WorkDaySchedule;
@@ -13,24 +13,10 @@ use crate::domain::repositories::emission_factor_repository::EmissionFactorRepos
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::repositories::profile_settings_repository::ProfileSettingsRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
+use crate::domain::rules;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::co2_calculator::Co2Calculator;
-
-/// Milliseconds in a UTC day. A valid `day` is a non-negative multiple of it
-/// (epoch ms at UTC midnight), matching the key the frontend sends.
-const MS_PER_DAY: i64 = 86_400_000;
-
-/// A valid presence `day` is a non-negative multiple of [`MS_PER_DAY`] (epoch ms
-/// at UTC midnight), matching the key the frontend sends. The vault has no CHECK
-/// on the column, so every write path must enforce this (here and on import).
-pub fn validate_day(day: i64) -> Result<(), DomainError> {
-    if day < 0 || day % MS_PER_DAY != 0 {
-        return Err(DomainError::Validation(
-            "day must be epoch ms at UTC midnight".to_string(),
-        ));
-    }
-    Ok(())
-}
+use crate::domain::services::unit_of_work::UnitOfWork;
 
 /// Set (create or update) the presence type for a given day of a profile, and
 /// compute + snapshot the day's commute footprint. Re-setting the same day
@@ -46,6 +32,7 @@ pub struct SetPresenceUseCase {
     profile_settings: Arc<dyn ProfileSettingsRepository>,
     entries: Arc<dyn WorkEntryRepository>,
     clock: Arc<dyn Clock>,
+    uow: Arc<dyn UnitOfWork>,
 }
 
 impl SetPresenceUseCase {
@@ -55,6 +42,7 @@ impl SetPresenceUseCase {
         profile_settings: Arc<dyn ProfileSettingsRepository>,
         entries: Arc<dyn WorkEntryRepository>,
         clock: Arc<dyn Clock>,
+        uow: Arc<dyn UnitOfWork>,
     ) -> Self {
         Self {
             presences,
@@ -62,6 +50,7 @@ impl SetPresenceUseCase {
             profile_settings,
             entries,
             clock,
+            uow,
         }
     }
 
@@ -72,11 +61,8 @@ impl SetPresenceUseCase {
         kind: &str,
         trips: Vec<TripInputDto>,
     ) -> Result<PresenceDto, DomainError> {
-        let profile_id = profile_id.trim();
-        if profile_id.is_empty() {
-            return Err(DomainError::Validation("profileId is required".to_string()));
-        }
-        validate_day(day)?;
+        let profile_id = rules::required_id("profileId", profile_id)?;
+        let day = rules::day(day)?;
         let kind = PresenceType::parse(kind)?;
 
         // CO2 is computed under the profile's own config; the default start time
@@ -86,21 +72,16 @@ impl SetPresenceUseCase {
         let settings = &profile_settings.co2;
 
         // CO2 is tied to presence: only office/remote days carry a commute.
+        rules::segment_count(trips.len(), false)?;
         let trips: Vec<TripInput> = if matches!(kind, PresenceType::Office | PresenceType::Remote) {
             trips
                 .into_iter()
-                .map(|t| t.into_domain(settings.default_car_occupancy))
-                .collect()
+                .enumerate()
+                .map(|(i, t)| t.into_domain(i, settings.default_car_occupancy))
+                .collect::<Result<_, _>>()?
         } else {
             Vec::new()
         };
-        for (i, t) in trips.iter().enumerate() {
-            if t.distance_km < 0.0 || !t.distance_km.is_finite() {
-                return Err(DomainError::Validation(format!(
-                    "trip {i}: distance must be >= 0"
-                )));
-            }
-        }
 
         let (factor_map, variant_map) =
             load_factor_maps(&self.factors, settings.factor_year).await?;
@@ -147,7 +128,28 @@ impl SetPresenceUseCase {
             })
             .collect();
 
-        let saved = self.presences.set_for_day(&presence, &domain_trips).await?;
+        // The day and its seeded schedule commit together.
+        let mut saved = None;
+        self.uow
+            .run(Box::pin(async {
+                saved = Some(
+                    self.save_day(&presence, &domain_trips, default_start)
+                        .await?,
+                );
+                Ok(())
+            }))
+            .await?;
+        let saved = saved.ok_or_else(|| DomainError::Storage("presence not saved".into()))?;
+        Ok(PresenceDto::from(saved))
+    }
+
+    async fn save_day(
+        &self,
+        presence: &Presence,
+        trips: &[Trip],
+        default_start: i64,
+    ) -> Result<Presence, DomainError> {
+        let saved = self.presences.set_for_day(presence, trips).await?;
 
         // Seed the default start time once, the first time the day becomes a
         // work day. The guard is keyed on the PERSISTED id (set_for_day reuses
@@ -166,7 +168,6 @@ impl SetPresenceUseCase {
                 })
                 .await?;
         }
-
-        Ok(PresenceDto::from(saved))
+        Ok(saved)
     }
 }

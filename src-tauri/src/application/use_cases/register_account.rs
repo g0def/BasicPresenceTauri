@@ -4,17 +4,14 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::application::dto::user_dto::UserDto;
-use crate::domain::entities::account::{Account, KeyMaterial};
+use crate::application::services::credentials;
+use crate::domain::entities::account::Account;
 use crate::domain::error::DomainError;
+use crate::domain::policy::{AuthPolicy, validate_password, validate_username};
 use crate::domain::repositories::account_repository::AccountRepository;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::key_service::KeyService;
 use crate::domain::services::password_hasher::PasswordHasher;
-
-const MIN_USERNAME_LEN: usize = 3;
-const MAX_USERNAME_LEN: usize = 64;
-const MIN_PASSWORD_LEN: usize = 8;
-const MAX_PASSWORD_LEN: usize = 1024;
 
 /// Create the single device-owner account (first run).
 pub struct RegisterAccountUseCase {
@@ -22,6 +19,7 @@ pub struct RegisterAccountUseCase {
     hasher: Arc<dyn PasswordHasher>,
     keys: Arc<dyn KeyService>,
     clock: Arc<dyn Clock>,
+    policy: AuthPolicy,
 }
 
 impl RegisterAccountUseCase {
@@ -30,12 +28,14 @@ impl RegisterAccountUseCase {
         hasher: Arc<dyn PasswordHasher>,
         keys: Arc<dyn KeyService>,
         clock: Arc<dyn Clock>,
+        policy: AuthPolicy,
     ) -> Self {
         Self {
             accounts,
             hasher,
             keys,
             clock,
+            policy,
         }
     }
 
@@ -44,38 +44,37 @@ impl RegisterAccountUseCase {
         validate_username(username)?;
         validate_password(password)?;
 
-        // Single-owner device: refuse a second account.
+        // Single-owner device: refuse a second account early (the insert below
+        // re-checks atomically, for concurrent registrations).
         if self.accounts.exists().await? {
             return Err(DomainError::AccountAlreadyExists);
         }
 
         // Password lives in a buffer that is zeroized on every exit path.
         let pw = Zeroizing::new(password.as_bytes().to_vec());
+        let password_hash = self.hasher.hash(pw.as_slice()).await?;
 
-        let password_hash = self.hasher.hash(pw.as_slice())?;
-
-        // Generate the DEK, derive the password-KEK, wrap the DEK.
-        let dek = self.keys.generate_dek()?;
-        let kek_salt = self.keys.generate_salt()?;
-        let kek = self.keys.derive_kek(pw.as_slice(), &kek_salt)?;
-        let wrapped = self.keys.wrap_dek(dek.as_slice(), kek.as_slice())?;
-
-        // Generate the vault MAC key (tamper-evidence) and wrap it with the same KEK.
-        let mac_key = self.keys.generate_dek()?;
-        let wrapped_mac = self.keys.wrap_dek(mac_key.as_slice(), kek.as_slice())?;
+        // Fresh vault keys (DEK + tamper-evidence MAC key), sealed under the
+        // password-derived KEK and bound to this account.
+        let id = Uuid::now_v7().to_string();
+        let dek = self.keys.generate_key()?;
+        let mac_key = self.keys.generate_key()?;
+        let key_material = credentials::seal(
+            self.keys.as_ref(),
+            &id,
+            pw.as_slice(),
+            dek.as_slice(),
+            mac_key.as_slice(),
+            &self.policy,
+        )
+        .await?;
 
         let now = self.clock.now_ms();
         let account = Account {
-            id: Uuid::now_v7().to_string(),
+            id,
             username: username.to_string(),
             password_hash,
-            key_material: KeyMaterial {
-                wrapped_dek: wrapped.ciphertext,
-                kek_salt,
-                dek_nonce: wrapped.nonce,
-                wrapped_mac_key: Some(wrapped_mac.ciphertext),
-                mac_key_nonce: Some(wrapped_mac.nonce),
-            },
+            key_material,
             failed_attempts: 0,
             locked_until: None,
             created_at: now,
@@ -85,24 +84,4 @@ impl RegisterAccountUseCase {
 
         Ok(UserDto::from(account.to_user()))
     }
-}
-
-fn validate_username(username: &str) -> Result<(), DomainError> {
-    let len = username.chars().count();
-    if !(MIN_USERNAME_LEN..=MAX_USERNAME_LEN).contains(&len) {
-        return Err(DomainError::Validation(format!(
-            "username must be {MIN_USERNAME_LEN}-{MAX_USERNAME_LEN} characters"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_password(password: &str) -> Result<(), DomainError> {
-    let len = password.chars().count();
-    if !(MIN_PASSWORD_LEN..=MAX_PASSWORD_LEN).contains(&len) {
-        return Err(DomainError::Validation(format!(
-            "password must be {MIN_PASSWORD_LEN}-{MAX_PASSWORD_LEN} characters"
-        )));
-    }
-    Ok(())
 }

@@ -1,5 +1,5 @@
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type {
   BundleImportTarget,
@@ -8,13 +8,8 @@ import type {
 } from "@/features/profile-transfer/domain/entities/bundle";
 import { TauriTransferRepository } from "@/features/profile-transfer/data/repositories/tauri-transfer.repository";
 
-// The repository is the only place that drives the native dialogs; stub them so
-// the test controls "picked path" vs "cancelled" without a real OS dialog.
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  save: vi.fn(),
-  open: vi.fn(),
-}));
-import { open, save } from "@tauri-apps/plugin-dialog";
+// The native dialogs are opened by the Rust backend: the repository only sends
+// a suggested file name / an opaque handle — never a file path.
 
 const SELECTION: BundleSelection = {
   includeDays: true,
@@ -44,13 +39,8 @@ const MANIFEST: BundleManifest = {
   unknownModeIds: [],
 };
 
-afterEach(() => {
-  vi.clearAllMocks();
-});
-
 describe("TauriTransferRepository", () => {
-  it("export: opens the save dialog then invokes export_profile_bundle with camelCase args", async () => {
-    vi.mocked(save).mockResolvedValue("/tmp/profile.json");
+  it("export: sends a suggested file name (no path) to export_profile_bundle", async () => {
     const summary = {
       days: 2,
       trips: 1,
@@ -59,14 +49,14 @@ describe("TauriTransferRepository", () => {
       taskPresets: 0,
       commutes: 0,
       settings: true,
-      path: "/tmp/profile.json",
+      path: "/home/u/profile.json",
     };
     mockIPC((cmd, args) => {
       if (cmd === "export_profile_bundle") {
         expect(args).toEqual({
           profileId: "p1",
           options: SELECTION,
-          path: "/tmp/profile.json",
+          defaultFileName: "profile.json",
         });
         return summary;
       }
@@ -74,52 +64,42 @@ describe("TauriTransferRepository", () => {
     });
 
     const repo = new TauriTransferRepository();
-    const result = await repo.exportProfileBundle(
-      "p1",
-      SELECTION,
-      "profile.json",
-    );
-
-    expect(save).toHaveBeenCalledOnce();
-    expect(result).toEqual(summary);
+    expect(
+      await repo.exportProfileBundle("p1", SELECTION, "profile.json"),
+    ).toEqual(summary);
   });
 
-  it("export: returns null (and never invokes) when the save dialog is cancelled", async () => {
-    vi.mocked(save).mockResolvedValue(null);
-    mockIPC(() => {
-      throw new Error("invoke must not be called when the dialog is cancelled");
-    });
-
+  it("export: returns null when the user cancels the backend dialog", async () => {
+    mockIPC(() => null);
     const repo = new TauriTransferRepository();
     expect(
       await repo.exportProfileBundle("p1", SELECTION, "profile.json"),
     ).toBeNull();
   });
 
-  it("inspect: opens the file dialog then invokes inspect_profile_bundle and returns path + manifest", async () => {
-    vi.mocked(open).mockResolvedValue("/tmp/in.json");
+  it("inspect: returns the opaque handle + manifest picked by the backend", async () => {
     mockIPC((cmd, args) => {
       if (cmd === "inspect_profile_bundle") {
-        expect(args).toEqual({ path: "/tmp/in.json" });
-        return MANIFEST;
+        expect(args).toEqual({});
+        return { handle: "h1", manifest: MANIFEST };
       }
       throw new Error(`unexpected command: ${cmd}`);
     });
 
     const repo = new TauriTransferRepository();
     expect(await repo.pickAndInspect()).toEqual({
-      path: "/tmp/in.json",
+      handle: "h1",
       manifest: MANIFEST,
     });
   });
 
   it("inspect: returns null when the open dialog is cancelled", async () => {
-    vi.mocked(open).mockResolvedValue(null);
+    mockIPC(() => null);
     const repo = new TauriTransferRepository();
     expect(await repo.pickAndInspect()).toBeNull();
   });
 
-  it("import: invokes import_profile_bundle with path/selection/target/conflictStrategy", async () => {
+  it("import: invokes import_profile_bundle with handle/selection/target/conflictStrategy", async () => {
     const target: BundleImportTarget = { kind: "new" };
     const summary = {
       profileId: "new1",
@@ -136,7 +116,7 @@ describe("TauriTransferRepository", () => {
     mockIPC((cmd, args) => {
       if (cmd === "import_profile_bundle") {
         expect(args).toEqual({
-          path: "/tmp/in.json",
+          handle: "h1",
           selection: SELECTION,
           target,
           conflictStrategy: "skip",
@@ -148,7 +128,7 @@ describe("TauriTransferRepository", () => {
 
     const repo = new TauriTransferRepository();
     expect(
-      await repo.importProfileBundle("/tmp/in.json", SELECTION, target, "skip"),
+      await repo.importProfileBundle("h1", SELECTION, target, "skip"),
     ).toEqual(summary);
   });
 });

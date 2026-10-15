@@ -22,6 +22,10 @@ pub enum DomainError {
     #[error("profile not found")]
     ProfileNotFound,
 
+    /// A referenced record (profile, presence, commute…) does not exist.
+    #[error("not found")]
+    NotFound,
+
     #[error("validation error: {0}")]
     Validation(String),
 
