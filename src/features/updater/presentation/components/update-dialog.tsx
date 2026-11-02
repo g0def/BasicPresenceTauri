@@ -14,8 +14,15 @@ import { useUpdater } from "@/features/updater/presentation/hooks/use-updater";
 
 export function UpdateDialog() {
   const { t } = useTranslation();
-  const { phase, update, progress, confirmInstall, relaunch, dismiss } =
-    useUpdater();
+  const {
+    phase,
+    update,
+    progress,
+    packageManaged,
+    confirmInstall,
+    relaunch,
+    dismiss,
+  } = useUpdater();
 
   const open =
     phase === "available" ||
@@ -62,6 +69,14 @@ export function UpdateDialog() {
               })}
             </DialogDescription>
           )}
+          {phase === "available" && packageManaged && (
+            <DialogDescription>
+              {t("updater.packageManaged")}{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+                sudo pacman -Syu
+              </code>
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         {phase === "downloading" && (
@@ -79,10 +94,12 @@ export function UpdateDialog() {
               <Button variant="outline" onClick={dismiss}>
                 {t("updater.later")}
               </Button>
-              <Button onClick={() => void confirmInstall()}>
-                <DownloadCloud className="mr-2 size-4" />
-                {t("updater.download")}
-              </Button>
+              {!packageManaged && (
+                <Button onClick={() => void confirmInstall()}>
+                  <DownloadCloud className="mr-2 size-4" />
+                  {t("updater.download")}
+                </Button>
+              )}
             </>
           )}
           {phase === "installed" && (

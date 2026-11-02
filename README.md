@@ -142,6 +142,39 @@ Cela compile le front (`tsc && vite build` → `dist/`), compile le binaire Rust
 
 ---
 
+## Installation sur Arch Linux (dépôt pacman)
+
+L'app est distribuée dans un **dépôt pacman signé**, hébergé sur la release GitHub
+[`arch-repo`](https://github.com/g0def/BasicPresenceTauri/releases/tag/arch-repo) et mis à
+jour automatiquement à chaque version publiée. Les mises à jour arrivent ensuite par
+`pacman -Syu` (l'app ne s'installe pas elle-même dans ce cas).
+
+1. Faire confiance à la clé de signature du dépôt — **vérifier que l'empreinte affichée est
+   bien `10BF FDCA 379E 604D 9225 01F3 BFCA EAFF DF40 2EB4`** avant de la signer :
+
+   ```bash
+   curl -sL https://raw.githubusercontent.com/g0def/BasicPresenceTauri/main/basicpresence-bin/basic-presence-repo.asc \
+     | sudo pacman-key --add -
+   sudo pacman-key --finger 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4
+   sudo pacman-key --lsign-key 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4
+   ```
+
+2. Déclarer le dépôt à la fin de `/etc/pacman.conf` :
+
+   ```ini
+   [basic-presence]
+   SigLevel = Required
+   Server = https://github.com/g0def/BasicPresenceTauri/releases/download/arch-repo
+   ```
+
+3. Installer :
+
+   ```bash
+   sudo pacman -Sy basic-presence-bin
+   ```
+
+---
+
 ## Structure du projet
 
 ```

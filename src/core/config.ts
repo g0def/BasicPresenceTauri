@@ -48,6 +48,7 @@ export const COMMANDS = {
   getDayNote: "get_day_note",
   setDayNote: "set_day_note",
   getLicence: "get_licence",
+  isPackageManaged: "is_package_managed",
   exportProfileData: "export_profile_data",
   exportProfileBundle: "export_profile_bundle",
   inspectProfileBundle: "inspect_profile_bundle",

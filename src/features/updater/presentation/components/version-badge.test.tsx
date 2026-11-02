@@ -14,6 +14,7 @@ function renderBadge(overrides: Partial<UpdaterContextValue> = {}) {
     phase: "idle",
     update: null,
     progress: null,
+    packageManaged: false,
     checkForUpdates: vi.fn().mockResolvedValue(undefined),
     openUpdater: vi.fn(),
     confirmInstall: vi.fn().mockResolvedValue(undefined),

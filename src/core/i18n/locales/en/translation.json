@@ -445,7 +445,8 @@
     "upToDate": "You are up to date",
     "error": "Update check failed",
     "badgeUpToDate": "Version {{version}} — up to date",
-    "badgeOutdated": "Update available — v{{version}}"
+    "badgeOutdated": "Update available — v{{version}}",
+    "packageManaged": "This installation is managed by pacman. To update, run:"
   },
   "workHours": {
     "encodeButton": "Log hours",

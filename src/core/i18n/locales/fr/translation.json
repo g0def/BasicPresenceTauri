@@ -445,7 +445,8 @@
     "upToDate": "Vous êtes à jour",
     "error": "Échec de la vérification",
     "badgeUpToDate": "Version {{version}} — à jour",
-    "badgeOutdated": "Mise à jour disponible — v{{version}}"
+    "badgeOutdated": "Mise à jour disponible — v{{version}}",
+    "packageManaged": "Cette installation est gérée par pacman. Pour mettre à jour, lancez :"
   },
   "workHours": {
     "encodeButton": "Encoder les heures",
