@@ -13,6 +13,18 @@ ignore = [
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained: syntect dumps, trusted data embedded at build time" },
     { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained: build time only" },
     { id = "RUSTSEC-2024-0320", reason = "yaml-rust unmaintained: syntect, trusted data" },
+    # zip extraction flaws (fixed in zip 9). Never fed untrusted archives: the
+    # updater extracts (Windows only) after verifying the minisign signature,
+    # spreadsheet-ods only writes our .ods, calamine is a dev-dependency.
+    # Drop once tauri-plugin-updater >= 2.14.1 (zip 9) passes the 7-day rule.
+    { id = "RUSTSEC-2026-0367", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0368", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0369", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0429", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    # zbus 5 internals merged into zbus 6; pulled by tauri-plugin-opener, no fix upstream.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained: via tauri-plugin-opener (zbus 5)" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained: via tauri-plugin-opener (zbus 5)" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained: via tauri-plugin-opener (zbus 5)" },
 ]
 
 [licenses]

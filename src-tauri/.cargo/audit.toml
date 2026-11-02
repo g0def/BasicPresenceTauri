@@ -14,4 +14,18 @@ ignore = [
     "RUSTSEC-2025-0141", # bincode unmaintained (syntect dumps, trusted data)
     "RUSTSEC-2024-0370", # proc-macro-error unmaintained (build time only)
     "RUSTSEC-2024-0320", # yaml-rust unmaintained (syntect, trusted data)
+
+    # --- zip extraction flaws (fixed in zip 9). No untrusted archive is ever
+    # extracted: the updater extracts (Windows only) after verifying the
+    # minisign signature; spreadsheet-ods only writes; calamine is dev-only.
+    # Drop once tauri-plugin-updater >= 2.14.1 (zip 9) passes the 7-day rule.
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
+    "RUSTSEC-2026-0429",
+
+    # --- zbus 5 internals, merged into zbus 6; via tauri-plugin-opener.
+    "RUSTSEC-2026-0370", # zvariant unmaintained
+    "RUSTSEC-2026-0371", # zbus_names unmaintained
+    "RUSTSEC-2026-0372", # zvariant_derive unmaintained
 ]
