@@ -8,7 +8,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chacha20poly1305::aead::{Aead, Payload};
-use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use sha2::{Digest, Sha256};
 
 use crate::domain::policy::KdfParams;
@@ -88,12 +88,12 @@ fn wrapped_keys_still_unwrap() {
 #[test]
 fn wrapping_is_unchanged() {
     // Same key, nonce and associated data → same ciphertext as before.
-    let cipher = XChaCha20Poly1305::new(Key::from_slice(&unhex(KEK_HEX)));
+    let cipher = XChaCha20Poly1305::new_from_slice(&unhex(KEK_HEX)).unwrap();
     let payload = Payload {
         msg: &DEK,
         aad: &aad_v2(),
     };
-    let v2 = cipher.encrypt(XNonce::from_slice(&NONCE), payload).unwrap();
+    let v2 = cipher.encrypt(&XNonce::from(NONCE), payload).unwrap();
     assert_eq!(hex(&v2), WRAP_V2_HEX);
 }
 

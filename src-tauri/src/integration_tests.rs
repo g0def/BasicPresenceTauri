@@ -2352,7 +2352,7 @@ async fn keystore_exec(state: &crate::presentation::state::AppState, sql: &str) 
 #[test]
 fn legacy_v1_key_material_is_upgraded_at_login() {
     use chacha20poly1305::aead::Aead;
-    use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 
     use crate::domain::services::key_service::KeyService;
     use crate::domain::services::password_hasher::PasswordHasher;
@@ -2383,8 +2383,9 @@ fn legacy_v1_key_material_is_upgraded_at_login() {
             .unwrap();
         let dek = ks.generate_key().unwrap();
         let nonce = [5u8; 24];
-        let wrapped = XChaCha20Poly1305::new(Key::from_slice(kek.as_slice()))
-            .encrypt(XNonce::from_slice(&nonce), dek.as_slice())
+        let wrapped = XChaCha20Poly1305::new_from_slice(kek.as_slice())
+            .unwrap()
+            .encrypt(&XNonce::from(nonce), dek.as_slice())
             .unwrap();
         let conn = state.keystore_db.connect().unwrap();
         conn.execute(
