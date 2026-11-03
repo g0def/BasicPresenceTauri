@@ -159,7 +159,8 @@ jour automatiquement à chaque version publiée. Les mises à jour arrivent ensu
    sudo pacman-key --lsign-key 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4
    ```
 
-2. Déclarer le dépôt à la fin de `/etc/pacman.conf` :
+2. Déclarer le dépôt à la fin de `/etc/pacman.conf` (à la main, ou avec la commande
+   ci-dessous) :
 
    ```ini
    [basic-presence]
@@ -167,11 +168,25 @@ jour automatiquement à chaque version publiée. Les mises à jour arrivent ensu
    Server = https://github.com/g0def/BasicPresenceTauri/releases/download/arch-repo
    ```
 
-3. Installer :
+   ```bash
+   printf '\n[basic-presence]\nSigLevel = Required\nServer = https://github.com/g0def/BasicPresenceTauri/releases/download/arch-repo\n' \
+     | sudo tee -a /etc/pacman.conf
+   ```
+
+3. Installer (`-Syu` et non `-Sy` : Arch ne supporte pas les mises à jour partielles) :
 
    ```bash
-   sudo pacman -Sy basic-presence-bin
+   sudo pacman -Syu basic-presence-bin
    ```
+
+**Mettre à jour** : les nouvelles versions arrivent avec la mise à jour habituelle du
+système, `sudo pacman -Syu`.
+
+**Désinstaller** : `sudo pacman -Rns basic-presence-bin`, puis retirer le bloc
+`[basic-presence]` de `/etc/pacman.conf` et, si souhaité, la clé :
+`sudo pacman-key --delete 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4`. Les données de
+l'app (profils, coffre chiffré) restent dans
+`~/.local/share/com.godef.basic-presence/`.
 
 ---
 
