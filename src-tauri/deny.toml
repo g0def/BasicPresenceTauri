@@ -21,6 +21,9 @@ ignore = [
     { id = "RUSTSEC-2026-0368", reason = "zip: no untrusted archive is ever extracted (see above)" },
     { id = "RUSTSEC-2026-0369", reason = "zip: no untrusted archive is ever extracted (see above)" },
     { id = "RUSTSEC-2026-0429", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    # calamine CFB/OLE2 parser DoS (fixed in 0.38, under 7 days old). Dev-only:
+    # tests read back the .ods files they generate themselves.
+    { id = "RUSTSEC-2026-0436", reason = "calamine dev-dependency, only parses test-generated files" },
     # zbus 5 internals merged into zbus 6; pulled by tauri-plugin-opener, no fix upstream.
     { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained: via tauri-plugin-opener (zbus 5)" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained: via tauri-plugin-opener (zbus 5)" },

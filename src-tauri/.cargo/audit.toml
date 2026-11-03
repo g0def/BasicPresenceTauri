@@ -24,6 +24,10 @@ ignore = [
     "RUSTSEC-2026-0369",
     "RUSTSEC-2026-0429",
 
+    # --- calamine CFB/OLE2 parser DoS (fixed in 0.38, under 7 days old).
+    # Dev-dependency: tests only parse the .ods files they generate.
+    "RUSTSEC-2026-0436",
+
     # --- zbus 5 internals, merged into zbus 6; via tauri-plugin-opener.
     "RUSTSEC-2026-0370", # zvariant unmaintained
     "RUSTSEC-2026-0371", # zbus_names unmaintained
