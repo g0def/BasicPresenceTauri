@@ -245,14 +245,14 @@ flowchart TD
 
 | Couche | Technologies (versions du projet) |
 | --- | --- |
-| **Frontend (Shell)** | React 19, TypeScript strict, Vite 7, i18next, Radix UI + shadcn (style *new-york*), Tailwind v4 |
+| **Frontend (Shell)** | React 19, TypeScript 6 strict, Vite 8, i18next, Radix UI + shadcn (style *new-york*), Tailwind v4 |
 | **Pont (IPC)** | `@tauri-apps/api` (centralisé dans `src/core/ipc.ts`) |
 | **Framework desktop** | Tauri v2 |
 | **Backend (Core)** | Rust (édition 2021) |
-| **Persistance** | libSQL 0.9 (feature `encryption`), 100 % locale et chiffrée en v1 |
+| **Persistance** | libSQL 0.10 (feature `encryption`), 100 % locale et chiffrée en v1 |
 | **Crypto** | Argon2id (hash + dérivation de clé), XChaCha20-Poly1305 (envelope), zeroize (effacement mémoire) |
 | **Tests** | `cargo test` (Rust) · Vitest + Testing Library (front) |
-| **Outillage** | **pnpm**, ESLint 9 (flat config), Prettier, `cargo fmt` / `clippy` |
+| **Outillage** | **pnpm 12**, ESLint 10 (flat config), Prettier, `cargo fmt` / `clippy` |
 
 ---
 

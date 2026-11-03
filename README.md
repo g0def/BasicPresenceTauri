@@ -18,8 +18,8 @@ Les données de présence étant **très confidentielles**, l'app est **offline-
 | Outil | Version | Notes |
 | --- | --- | --- |
 | **Rust** | stable (rustup) | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
-| **Node.js** | ≥ 20.19 | requis par Vite 7 |
-| **pnpm** | ≥ 9 | `npm install -g pnpm` (ou `corepack enable`) |
+| **Node.js** | ≥ 24 (LTS) | `engines` du projet ; Vite 8, Vitest 5 et jsdom 30 |
+| **pnpm** | 12 | `npm install -g pnpm` ; une version ≥ 9.7 bascule seule sur celle de `packageManager` |
 | **Dépendances système Tauri** | — | voir ci-dessous |
 
 ### Dépendances système (Tauri v2)

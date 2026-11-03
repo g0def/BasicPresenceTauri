@@ -24,13 +24,13 @@ système direct au _Shell_ (la WebView). Tout passe par des commandes validées.
 
 | Couche      | Technologies                                                                 |
 | ----------- | ---------------------------------------------------------------------------- |
-| Frontend    | React 19, TypeScript, Vite 7, **TanStack Router** (file-based), **TanStack Query** (état serveur) + React Context (état d'UI), conteneur d'injection (`core/di`) |
+| Frontend    | React 19, TypeScript 6, Vite 8 (Rolldown), **TanStack Router** (file-based), **TanStack Query** (état serveur) + React Context (état d'UI), conteneur d'injection (`core/di`) |
 | Bridge      | `@tauri-apps/api` (core)                                                      |
 | Backend     | Rust (édition 2024), Tauri v2 (**pattern d'isolation**)                       |
 | Persistance | **libSQL** (moteur de Turso), local + **chiffré au repos** (AES-256-CBC)      |
 | Crypto      | **Argon2id** (hash + dérivation de clé), **XChaCha20-Poly1305** (envelope)   |
 | Tests       | `cargo test` (Rust), **Vitest** + Testing Library (front)                    |
-| Outillage   | **pnpm 11** (âge minimum 7 j, builds bloqués), ESLint 9 (typé + frontières de couches + jsx-a11y), Prettier, cargo-deny |
+| Outillage   | **pnpm 12** (âge minimum 7 j, builds bloqués), ESLint 10 (typé + frontières de couches + jsx-a11y + règles React Compiler), Prettier, cargo-deny — politique : [dependances.md](documentation/dependances.md) |
 
 ---
 
