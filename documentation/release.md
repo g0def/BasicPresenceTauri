@@ -35,7 +35,7 @@ Longer term, the strongest option is to sign locally: CI builds and uploads unsi
 5. Verify the update loop from an installed copy of the previous version (see below).
 6. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` (checksum + provenance attestation from `release.yml` for the tag's commit) with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Approve its run too. To rebuild a version, run the workflow manually **from its tag**. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
 
-**Fallback — releasing from a tag:** pushing a `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) runs the same workflow; `detect` then refuses a tag that does not match `package.json`. Use it to build a version whose bump is already on `main` (e.g. 1.1.0, merged before this trigger existed).
+**Fallback — releasing from a tag:** pushing a `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) runs the same workflow; `detect` then refuses a tag that does not match `package.json`. Use it to rebuild a version whose bump is already on `main` (e.g. after its draft was deleted).
 
 ### Linux note
 
