@@ -206,6 +206,27 @@ mod tests {
         }
     }
 
+    /// Known answers from the crate versions that wrote the existing
+    /// baselines: an upgrade of hmac/sha2 must reproduce them byte for byte.
+    #[test]
+    fn mac_formats_are_unchanged() {
+        let (dir, path) = temp_vault("vectors", b"vault-bytes");
+        std::fs::write(super::with_suffix(&path, "-wal"), b"wal-bytes").unwrap();
+        assert_eq!(
+            hex(&compute_mac(&path, &KEY).unwrap()),
+            "77fc42e43a31310ae317619ff061522f14980946bfd33cbf8209c10d9800e55c"
+        );
+        assert_eq!(
+            hex(&compute_legacy_mac(&path, &KEY).unwrap()),
+            "88c7ce80785922b15efa4ccb85dae176f26eff3c949726bc1b310b113933d732"
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
     #[test]
     fn matching_baseline_is_clean() {
         let (dir, path) = temp_vault("clean", b"hello");
