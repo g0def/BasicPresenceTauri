@@ -6,7 +6,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // Expose the app version (single source of truth: package.json) to the frontend
@@ -25,7 +24,6 @@ export default defineConfig(async () => ({
     // Must come before react(): scans src/routes and generates src/routeTree.gen.ts.
     // Skipped under vitest: the committed routeTree.gen.ts is enough there, and
     // the code-splitting transform breaks lazy route chunks in jsdom.
-    // @ts-expect-error process is a nodejs global
     ...(process.env.VITEST
       ? []
       : [tanstackRouter({ target: "react", autoCodeSplitting: true })]),
