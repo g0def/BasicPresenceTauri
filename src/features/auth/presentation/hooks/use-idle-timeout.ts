@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 
 /**
  * Logs the user out after `idleMs` without any interaction, and reports real
@@ -28,22 +28,21 @@ export function useIdleTimeout(
   onActivity?: () => void,
   activityPingMs = 60_000,
 ): void {
-  // Keep the latest callbacks without re-arming listeners on every render.
-  const onIdleRef = useRef(onIdle);
-  onIdleRef.current = onIdle;
-  const onActivityRef = useRef(onActivity);
-  onActivityRef.current = onActivity;
+  // Effect events: always call the latest callbacks without re-arming the
+  // listeners when they change.
+  const fireIdle = useEffectEvent(() => onIdle());
+  const fireActivity = useEffectEvent(() => onActivity?.());
 
   useEffect(() => {
     if (!enabled) return;
 
     let lastActivity = Date.now();
     let lastPing = lastActivity;
-    let timer = window.setTimeout(() => onIdleRef.current(), idleMs);
+    let timer = window.setTimeout(() => fireIdle(), idleMs);
 
     const arm = (delay: number) => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => onIdleRef.current(), delay);
+      timer = window.setTimeout(() => fireIdle(), delay);
     };
 
     const onUserActivity = () => {
@@ -52,7 +51,7 @@ export function useIdleTimeout(
       arm(idleMs);
       if (now - lastPing >= activityPingMs) {
         lastPing = now;
-        onActivityRef.current?.();
+        fireActivity();
       }
     };
 
@@ -64,7 +63,7 @@ export function useIdleTimeout(
       const idleFor = Date.now() - lastActivity;
       if (idleFor >= idleMs) {
         window.clearTimeout(timer);
-        onIdleRef.current();
+        fireIdle();
       } else {
         arm(idleMs - idleFor);
       }

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useContainer } from "@/core/di";
-import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
+import { useCommand, useFeatureError } from "@/core/query";
 import type {
   Commute,
   CreateCommuteInput,
@@ -49,15 +49,6 @@ export function CommuteProvider({ children }: { children: ReactNode }) {
   );
   const queryClient = useQueryClient();
   const { run, isPending: isSubmitting } = useCommand();
-  const [error, setError] = useState<string | null>(null);
-
-  const reportError = useCallback(
-    (e: unknown) => {
-      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
-    },
-    [t],
-  );
-
   // The referential is profile-independent but needs an unlocked vault, so it
   // loads once a profile (hence a session) is available.
   const factorsQuery = useQuery({
@@ -73,10 +64,11 @@ export function CommuteProvider({ children }: { children: ReactNode }) {
     queryFn: () => useCases.list(profileId as string),
   });
 
-  useEffect(() => {
-    const e = factorsQuery.error ?? commutesQuery.error;
-    if (e) reportError(e);
-  }, [factorsQuery.error, commutesQuery.error, reportError]);
+  const { error, reportError, clearError } = useFeatureError(
+    t("errors.generic"),
+    factorsQuery.error,
+    commutesQuery.error,
+  );
 
   // Refresh after a write so the indicative CO2 is recomputed by the backend.
   const reload = useCallback(async (): Promise<void> => {
@@ -88,7 +80,7 @@ export function CommuteProvider({ children }: { children: ReactNode }) {
 
   const mutate = useCallback(
     async (work: () => Promise<unknown>): Promise<boolean> => {
-      setError(null);
+      clearError();
       try {
         await run(work);
         await reload();
@@ -98,7 +90,7 @@ export function CommuteProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [run, reload, reportError],
+    [clearError, run, reload, reportError],
   );
 
   const createCommute = useCallback(
@@ -118,8 +110,6 @@ export function CommuteProvider({ children }: { children: ReactNode }) {
     (id: string) => mutate(() => useCases.remove(id)),
     [mutate, useCases],
   );
-
-  const clearError = useCallback(() => setError(null), []);
 
   const commutes = (profileId && commutesQuery.data) || NO_COMMUTES;
   const emissionFactors = (profileId && factorsQuery.data) || NO_FACTORS;

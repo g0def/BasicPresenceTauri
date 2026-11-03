@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,12 +35,17 @@ export function StartTimePicker({
   label,
   hint,
 }: StartTimePickerProps) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() =>
+    value === null ? "" : formatClockTime(value),
+  );
 
-  // Re-sync the field whenever the bound value changes.
-  useEffect(() => {
+  // Re-sync the field whenever the bound value changes (adjusted during
+  // render, not in an effect).
+  const [syncedWith, setSyncedWith] = useState(value);
+  if (value !== syncedWith) {
+    setSyncedWith(value);
     setText(value === null ? "" : formatClockTime(value));
-  }, [value]);
+  }
 
   const commit = () => {
     const startMinutes = parseClockTime(text);

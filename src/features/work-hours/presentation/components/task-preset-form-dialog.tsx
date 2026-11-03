@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
   TASK_COLOR_PALETTE,
 } from "@/features/work-hours/presentation/work-hours-palette";
 import { cn } from "@/lib/utils";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 /** `custom` adds a one-off task to the day without saving a preset. */
 export type TaskFormMode = "preset-create" | "preset-edit" | "custom";
@@ -65,13 +66,12 @@ export function TaskPresetFormDialog({
   const [color, setColor] = useState<string>(DEFAULT_TASK_COLOR);
 
   // Reset the form whenever the dialog (re)opens or targets another preset.
-  useEffect(() => {
-    if (!open) return;
+  useResetOnOpen(open, preset, () => {
     setTitle(preset?.title ?? "");
     setDescription(preset?.description ?? "");
     setMinutes(preset?.defaultMinutes ?? 60);
     setColor(preset?.color ?? DEFAULT_TASK_COLOR);
-  }, [open, preset]);
+  });
 
   const canSubmit = title.trim().length > 0 && !isSubmitting;
 

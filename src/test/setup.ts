@@ -29,15 +29,17 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 
 // jsdom's default (opaque) origin does not expose a usable `localStorage`, so
 // any code reading/writing it throws. Provide an in-memory polyfill.
-let hasLocalStorage = false;
-try {
-  hasLocalStorage =
-    typeof globalThis.localStorage !== "undefined" &&
-    globalThis.localStorage !== null;
-} catch {
-  hasLocalStorage = false;
+function hasUsableLocalStorage(): boolean {
+  try {
+    return (
+      typeof globalThis.localStorage !== "undefined" &&
+      globalThis.localStorage !== null
+    );
+  } catch {
+    return false;
+  }
 }
-if (!hasLocalStorage) {
+if (!hasUsableLocalStorage()) {
   class MemoryStorage implements Storage {
     private store = new Map<string, string>();
     get length(): number {

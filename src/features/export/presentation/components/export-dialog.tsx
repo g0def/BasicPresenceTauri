@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 
@@ -18,6 +18,7 @@ import {
 } from "@/features/export/domain/entities/export";
 import { buildExportLabels } from "@/features/export/presentation/build-export-labels";
 import { useExport } from "@/features/export/presentation/hooks/use-export";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 interface ExportDialogProps {
   open: boolean;
@@ -57,13 +58,12 @@ export function ExportDialog({
   const [summary, setSummary] = useState<ExportSummary | null>(null);
 
   // Reset everything whenever the dialog (re)opens.
-  useEffect(() => {
-    if (!open) return;
+  useResetOnOpen(open, null, () => {
     setStage("idle");
     setOptions(DEFAULT_EXPORT_OPTIONS);
     setSummary(null);
     clearError();
-  }, [open, clearError]);
+  });
 
   const toggle = (key: keyof ExportOptions) =>
     setOptions((prev) => ({ ...prev, [key]: !prev[key] }));

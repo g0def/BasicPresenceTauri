@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Input } from "@/components/ui/input";
@@ -13,12 +13,15 @@ export function Co2Section() {
   const { settings, update } = useProfileSettings();
 
   // Car-occupancy is a free number field: keep a local draft, commit on blur.
-  const [occupancy, setOccupancy] = useState(
-    String(settings.co2.defaultCarOccupancy),
-  );
-  useEffect(() => {
-    setOccupancy(String(settings.co2.defaultCarOccupancy));
-  }, [settings.co2.defaultCarOccupancy]);
+  // The draft follows the saved value whenever it changes (adjusted during
+  // render, not in an effect).
+  const saved = String(settings.co2.defaultCarOccupancy);
+  const [occupancy, setOccupancy] = useState(saved);
+  const [syncedWith, setSyncedWith] = useState(saved);
+  if (saved !== syncedWith) {
+    setSyncedWith(saved);
+    setOccupancy(saved);
+  }
   const commitOccupancy = () => {
     const n = Math.round(Number(occupancy));
     if (

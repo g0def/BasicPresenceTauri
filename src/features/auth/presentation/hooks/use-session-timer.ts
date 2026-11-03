@@ -19,10 +19,7 @@ export function useSessionTimer(
   );
 
   useEffect(() => {
-    if (expiresAt == null) {
-      setRemainingMs(0);
-      return;
-    }
+    if (expiresAt == null) return;
 
     const tick = () => {
       const left = expiresAt - Date.now();
@@ -39,5 +36,7 @@ export function useSessionTimer(
     return () => window.clearInterval(id);
   }, [expiresAt, onExpire]);
 
-  return remainingMs;
+  // No session: nothing remains (derived, so no extra render is needed when
+  // the session ends; a stale count is never shown).
+  return expiresAt == null ? 0 : remainingMs;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 
@@ -20,6 +20,7 @@ import {
 } from "@/features/profile-transfer/domain/entities/bundle";
 import { useProfileTransfer } from "@/features/profile-transfer/presentation/hooks/use-profile-transfer";
 import { useProfile } from "@/entities/profile/model/use-profile";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 interface ExportProfileDialogProps {
   open: boolean;
@@ -54,13 +55,13 @@ export function ExportProfileDialog({
     useState<BundleSelection>(DEFAULT_SELECTION);
   const [summary, setSummary] = useState<BundleExportSummary | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  // Reset everything whenever the dialog (re)opens.
+  useResetOnOpen(open, null, () => {
     setStage("idle");
     setSelection(DEFAULT_SELECTION);
     setSummary(null);
     clearError();
-  }, [open, clearError]);
+  });
 
   const toggle = (key: keyof BundleSelection) =>
     setSelection((prev) => ({ ...prev, [key]: !prev[key] }));

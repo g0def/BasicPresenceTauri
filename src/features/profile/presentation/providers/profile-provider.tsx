@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useContainer } from "@/core/di";
-import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
+import { useCommand, useFeatureError } from "@/core/query";
 import type {
   CreateProfileInput,
   Profile,
@@ -44,23 +44,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   );
   const queryClient = useQueryClient();
   const { run, isPending: isSubmitting } = useCommand();
-  const [error, setError] = useState<string | null>(null);
-
   const listQuery = useQuery({
     queryKey: profileKeys.all,
     queryFn: () => useCases.list(),
   });
 
-  const reportError = useCallback(
-    (e: unknown) => {
-      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
-    },
-    [t],
+  const { error, reportError, clearError } = useFeatureError(
+    t("errors.generic"),
+    listQuery.error,
   );
-
-  useEffect(() => {
-    if (listQuery.error) reportError(listQuery.error);
-  }, [listQuery.error, reportError]);
 
   const refresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: profileKeys.all });
@@ -68,7 +60,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const mutate = useCallback(
     async (work: () => Promise<unknown>): Promise<boolean> => {
-      setError(null);
+      clearError();
       try {
         await run(work);
         await refresh();
@@ -78,7 +70,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [run, refresh, reportError],
+    [clearError, run, refresh, reportError],
   );
 
   const createProfile = useCallback(
@@ -114,8 +106,6 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     },
     [queryClient, run, useCases, reportError],
   );
-
-  const clearError = useCallback(() => setError(null), []);
 
   const profiles = listQuery.data?.profiles ?? NO_PROFILES;
   const activeProfileId = listQuery.data?.activeProfileId ?? null;

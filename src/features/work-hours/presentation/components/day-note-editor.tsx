@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 
 import { Crepe } from "@milkdown/crepe";
 
@@ -25,9 +25,9 @@ export function DayNoteEditor({
   onChange,
 }: DayNoteEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  // Latest handler via a ref so the editor is created exactly once.
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  // Effect event: the editor (created exactly once) always calls the latest
+  // handler.
+  const emitChange = useEffectEvent((markdown: string) => onChange(markdown));
   const initialRef = useRef(defaultValue);
   const placeholderRef = useRef(placeholder);
 
@@ -46,7 +46,7 @@ export function DayNoteEditor({
       },
     });
     crepe.on((listener) => {
-      listener.markdownUpdated((_, md) => onChangeRef.current(md));
+      listener.markdownUpdated((_, md) => emitChange(md));
     });
 
     let destroyed = false;
@@ -58,7 +58,7 @@ export function DayNoteEditor({
       destroyed = true;
       void crepe.destroy();
     };
-    // Mount once: uncontrolled editor reading the refs above for latest handlers.
+    // Mount once: uncontrolled editor (seeded from the refs above).
   }, []);
 
   return <div ref={rootRef} className="milkdown-host" />;
