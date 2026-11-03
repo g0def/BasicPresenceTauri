@@ -1,4 +1,6 @@
 pub mod argon2_hasher;
+#[cfg(test)]
+mod compat_vectors;
 pub mod device_key;
 pub mod key_service;
 pub mod token_generator;

@@ -1,6 +1,5 @@
-use argon2::password_hash::{
-    Error as PhError, PasswordHash, PasswordHasher as _, PasswordVerifier as _, SaltString,
-};
+use argon2::password_hash::phc::PasswordHash;
+use argon2::password_hash::{Error as PhError, PasswordHasher as _, PasswordVerifier as _};
 use argon2::{Algorithm, Argon2, Params, Version};
 use async_trait::async_trait;
 use zeroize::Zeroizing;
@@ -28,7 +27,7 @@ fn argon2(params: Params) -> Argon2<'static> {
 }
 
 /// Parameters embedded in a PHC string, if it is a well-formed Argon2 one.
-fn phc_params(parsed: &PasswordHash<'_>) -> Option<KdfParams> {
+fn phc_params(parsed: &PasswordHash) -> Option<KdfParams> {
     let params = Params::try_from(parsed).ok()?;
     Some(KdfParams {
         m_cost: params.m_cost(),
@@ -42,13 +41,11 @@ impl PasswordHasher for Argon2PasswordHasher {
     async fn hash(&self, password: &[u8]) -> Result<String, DomainError> {
         let mut salt_bytes = [0u8; 16];
         getrandom::fill(&mut salt_bytes).map_err(|e| DomainError::Hashing(e.to_string()))?;
-        let salt =
-            SaltString::encode_b64(&salt_bytes).map_err(|e| DomainError::Hashing(e.to_string()))?;
         let password = Zeroizing::new(password.to_vec());
         let params = self.params.clone();
         run_blocking(move || {
             argon2(params)
-                .hash_password(&password, &salt)
+                .hash_password_with_salt(&password, &salt_bytes)
                 .map(|hash| hash.to_string())
                 .map_err(|e| DomainError::Hashing(e.to_string()))
         })
@@ -75,7 +72,7 @@ impl PasswordHasher for Argon2PasswordHasher {
                 PasswordHash::new(&phc).map_err(|e| DomainError::Hashing(e.to_string()))?;
             match argon2(params).verify_password(&password, &parsed) {
                 Ok(()) => Ok(true),
-                Err(PhError::Password) => Ok(false),
+                Err(PhError::PasswordInvalid) => Ok(false),
                 Err(e) => Err(DomainError::Hashing(e.to_string())),
             }
         })

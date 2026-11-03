@@ -30,39 +30,34 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Persistance offline-first chiffrée (moteur libSQL / Turso), 100% locale en v1
-libsql = { version = "0.9", default-features = false, features = ["encryption"] }
+libsql = { version = "0.10", default-features = false, features = ["encryption"] }
 bytes = "1"
 
 # Hachage de mot de passe & dérivation de clé (Argon2id)
-argon2 = "0.5"
-password-hash = { version = "0.5", features = ["std"] }
+# `zeroize`: Argon2's working memory is wiped after each derivation.
+argon2 = { version = "0.6", features = ["zeroize"] }
 
 # Envelope encryption du DEK (AEAD authentifié, nonce 192 bits)
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.11"
 
 # Évidence d'altération du vault au repos (HMAC-SHA256 sur le fichier + comparaison
 # constant-time). libSQL 0.9 ne chiffre qu'en AES-256-CBC non authentifié.
-hmac = "0.12"
-sha2 = "0.10"
+hmac = "0.13"
+sha2 = "0.11"
 subtle = "2"
 
 # Scellement du keystore : clé de device stockée dans le trousseau OS.
-# `sync-secret-service` + `crypto-rust` => backend pur Rust (zbus), pas de
-# dépendance système à OpenSSL/libsecret au build (le Secret Service GNOME/KWallet
-# reste requis au runtime sous Linux).
-keyring = { version = "3", features = [
-    "apple-native",
-    "windows-native",
-    "sync-secret-service",
-    "crypto-rust",
-] }
+# keyring-core (API) + un store natif par plateforme (cf. la section
+# `[target.…]` plus bas) — l'intégration recommandée depuis keyring 4. Les
+# stores retrouvent les entrées écrites par keyring 3 (mêmes attributs).
+keyring-core = "1"
 
 # Aléatoire cryptographique, effacement mémoire, ids, erreurs, encodage
-getrandom = "0.3"
+getrandom = "0.4"
 zeroize = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v7"] }
 thiserror = "2"
-base64 = "0.22"
+base64 = "0.23"
 async-trait = "0.1"
 # Verrou d'écriture asynchrone + transaction ambiante (task-local) du vault.
 # Déjà présent via tauri : aucune nouvelle dépendance téléchargée.
@@ -73,7 +68,7 @@ tokio = { version = "1", features = ["sync", "rt"] }
 # défaut (qui tire onig, une dépendance C). On branche notre propre coloration via
 # syntect en `default-fancy` (moteur regex pur-Rust `fancy-regex`, donc PAS de dep C).
 # Le HTML est ensuite assaini par Ammonia (whitelist html5ever) avant la WebView.
-comrak = { version = "0.52.0", default-features = false }
+comrak = { version = "0.59.0", default-features = false }
 ammonia = "4.1.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 spreadsheet-ods = "1.0.4"
@@ -82,7 +77,7 @@ chrono = { version = "0.4.45", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
-calamine = "0.35.0"
+calamine = "0.37.0"
 
 
 # Argon2 is ~10x slower unoptimized: keep `tauri dev` logins (auth hash + 64 MiB
@@ -101,3 +96,15 @@ strip = true
 overflow-checks = true
 # `panic = "unwind"` (the default) is kept on purpose: unwinding runs the
 # `Zeroizing` destructors, so key material is wiped even on a panic.
+
+# Trousseau OS par plateforme (mêmes stores que la façade `v1` de keyring 4).
+# Linux : Secret Service en pur Rust (zbus + `crypto-rust`), sans OpenSSL ni
+# libsecret au build (GNOME Keyring/KWallet reste requis au runtime).
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "1", features = ["keychain"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = "1"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust"] }

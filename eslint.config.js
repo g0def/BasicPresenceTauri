@@ -227,6 +227,14 @@ export default tseslint.config(
     },
   },
 
+  // Route files export `Route` next to their components by design: the router
+  // plugin (`autoCodeSplitting`) moves those components into their own modules
+  // and handles their hot reload, so the fast-refresh rule does not apply.
+  {
+    files: ["src/routes/**/*.tsx"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
+
   // Accessibility of the JSX.
   { files: ["src/**/*.tsx"], ...jsxA11y.flatConfigs.recommended },
   {

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useContainer } from "@/core/di";
-import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
+import { useCommand, useFeatureError } from "@/core/query";
 import {
   DEFAULT_PROFILE_SETTINGS,
   type ProfileSettings,
@@ -64,15 +64,6 @@ export function ProfileSettingsProvider({ children }: { children: ReactNode }) {
   );
   const queryClient = useQueryClient();
   const { run, isPending: isSubmitting } = useCommand();
-  const [error, setError] = useState<string | null>(null);
-
-  const reportError = useCallback(
-    (e: unknown) => {
-      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
-    },
-    [t],
-  );
-
   // Load (and reset on) active-profile change. Without a profile there is
   // nothing to load — defaults apply.
   const query = useQuery({
@@ -93,9 +84,10 @@ export function ProfileSettingsProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  useEffect(() => {
-    if (query.error) reportError(query.error);
-  }, [query.error, reportError]);
+  const { error, reportError, clearError } = useFeatureError(
+    t("errors.generic"),
+    query.error,
+  );
 
   const settings =
     profileId && query.data ? query.data : DEFAULT_PROFILE_SETTINGS;
@@ -117,7 +109,7 @@ export function ProfileSettingsProvider({ children }: { children: ReactNode }) {
         co2: { ...settings.co2, ...(input.co2 ?? {}) },
       };
       queryClient.setQueryData(key, optimistic); // the note-font effect fires now
-      setError(null);
+      clearError();
       try {
         const canonical = await run(() => setUseCase(profileId, optimistic));
         queryClient.setQueryData(key, canonical);
@@ -128,10 +120,16 @@ export function ProfileSettingsProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [profileId, settings, queryClient, run, setUseCase, reportError],
+    [
+      clearError,
+      profileId,
+      settings,
+      queryClient,
+      run,
+      setUseCase,
+      reportError,
+    ],
   );
-
-  const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<ProfileSettingsContextValue>(
     () => ({

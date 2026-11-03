@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Profile } from "@/entities/profile/model/profile";
 import { useProfile } from "@/entities/profile/model/use-profile";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 interface ProfileFormDialogProps {
   open: boolean;
@@ -29,27 +30,30 @@ export function ProfileFormDialog({
   profile,
 }: ProfileFormDialogProps) {
   const { t } = useTranslation();
-  const { createProfile, updateProfile, isSubmitting, error, clearError } =
-    useProfile();
+  const { createProfile, updateProfile, isSubmitting, error } = useProfile();
   const isEdit = Boolean(profile);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [enterprise, setEnterprise] = useState("");
   const [poste, setPoste] = useState("");
+  // The profile context's error is shared with the rest of the app: only show
+  // it here for a submit made since the dialog opened.
+  const [submitted, setSubmitted] = useState(false);
+  const formError = submitted ? error : null;
 
   // Reset the fields whenever the dialog (re)opens or the edited profile changes.
-  useEffect(() => {
-    if (!open) return;
+  useResetOnOpen(open, profile, () => {
     setFirstName(profile?.firstName ?? "");
     setLastName(profile?.lastName ?? "");
     setEnterprise(profile?.enterprise ?? "");
     setPoste(profile?.poste ?? "");
-    clearError();
-  }, [open, profile, clearError]);
+    setSubmitted(false);
+  });
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     const fields = {
       firstName,
       lastName,
@@ -121,7 +125,7 @@ export function ProfileFormDialog({
             />
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {formError && <p className="text-sm text-destructive">{formError}</p>}
 
           <DialogFooter>
             <Button

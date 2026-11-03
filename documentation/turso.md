@@ -42,7 +42,7 @@ let db = Builder::new_local(path).encryption_config(config).build().await?;
 let conn = db.connect()?;
 ```
 
-Faits d'API importants (libsql 0.9) :
+Faits d'API importants (libsql 0.9 et 0.10, API identique) :
 
 - `Cipher` n'expose qu'**`Aes256Cbc`** ; la clé fait **exactement 32 octets**.
 - `Connection` est `Send + Sync + Clone` (Arc interne) → **pas besoin de `Mutex<Connection>`**, on la clone.

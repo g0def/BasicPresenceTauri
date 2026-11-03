@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useContainer } from "@/core/di";
-import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
+import { useCommand, useFeatureError } from "@/core/query";
 import type {
   TaskPreset,
   TaskPresetInput,
@@ -44,15 +44,6 @@ export function TaskPresetProvider({ children }: { children: ReactNode }) {
   );
   const queryClient = useQueryClient();
   const { run, isPending: isSubmitting } = useCommand();
-  const [error, setError] = useState<string | null>(null);
-
-  const reportError = useCallback(
-    (e: unknown) => {
-      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
-    },
-    [t],
-  );
-
   // Reloads whenever the active profile changes (the key carries it).
   const query = useQuery({
     queryKey: presetsKey(profileId),
@@ -62,9 +53,10 @@ export function TaskPresetProvider({ children }: { children: ReactNode }) {
   const presets = (profileId && query.data) || NO_PRESETS;
   const isLoading = profileId !== null && query.isPending;
 
-  useEffect(() => {
-    if (query.error) reportError(query.error);
-  }, [query.error, reportError]);
+  const { error, reportError, clearError } = useFeatureError(
+    t("errors.generic"),
+    query.error,
+  );
 
   /** Apply a write, then patch the cached list with `patch`. */
   const mutate = useCallback(
@@ -72,7 +64,7 @@ export function TaskPresetProvider({ children }: { children: ReactNode }) {
       work: () => Promise<T>,
       patch: (prev: TaskPreset[], result: T) => TaskPreset[],
     ): Promise<boolean> => {
-      setError(null);
+      clearError();
       try {
         const result = await run(work);
         queryClient.setQueryData<TaskPreset[]>(
@@ -85,7 +77,7 @@ export function TaskPresetProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [profileId, run, queryClient, reportError],
+    [clearError, profileId, run, queryClient, reportError],
   );
 
   const createPreset = useCallback(
@@ -117,8 +109,6 @@ export function TaskPresetProvider({ children }: { children: ReactNode }) {
       ),
     [mutate, useCases],
   );
-
-  const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<TaskPresetContextValue>(
     () => ({

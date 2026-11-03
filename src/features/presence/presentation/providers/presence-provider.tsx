@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { startOfMonth } from "date-fns";
 
@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useContainer } from "@/core/di";
-import { errorMessage, isSessionExpired, useCommand } from "@/core/query";
+import { useCommand, useFeatureError } from "@/core/query";
 import type {
   Presence,
   PresenceTrip,
@@ -46,15 +46,6 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
   );
-  const [error, setError] = useState<string | null>(null);
-
-  const reportError = useCallback(
-    (e: unknown) => {
-      if (!isSessionExpired(e)) setError(errorMessage(e, t("errors.generic")));
-    },
-    [t],
-  );
-
   // Reloads whenever the active profile changes (the key carries it).
   const key = presenceKeys.byProfile(profileId);
   const query = useQuery({
@@ -64,9 +55,10 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   });
   const presences = (profileId && query.data) || NO_PRESENCES;
 
-  useEffect(() => {
-    if (query.error) reportError(query.error);
-  }, [query.error, reportError]);
+  const { error, reportError, clearError } = useFeatureError(
+    t("errors.generic"),
+    query.error,
+  );
 
   const setPresence = useCallback(
     async (
@@ -75,7 +67,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       trips?: PresenceTrip[],
     ): Promise<Presence | null> => {
       if (!profileId) return null;
-      setError(null);
+      clearError();
       try {
         const saved = await run(() =>
           useCases.set({ profileId, day, type, trips }),
@@ -92,7 +84,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [profileId, run, useCases, queryClient, reportError],
+    [clearError, profileId, run, useCases, queryClient, reportError],
   );
 
   const getPresenceTrips = useCallback(
@@ -112,7 +104,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   const deletePresence = useCallback(
     async (id: string): Promise<boolean> => {
-      setError(null);
+      clearError();
       try {
         await run(() => useCases.remove(id));
         queryClient.setQueryData<Presence[]>(
@@ -126,7 +118,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [profileId, run, useCases, queryClient, reportError],
+    [clearError, profileId, run, useCases, queryClient, reportError],
   );
 
   // Re-pull the whole list from the backend. Used after a bulk import or a
@@ -139,7 +131,6 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     });
   }, [profileId, queryClient]);
 
-  const clearError = useCallback(() => setError(null), []);
   const isLoading = profileId !== null && (query.isPending || query.isFetching);
 
   const presencesByDay = useMemo(() => {

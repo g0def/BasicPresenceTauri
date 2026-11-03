@@ -2352,7 +2352,7 @@ async fn keystore_exec(state: &crate::presentation::state::AppState, sql: &str) 
 #[test]
 fn legacy_v1_key_material_is_upgraded_at_login() {
     use chacha20poly1305::aead::Aead;
-    use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
+    use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 
     use crate::domain::services::key_service::KeyService;
     use crate::domain::services::password_hasher::PasswordHasher;
@@ -2383,8 +2383,9 @@ fn legacy_v1_key_material_is_upgraded_at_login() {
             .unwrap();
         let dek = ks.generate_key().unwrap();
         let nonce = [5u8; 24];
-        let wrapped = XChaCha20Poly1305::new(Key::from_slice(kek.as_slice()))
-            .encrypt(XNonce::from_slice(&nonce), dek.as_slice())
+        let wrapped = XChaCha20Poly1305::new_from_slice(kek.as_slice())
+            .unwrap()
+            .encrypt(&XNonce::from(nonce), dek.as_slice())
             .unwrap();
         let conn = state.keystore_db.connect().unwrap();
         conn.execute(
@@ -2669,6 +2670,114 @@ fn security_journal_reports_what_happened_since_the_last_visit() {
             .expect("login");
         assert!(third.security_events.is_empty());
         assert_eq!(third.failed_attempts_since_last_login, 0);
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+// ---------------------------------------------------------------------------
+// On-disk compatibility: a keystore + vault written by an older libSQL must
+// still open after a dependency upgrade (users' data is never migrated by hand).
+// ---------------------------------------------------------------------------
+
+/// Fixture written by libSQL 0.9 (see `write_libsql_compat_fixture`).
+const LIBSQL_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/vault-libsql-0.9"
+);
+const FIXTURE_DAY: i64 = 1_717_200_000_000;
+
+fn fixture_config(dir: &std::path::Path) -> AppConfig {
+    let (mut config, scratch) = temp_config("fixture-cfg");
+    let _ = std::fs::remove_dir_all(scratch);
+    config.keystore_path = dir.join("keystore.db");
+    config.vault_path = dir.join("vault.db");
+    // Any integrity mismatch after the clean shutdown fails the login.
+    config.integrity = IntegrityPolicy::HardFail;
+    config
+}
+
+/// Regenerates the fixture with the libSQL version currently in Cargo.lock:
+/// `BP_FIXTURE_DIR=tests/fixtures/vault-libsql-0.9 cargo test write_libsql_compat_fixture -- --ignored`
+#[test]
+#[ignore = "writes the on-disk compatibility fixture"]
+fn write_libsql_compat_fixture() {
+    tauri::async_runtime::block_on(async {
+        let dir = PathBuf::from(std::env::var("BP_FIXTURE_DIR").expect("BP_FIXTURE_DIR"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let state = build_state(fixture_config(&dir), &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+        state
+            .set_presence
+            .execute(&profile.id, FIXTURE_DAY, "office", vec![])
+            .await
+            .expect("set presence");
+        // Clean shutdown: locks the vault and records the integrity baseline.
+        state.logout.execute(&session.token).await.unwrap();
+    });
+}
+
+#[test]
+fn vault_written_by_libsql_0_9_still_opens() {
+    tauri::async_runtime::block_on(async {
+        let (_, dir) = temp_config("libsql-compat");
+        for file in std::fs::read_dir(LIBSQL_FIXTURE).expect("fixture present") {
+            let file = file.unwrap();
+            std::fs::copy(file.path(), dir.join(file.file_name())).unwrap();
+        }
+        let state = build_state(fixture_config(&dir), &TEST_DEVICE_KEY)
+            .await
+            .expect("keystore written by libSQL 0.9 opens");
+
+        assert!(state.account_exists.execute().await.unwrap());
+        let session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("vault written by libSQL 0.9 unlocks, integrity intact");
+
+        let listed = state.list_profiles.execute().await.expect("list");
+        assert_eq!(listed.profiles.len(), 1);
+        let profile = &listed.profiles[0];
+        assert_eq!(profile.first_name, "Ada");
+        let presences = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .expect("presences");
+        assert_eq!(presences.len(), 1);
+        assert_eq!(presences[0].day, FIXTURE_DAY);
+        assert_eq!(presences[0].kind, "office");
+
+        // Writes still work, and the vault reopens after a clean shutdown.
+        state
+            .set_presence
+            .execute(&profile.id, FIXTURE_DAY + 86_400_000, "remote", vec![])
+            .await
+            .expect("write");
+        state.logout.execute(&session.token).await.unwrap();
+        state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("reopens after a write");
 
         let _ = std::fs::remove_dir_all(dir);
     });

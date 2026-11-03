@@ -1,7 +1,7 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use async_trait::async_trait;
 use chacha20poly1305::aead::{Aead, Payload};
-use chacha20poly1305::{Key, KeyInit, XChaCha20Poly1305, XNonce};
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::domain::error::DomainError;
@@ -35,10 +35,9 @@ fn associated_data(binding: KeyBinding<'_>) -> Vec<u8> {
 }
 
 fn check_kek(kek: &[u8]) -> Result<XChaCha20Poly1305, DomainError> {
-    if kek.len() != 32 {
-        return Err(DomainError::Crypto("invalid KEK length".into()));
-    }
-    Ok(XChaCha20Poly1305::new(Key::from_slice(kek)))
+    // Rejects anything but a 32-byte key (no intermediate copy of the key).
+    XChaCha20Poly1305::new_from_slice(kek)
+        .map_err(|_| DomainError::Crypto("invalid KEK length".into()))
 }
 
 #[async_trait]
@@ -97,7 +96,7 @@ impl KeyService for Argon2KeyService {
         });
         let ciphertext = cipher
             .encrypt(
-                XNonce::from_slice(&nonce_bytes),
+                &XNonce::from(nonce_bytes),
                 Payload {
                     msg: key,
                     aad: &aad,
@@ -125,9 +124,11 @@ impl KeyService for Argon2KeyService {
             2 => associated_data(binding),
             _ => return Err(DomainError::Crypto("unknown key wrap version".into())),
         };
+        let nonce = XNonce::try_from(wrapped.nonce.as_slice())
+            .map_err(|_| DomainError::Crypto("invalid nonce length".into()))?;
         let mut plaintext = cipher
             .decrypt(
-                XNonce::from_slice(&wrapped.nonce),
+                &nonce,
                 Payload {
                     msg: wrapped.ciphertext.as_ref(),
                     aad: &aad,
@@ -229,7 +230,7 @@ mod tests {
         let nonce = [3u8; 24];
         let ciphertext = check_kek(kek.as_slice())
             .unwrap()
-            .encrypt(XNonce::from_slice(&nonce), key.as_slice())
+            .encrypt(&XNonce::from(nonce), key.as_slice())
             .unwrap();
         let wrapped = WrappedKey {
             ciphertext,

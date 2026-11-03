@@ -49,12 +49,13 @@ export function WorkEntryList({
   }
 
   // Entries stack from the day start: entry N begins where N-1 ends.
+  // (A running sum, without mutating a variable captured by a callback.)
+  const startTimes: number[] = [];
   let cursor = dayStartMinutes ?? 0;
-  const startTimes = entries.map((e) => {
-    const startsAt = cursor;
-    cursor += e.minutes;
-    return startsAt;
-  });
+  for (const entry of entries) {
+    startTimes.push(cursor);
+    cursor += entry.minutes;
+  }
 
   return (
     <ol className="grid gap-2">

@@ -31,6 +31,8 @@ lerna-debug.log*
 # --- Bases de données locales (chiffrées ou non) ---
 # La persistance est 100% locale (libSQL) : aucune DB ne doit être versionnée
 *.db
+# On-disk compatibility fixtures (test-only data, sealed with a test key).
+!src-tauri/tests/fixtures/**/*.db
 *.db-shm
 *.db-wal
 *.sqlite

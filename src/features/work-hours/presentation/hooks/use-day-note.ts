@@ -46,7 +46,10 @@ export function useDayNote(presenceId: string): UseDayNoteValue {
   const { run } = useCommand();
   const [markdown, setMarkdownState] = useState("");
   const [html, setHtml] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  // Loading until the data of the current day has arrived (derived: no
+  // synchronous "loading" state flip inside the load effect).
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const isLoading = loadedFor !== presenceId;
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,7 +122,6 @@ export function useDayNote(presenceId: string): UseDayNoteValue {
   // Load the day's note; flush any pending save on leave.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
     run(() => getDayNote(presenceId))
       .then((note) => {
         if (cancelled) return;
@@ -131,7 +133,7 @@ export function useDayNote(presenceId: string): UseDayNoteValue {
         if (!cancelled) handleError(e);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setLoadedFor(presenceId);
       });
     return () => {
       cancelled = true;

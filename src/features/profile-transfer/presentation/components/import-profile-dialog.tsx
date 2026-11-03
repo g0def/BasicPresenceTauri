@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
 import { useProfileTransfer } from "@/features/profile-transfer/presentation/hooks/use-profile-transfer";
 import { useProfile } from "@/entities/profile/model/use-profile";
 import { usePresence } from "@/entities/presence/model/use-presence";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 interface ImportProfileDialogProps {
   open: boolean;
@@ -76,8 +77,7 @@ export function ImportProfileDialog({
   const [summary, setSummary] = useState<BundleImportSummary | null>(null);
 
   // Reset everything whenever the dialog (re)opens.
-  useEffect(() => {
-    if (!open) return;
+  useResetOnOpen(open, null, () => {
     setStage("idle");
     setLocalError(null);
     setHandle(null);
@@ -89,7 +89,7 @@ export function ImportProfileDialog({
     setConflict("skip");
     setSummary(null);
     clearError();
-  }, [open, clearError]);
+  });
 
   const chooseFile = async () => {
     setLocalError(null);

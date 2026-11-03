@@ -51,7 +51,10 @@ export function useWorkDay(presenceId: string): UseWorkDayValue {
   const { run } = useCommand();
   const [entries, setEntries] = useState<WorkEntry[]>([]);
   const [schedule, setScheduleState] = useState<WorkDaySchedule | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Loading until the data of the current day has arrived (derived: no
+  // synchronous "loading" state flip inside the load effect).
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const isLoading = loadedFor !== presenceId;
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,7 +120,6 @@ export function useWorkDay(presenceId: string): UseWorkDayValue {
   // Load the day's entries + schedule; flush any pending save on leave.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
     run(() =>
       Promise.all([
         getEntriesUseCase(presenceId),
@@ -134,7 +136,7 @@ export function useWorkDay(presenceId: string): UseWorkDayValue {
         if (!cancelled) handleError(e);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setLoadedFor(presenceId);
       });
     return () => {
       cancelled = true;

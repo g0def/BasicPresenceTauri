@@ -33,6 +33,7 @@ import { dayKey } from "@/entities/presence/lib/day-key";
 import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import { usePresence } from "@/entities/presence/model/use-presence";
 import { cn } from "@/lib/utils";
+import { useResetOnOpen } from "@/shared/hooks/use-reset-on-open";
 
 interface PresenceDayDialogProps {
   /** The calendar day being edited, or `null` when the dialog is closed. */
@@ -87,13 +88,12 @@ export function PresenceDayDialog({
   const [customRoundTrip, setCustomRoundTrip] = useState(true);
 
   // Reset the wizard whenever the dialog (re)opens or the day changes.
-  useEffect(() => {
-    if (!open) return;
+  useResetOnOpen(open, key, () => {
     setStep("type");
     setChoice(null);
     setCustomSegments([emptySegment()]);
     setCustomRoundTrip(true);
-  }, [open, key]);
+  });
 
   // Pre-fill the custom trip from a previously-encoded office/remote day.
   useEffect(() => {

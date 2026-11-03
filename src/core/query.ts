@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import { isAppError } from "@/core/errors";
@@ -15,6 +15,44 @@ export function isSessionExpired(e: unknown): boolean {
 /** User-facing message of an error (backend messages are already safe). */
 export function errorMessage(e: unknown, fallback: string): string {
   return isAppError(e) ? e.message : fallback;
+}
+
+/**
+ * Error state of a feature provider: the last failed action, else the first
+ * failed query. Query errors are derived during render (never copied into
+ * state by an effect), so a query that recovers stops showing its error.
+ * `clearError` dismisses both — the dismissed query errors stay hidden until
+ * the query fails again (a new error object).
+ */
+export function useFeatureError(
+  fallback: string,
+  queryError: unknown,
+  otherQueryError: unknown = null,
+) {
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<readonly unknown[]>([]);
+
+  const shownQueryError =
+    [queryError, otherQueryError].find(
+      (e) => e != null && !isSessionExpired(e) && !dismissed.includes(e),
+    ) ?? null;
+
+  const reportError = useCallback(
+    (e: unknown) => {
+      if (!isSessionExpired(e)) setActionError(errorMessage(e, fallback));
+    },
+    [fallback],
+  );
+
+  const clearError = useCallback(() => {
+    setActionError(null);
+    setDismissed([queryError, otherQueryError]);
+  }, [queryError, otherQueryError]);
+
+  const error =
+    actionError ??
+    (shownQueryError ? errorMessage(shownQueryError, fallback) : null);
+  return { error, reportError, clearError };
 }
 
 /**
