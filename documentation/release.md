@@ -33,7 +33,7 @@ Longer term, the strongest option is to sign locally: CI builds and uploads unsi
 3. Approve the run (*Review deployments*, environment `release`). The workflow re-runs the CI gates, builds four matrix jobs (macOS arm64, macOS x86_64, Linux, Windows), signs the updater artifacts and creates a **draft** release `vX.Y.Z` targeting the built commit, with `latest.json`, the SBOM and `SHA256SUMS`.
 4. Review the draft release on GitHub, then **publish** it. Publishing is the gate: it creates the `vX.Y.Z` tag on the built commit, and `releases/latest/download/latest.json` only resolves once the release is non-draft and non-prerelease. Nothing reaches users before this step.
 5. Verify the update loop from an installed copy of the previous version (see below).
-6. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` (checksum + provenance attestation from `release.yml` for the tag's commit) with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Approve its run too. To rebuild a version, run the workflow manually **from its tag**. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
+6. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` (checksum + provenance attestation from `release.yml` for the tag's commit) with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Approve its run too. To rebuild a version, run the workflow manually **from `main`** with the version tag as input (`gh workflow run arch-repo.yml -f tag=vX.Y.Z`): the workflow file comes from `main`, PKGBUILD and LICENCE from the tag. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
 
 **Fallback — releasing from a tag:** pushing a `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) runs the same workflow; `detect` then refuses a tag that does not match `package.json`. Use it to rebuild a version whose bump is already on `main` (e.g. after its draft was deleted).
 
@@ -49,7 +49,7 @@ Installs from the pacman repository carry the marker `/usr/lib/basic-presence/ma
 - **Environment secrets** (environment `release`, not repository secrets): `ARCH_REPO_GPG_PRIVATE_KEY` = `gpg --armor --export-secret-keys <FPR>`, `ARCH_REPO_GPG_PASSPHRASE` = its passphrase.
 - Public key committed as `basicpresence-bin/basic-presence-repo.asc` (`gpg --armor --export <FPR>`); its fingerprint is printed in the README. Back up the private key in the password manager.
 - **Before expiry** (2 years): `gpg --quick-set-expire <FPR> 2y`, re-export the public key, update the secret. Users re-import the key (`pacman-key --add` + `--lsign-key`).
-- **Rotation / compromise**: new key, new secret, new `.asc` and README fingerprint, re-run the workflow from the latest tag; announce it in the release notes (users must trust the new key and `pacman-key --delete` the old one).
+- **Rotation / compromise**: new key, new secret, new `.asc` and README fingerprint, re-run the workflow from `main` with the latest tag as input; announce it in the release notes (users must trust the new key and `pacman-key --delete` the old one).
 
 ## Testing the update loop locally (before the first real release)
 

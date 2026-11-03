@@ -2,12 +2,18 @@ name: Arch repository
 
 # Publishes the signed pacman repository (release `arch-repo`) from a PUBLISHED
 # release: the draft stays the manual gate, nothing reaches pacman users before
-# it is published. To rebuild by hand, run this workflow from the tag
-# ("Use workflow from" → the `v*` tag).
+# it is published. To rebuild by hand, run this workflow from `main` with the
+# version's tag as input (the workflow file then comes from `main`, so a fix
+# here applies to an already published version).
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published version to (re)publish, e.g. v1.1.0"
+        required: true
+        type: string
 
 # One repository database: never update it from two runs at once.
 concurrency:
@@ -26,8 +32,8 @@ jobs:
   build-repo:
     name: Build, sign & publish the pacman repository
     if: >-
-      startsWith(github.ref_name, 'v') &&
-      (github.event_name != 'release' || !github.event.release.prerelease)
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.ref_name, 'v') && !github.event.release.prerelease)
     runs-on: ubuntu-latest
     # Pinned by digest like the actions (a floating tag changes under us).
     # To update: resolve the current `base-devel` digest and replace it.
@@ -42,13 +48,23 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.tag }}
     steps:
       - name: Install tools
         run: pacman -Syu --noconfirm --needed github-cli namcap
 
+      # A dispatched tag is user input: only a plain version tag goes further.
+      - name: Check the tag
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::not a version tag: $TAG"
+            exit 1
+          fi
+
+      # PKGBUILD and LICENCE as they are at the version's tag.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
 
       # Same chain of trust as the release: the .deb must match the published
@@ -56,9 +72,8 @@ jobs:
       # the very commit the tag points to (whether the build was started by the
       # version bump on main or by the tag), on a GitHub-hosted runner.
       - name: Download and verify the .deb
-        env:
-          TAG_COMMIT: ${{ github.sha }}
         run: |
+          TAG_COMMIT=$(gh api "repos/${GH_REPO}/commits/${TAG}" --jq .sha)
           VERSION="${TAG#v}"
           DEB="basic-presence_${VERSION}_amd64.deb"
           mkdir -p /tmp/dl && cd /tmp/dl
@@ -74,6 +89,8 @@ jobs:
       # makepkg refuses to run as root: build as a throwaway user. The verified
       # .deb and the tag's LICENCE are placed under the names the PKGBUILD
       # expects, so makepkg uses them (and still re-checks the pinned checksums).
+      # --nodeps: the binary is only repackaged, its runtime dependencies are
+      # needed on the user's machine (pacman installs them), not here.
       - name: Build the package
         run: |
           LICENCE_SHA256=$(sha256sum LICENCE | cut -d' ' -f1)
@@ -88,7 +105,7 @@ jobs:
               "/home/builder/pkg/${PKGNAME}-${VERSION}.deb"
           install -o builder LICENCE "/home/builder/pkg/LICENCE-${VERSION}"
           chown -R builder /home/builder/pkg
-          su builder -c "cd /home/builder/pkg && makepkg --force --cleanbuild --noconfirm"
+          su builder -c "cd /home/builder/pkg && makepkg --force --cleanbuild --nodeps --noconfirm"
           namcap /home/builder/pkg/*.pkg.tar.zst || true
           mkdir -p /tmp/repo
           cp /home/builder/pkg/*.pkg.tar.zst /tmp/repo/
