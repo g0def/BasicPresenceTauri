@@ -31,6 +31,22 @@ export function UpdaterProvider({
   const [phase, setPhase] = useState<UpdatePhase>("idle");
   const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [packageManaged, setPackageManaged] = useState(false);
+
+  // A pacman-owned install must not self-update (the updater would try
+  // `pkexec dpkg -i`). Unknown → false: the regular flow stays available.
+  useEffect(() => {
+    let cancelled = false;
+    repo
+      .isPackageManaged()
+      .then((managed) => {
+        if (!cancelled) setPackageManaged(managed);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [repo]);
 
   // Prevent concurrent checks.
   const checking = useRef(false);
@@ -65,6 +81,7 @@ export function UpdaterProvider({
   );
 
   const confirmInstall = useCallback(async () => {
+    if (packageManaged) return;
     setPhase("downloading");
     setProgress({ downloaded: 0, total: null });
     try {
@@ -73,7 +90,7 @@ export function UpdaterProvider({
     } catch {
       setPhase("error");
     }
-  }, [repo]);
+  }, [packageManaged, repo]);
 
   const relaunch = useCallback(async () => {
     await beforeRelaunch?.();
@@ -111,6 +128,7 @@ export function UpdaterProvider({
       phase,
       update,
       progress,
+      packageManaged,
       checkForUpdates,
       openUpdater,
       confirmInstall,
@@ -121,6 +139,7 @@ export function UpdaterProvider({
       phase,
       update,
       progress,
+      packageManaged,
       checkForUpdates,
       openUpdater,
       confirmInstall,

@@ -1,6 +1,9 @@
 import { check as tauriCheck, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch as tauriRelaunch } from "@tauri-apps/plugin-process";
 
+import { COMMANDS } from "@/core/config";
+import { invoke } from "@/core/ipc";
+
 import type {
   AvailableUpdate,
   DownloadProgress,
@@ -55,5 +58,9 @@ export class TauriUpdaterRepository implements UpdaterRepository {
 
   async relaunch(): Promise<void> {
     await tauriRelaunch();
+  }
+
+  async isPackageManaged(): Promise<boolean> {
+    return invoke(COMMANDS.isPackageManaged);
   }
 }

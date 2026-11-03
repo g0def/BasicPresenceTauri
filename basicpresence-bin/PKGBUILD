@@ -1,21 +1,28 @@
 # Maintainer: g0def <g0def@proton.me>
 pkgname=basic-presence-bin
-pkgver=0.2.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="A presence tracking application"
 arch=('x86_64')
 url="https://github.com/g0def/BasicPresenceTauri"
 # Proprietary licence (see LICENCE in the upstream repository), not MIT.
 license=('LicenseRef-BasicPresence')
-depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+# Direct dependencies of the binary (as reported by namcap), not transitive
+# ones. libayatana-appindicator is loaded at runtime for the tray icon.
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'libsoup3' 'glib2'
+         'cairo' 'gdk-pixbuf2' 'dbus' 'glibc' 'libgcc' 'hicolor-icon-theme')
 provides=('basic-presence')
 conflicts=('basic-presence')
 
+# The licence is not shipped in the .deb: take it from the same tag.
+source=("LICENCE-${pkgver}::https://raw.githubusercontent.com/g0def/BasicPresenceTauri/v${pkgver}/LICENCE")
 source_x86_64=("${pkgname}-${pkgver}.deb::https://github.com/g0def/BasicPresenceTauri/releases/download/v${pkgver}/basic-presence_${pkgver}_amd64.deb")
 # Pinned checksum of the published .deb: makepkg refuses a modified download.
 # On each release, take the value from the release's SHA256SUMS asset
-# (or run `updpkgsums`) — never 'SKIP'.
-sha256sums_x86_64=('8623b10d231ad155d461877d4b4e3beef878fad59d776311adc572a54fffdc08')
+# (or run `updpkgsums`) — never 'SKIP'. The pacman repository workflow
+# (.github/workflows/arch-repo.yml) rewrites pkgver and both values itself.
+sha256sums=('2c234a4c2b8d6b572c56246faca6fd377bec398ae3068c4838260530640b49e7')
+sha256sums_x86_64=('f3dd7425b556863332e904cfc28cdce77309ae0d12d9ab913696047654e9f55f')
 
 package() {
     cd "${srcdir}"
@@ -30,4 +37,10 @@ package() {
         install -Dm644 "usr/share/icons/hicolor/${size}/apps/basic-presence.png" \
             "${pkgdir}/usr/share/icons/hicolor/${size}/apps/basic-presence.png"
     done
+
+    install -Dm644 "LICENCE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENCE"
+
+    # Tells the app that pacman owns this install: it then announces updates
+    # (`pacman -Syu`) instead of self-installing the .deb it was built from.
+    install -Dm644 /dev/null "${pkgdir}/usr/lib/basic-presence/managed-by-pacman"
 }

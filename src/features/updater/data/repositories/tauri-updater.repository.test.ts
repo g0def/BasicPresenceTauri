@@ -1,3 +1,4 @@
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DownloadProgress } from "@/features/updater/domain/entities/update";
@@ -44,6 +45,15 @@ describe("TauriUpdaterRepository", () => {
       { downloaded: 40, total: 100 },
       { downloaded: 100, total: 100 },
     ]);
+  });
+
+  it("asks the backend whether pacman owns the installation", async () => {
+    mockIPC((cmd) => {
+      if (cmd === "is_package_managed") return true;
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    expect(await new TauriUpdaterRepository().isPackageManaged()).toBe(true);
   });
 
   it("refuses to install without a prior successful check", async () => {

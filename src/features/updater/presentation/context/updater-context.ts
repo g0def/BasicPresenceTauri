@@ -10,6 +10,9 @@ export interface UpdaterContextValue {
   phase: UpdatePhase;
   update: AvailableUpdate | null;
   progress: DownloadProgress | null;
+  /** The installation belongs to pacman: updates are announced but installed
+   * with `pacman -Syu`, never from the app. */
+  packageManaged: boolean;
   checkForUpdates: (manual?: boolean) => Promise<void>;
   /** Open the updater from the header badge: re-open the dialog if an update is
    * already known, otherwise trigger a manual check. */

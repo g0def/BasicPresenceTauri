@@ -142,6 +142,54 @@ Cela compile le front (`tsc && vite build` → `dist/`), compile le binaire Rust
 
 ---
 
+## Installation sur Arch Linux (dépôt pacman)
+
+L'app est distribuée dans un **dépôt pacman signé**, hébergé sur la release GitHub
+[`arch-repo`](https://github.com/g0def/BasicPresenceTauri/releases/tag/arch-repo) et mis à
+jour automatiquement à chaque version publiée. Les mises à jour arrivent ensuite par
+`pacman -Syu` (l'app ne s'installe pas elle-même dans ce cas).
+
+1. Faire confiance à la clé de signature du dépôt — **vérifier que l'empreinte affichée est
+   bien `10BF FDCA 379E 604D 9225 01F3 BFCA EAFF DF40 2EB4`** avant de la signer :
+
+   ```bash
+   curl -sL https://raw.githubusercontent.com/g0def/BasicPresenceTauri/main/basicpresence-bin/basic-presence-repo.asc \
+     | sudo pacman-key --add -
+   sudo pacman-key --finger 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4
+   sudo pacman-key --lsign-key 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4
+   ```
+
+2. Déclarer le dépôt à la fin de `/etc/pacman.conf` (à la main, ou avec la commande
+   ci-dessous) :
+
+   ```ini
+   [basic-presence]
+   SigLevel = Required
+   Server = https://github.com/g0def/BasicPresenceTauri/releases/download/arch-repo
+   ```
+
+   ```bash
+   printf '\n[basic-presence]\nSigLevel = Required\nServer = https://github.com/g0def/BasicPresenceTauri/releases/download/arch-repo\n' \
+     | sudo tee -a /etc/pacman.conf
+   ```
+
+3. Installer (`-Syu` et non `-Sy` : Arch ne supporte pas les mises à jour partielles) :
+
+   ```bash
+   sudo pacman -Syu basic-presence-bin
+   ```
+
+**Mettre à jour** : les nouvelles versions arrivent avec la mise à jour habituelle du
+système, `sudo pacman -Syu`.
+
+**Désinstaller** : `sudo pacman -Rns basic-presence-bin`, puis retirer le bloc
+`[basic-presence]` de `/etc/pacman.conf` et, si souhaité, la clé :
+`sudo pacman-key --delete 10BFFDCA379E604D922501F3BFCAEAFFDF402EB4`. Les données de
+l'app (profils, coffre chiffré) restent dans
+`~/.local/share/com.godef.basic-presence/`.
+
+---
+
 ## Structure du projet
 
 ```

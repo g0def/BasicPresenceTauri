@@ -52,6 +52,7 @@
     "get_day_note",
     "set_day_note",
     "get_licence",
+    "is_package_managed",
     "export_profile_data",
     "export_profile_bundle",
     "inspect_profile_bundle",

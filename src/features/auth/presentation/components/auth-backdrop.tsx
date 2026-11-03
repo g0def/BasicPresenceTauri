@@ -18,9 +18,11 @@ export function AuthBackdrop() {
       className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
       {/* Halos diffus — ambiance « éco-tech », teinte le fond mint/sombre.
-          Ils dérivent et respirent lentement (cf. auth-glow-* dans index.css). */}
-      <div className="auth-glow-1 absolute -left-24 -top-24 size-80 rounded-full bg-success/15 blur-3xl" />
-      <div className="auth-glow-2 absolute -bottom-32 -right-24 size-104 rounded-full bg-primary/15 blur-3xl" />
+          Ils dérivent et respirent lentement (cf. auth-glow-* dans index.css).
+          Dégradé radial plutôt que `blur-*` : un filtre de flou animé est
+          recalculé à chaque frame et sature WebKitGTK (latence de saisie). */}
+      <div className="auth-glow-1 absolute -left-24 -top-24 size-80" />
+      <div className="auth-glow-2 absolute -bottom-32 -right-24 size-104" />
 
       {/* Scène ancrée en bas, pleine largeur : domicile ↔ bureau */}
       <svg

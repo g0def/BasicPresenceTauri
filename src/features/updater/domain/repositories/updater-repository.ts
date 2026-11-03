@@ -9,4 +9,7 @@ export interface UpdaterRepository {
     onProgress: (progress: DownloadProgress) => void,
   ): Promise<void>;
   relaunch(): Promise<void>;
+  /** True when a system package manager (pacman) owns the installation: the
+   * update must then go through it, never through `downloadAndInstall`. */
+  isPackageManaged(): Promise<boolean>;
 }

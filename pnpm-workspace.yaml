@@ -119,3 +119,4 @@ overrides:
   esbuild: 0.28.2 # GHSA-g7r4-m6w7-qqqr (dev server Windows uniquement)
   katex: 0.19.0 # GHSA-238p-pmpm-9mq7 (via @milkdown/crepe > remark-math)
   postcss-selector-parser: 7.1.6 # CPU DoS (via @tailwindcss/typography, build uniquement)
+  seroval: 1.6.12 # GHSA-f86p-h4j2-7qgj, GHSA-9wx9-5pv9-3349 (via @tanstack/react-router > router-core)

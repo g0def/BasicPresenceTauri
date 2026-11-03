@@ -94,7 +94,7 @@ use crate::infrastructure::persistence::work_entry_repository::LibsqlWorkEntryRe
 use crate::infrastructure::session::in_memory_session_store::InMemorySessionStore;
 use crate::infrastructure::transfer::json_bundle_codec::JsonProfileBundleCodec;
 use crate::presentation::commands::{
-    auth, commute, export, legal, presence, profile, settings, transfer, work_hours,
+    auth, commute, export, install, legal, presence, profile, settings, transfer, work_hours,
 };
 use crate::presentation::file_dialogs::PendingImports;
 use crate::presentation::state::AppState;
@@ -164,6 +164,7 @@ pub fn run() {
             work_hours::get_day_note,
             work_hours::set_day_note,
             legal::get_licence,
+            install::is_package_managed,
             export::export_profile_data,
             transfer::export_profile_bundle,
             transfer::inspect_profile_bundle,

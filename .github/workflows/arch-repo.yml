@@ -1,0 +1,158 @@
+name: Arch repository
+
+# Publishes the signed pacman repository (release `arch-repo`) from a PUBLISHED
+# release: the draft stays the manual gate, nothing reaches pacman users before
+# it is published. To rebuild by hand, run this workflow from the tag
+# ("Use workflow from" → the `v*` tag).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# One repository database: never update it from two runs at once.
+concurrency:
+  group: arch-repo
+  cancel-in-progress: false
+
+# Nothing by default: each job asks for exactly what it needs.
+permissions: {}
+
+env:
+  REPO_NAME: basic-presence
+  REPO_TAG: arch-repo
+  PKGNAME: basic-presence-bin
+
+jobs:
+  build-repo:
+    name: Build, sign & publish the pacman repository
+    if: >-
+      startsWith(github.ref_name, 'v') &&
+      (github.event_name != 'release' || !github.event.release.prerelease)
+    runs-on: ubuntu-latest
+    # Pinned by digest like the actions (a floating tag changes under us).
+    # To update: resolve the current `base-devel` digest and replace it.
+    container: archlinux:base-devel@sha256:624bdc7fc6615155d67bc34cf7146c0c9fd0e3c92943977da63a630e4ca49c30
+    # The repository signing key lives in the protected `release` environment,
+    # next to the updater key (see documentation/release.md).
+    environment: release
+    permissions:
+      contents: write # read the version release, update the `arch-repo` release
+      attestations: write # provenance of the built package
+      id-token: write # OIDC for the attestation
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed github-cli namcap
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # Same chain of trust as the release: the .deb must match the published
+      # SHA256SUMS AND carry a provenance attestation made by release.yml, for
+      # this very tag, on a GitHub-hosted runner.
+      - name: Download and verify the .deb
+        run: |
+          VERSION="${TAG#v}"
+          DEB="basic-presence_${VERSION}_amd64.deb"
+          mkdir -p /tmp/dl && cd /tmp/dl
+          gh release download "$TAG" --pattern "$DEB" --pattern SHA256SUMS
+          grep -E "  ${DEB}\$" SHA256SUMS | sha256sum -c -
+          gh attestation verify "$DEB" --repo "$GH_REPO" \
+              --signer-workflow "${GH_REPO}/.github/workflows/release.yml" \
+              --source-ref "refs/tags/${TAG}" \
+              --deny-self-hosted-runners
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "DEB_SHA256=$(sha256sum "$DEB" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      # makepkg refuses to run as root: build as a throwaway user. The verified
+      # .deb and the tag's LICENCE are placed under the names the PKGBUILD
+      # expects, so makepkg uses them (and still re-checks the pinned checksums).
+      - name: Build the package
+        run: |
+          LICENCE_SHA256=$(sha256sum LICENCE | cut -d' ' -f1)
+          useradd -m builder
+          install -d -o builder /home/builder/pkg
+          sed -e "s/^pkgver=.*/pkgver=${VERSION}/" \
+              -e "s/^pkgrel=.*/pkgrel=1/" \
+              -e "s/^sha256sums=.*/sha256sums=('${LICENCE_SHA256}')/" \
+              -e "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${DEB_SHA256}')/" \
+              basicpresence-bin/PKGBUILD > /home/builder/pkg/PKGBUILD
+          install -o builder "/tmp/dl/basic-presence_${VERSION}_amd64.deb" \
+              "/home/builder/pkg/${PKGNAME}-${VERSION}.deb"
+          install -o builder LICENCE "/home/builder/pkg/LICENCE-${VERSION}"
+          chown -R builder /home/builder/pkg
+          su builder -c "cd /home/builder/pkg && makepkg --force --cleanbuild --noconfirm"
+          namcap /home/builder/pkg/*.pkg.tar.zst || true
+          mkdir -p /tmp/repo
+          cp /home/builder/pkg/*.pkg.tar.zst /tmp/repo/
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: /tmp/repo/*.pkg.tar.zst
+
+      # Key and passphrase come from the environment secrets; gpg reads the
+      # passphrase from a file only readable by root, removed at the end.
+      - name: Import the signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.ARCH_REPO_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.ARCH_REPO_GPG_PASSPHRASE }}
+        run: |
+          install -d -m 700 ~/.gnupg
+          umask 077
+          printf '%s' "$GPG_PASSPHRASE" > ~/.gnupg/passphrase
+          printf 'batch\npinentry-mode loopback\npassphrase-file %s\n' \
+              "$HOME/.gnupg/passphrase" > ~/.gnupg/gpg.conf
+          printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --import
+          FPR=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ { print $10; exit }')
+          echo "GPG_FPR=$FPR" >> "$GITHUB_ENV"
+
+      # Start from the current database so other entries (and history) are
+      # kept; -R drops the replaced version's file from the database.
+      - name: Sign the package and update the database
+        run: |
+          cd /tmp/repo
+          if ! gh release view "$REPO_TAG" > /dev/null 2>&1; then
+            gh release create "$REPO_TAG" --prerelease --latest=false \
+                --title "Arch Linux repository" \
+                --notes "Signed pacman repository. Setup: see README → Arch Linux."
+          fi
+          gh release download "$REPO_TAG" \
+              --pattern "${REPO_NAME}.db.tar.gz" \
+              --pattern "${REPO_NAME}.files.tar.gz" || true
+          for pkg in *.pkg.tar.zst; do
+            gpg --local-user "$GPG_FPR" --detach-sign --no-armor "$pkg"
+          done
+          repo-add --sign --key "$GPG_FPR" --remove \
+              "${REPO_NAME}.db.tar.gz" *.pkg.tar.zst
+          # GitHub release assets cannot be symlinks: ship real copies under
+          # the names pacman requests.
+          for f in db files; do
+            for s in "" .sig; do
+              cp --remove-destination "${REPO_NAME}.${f}.tar.gz${s}" "${REPO_NAME}.${f}${s}"
+            done
+          done
+
+      - name: Publish to the arch-repo release
+        run: |
+          cd /tmp/repo
+          gh release upload "$REPO_TAG" --clobber \
+              "${REPO_NAME}".db* "${REPO_NAME}".files* *.pkg.tar.zst *.pkg.tar.zst.sig
+
+      # Keep the current and the previous package (for a `pacman -U` rollback).
+      - name: Prune old packages
+        run: |
+          gh release view "$REPO_TAG" --json assets --jq '.assets[].name' \
+              | grep -E "^${PKGNAME}-.*\.pkg\.tar\.zst$" | sort -V | head -n -2 \
+              | while read -r old; do
+                  gh release delete-asset "$REPO_TAG" "$old" --yes
+                  gh release delete-asset "$REPO_TAG" "${old}.sig" --yes || true
+                done
+
+      - name: Remove the signing material
+        if: always()
+        run: rm -rf ~/.gnupg

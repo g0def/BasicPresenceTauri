@@ -213,6 +213,28 @@
   }
 }
 
+/* Halos : dégradé radial (pas de `filter: blur`, trop coûteux à animer sous
+   WebKitGTK), sur leur propre couche de composition. */
+.auth-glow-1,
+.auth-glow-2 {
+  border-radius: 9999px;
+  will-change: transform, opacity;
+}
+.auth-glow-1 {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--success) 15%, transparent) 35%,
+    transparent
+  );
+}
+.auth-glow-2 {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--primary) 15%, transparent) 35%,
+    transparent
+  );
+}
+
 /* Halos « vivants » : dérive + respiration (échelle/opacité) très lentes. */
 @keyframes auth-glow-1 {
   0%,

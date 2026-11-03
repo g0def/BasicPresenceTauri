@@ -34,11 +34,21 @@ Longer term, the strongest option is to sign locally: CI builds and uploads unsi
 4. The `.github/workflows/release.yml` workflow builds four matrix jobs (macOS arm64, macOS x86_64, Linux, Windows), signs updater artifacts, and creates a **draft** GitHub release with `latest.json`.
 5. Review the draft release on GitHub, then **publish** it. Publishing is the gate: `releases/latest/download/latest.json` only resolves once the release is non-draft and non-prerelease.
 6. Verify the update loop from an installed copy of the previous version (see below).
-7. AUR: copy the `.deb` hash from the release's `SHA256SUMS` into `basicpresence-bin/PKGBUILD` (`sha256sums_x86_64`), bump `pkgver`, then publish.
+7. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Nothing to do by hand; check the run (it waits for the `release` environment reviewer). To rebuild a version, run the workflow manually **from its tag**. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
 
 ### Linux note
 
 The `tauri-plugin-updater` v2.10+ supports deb, rpm, and AppImage. However, deb/rpm updates require elevated privileges via `pkexec`. Recommend distributing the **AppImage** to end users for the smoothest self-update experience.
+
+Installs from the pacman repository carry the marker `/usr/lib/basic-presence/managed-by-pacman`: the app then only *announces* updates and tells the user to run `sudo pacman -Syu` (self-installing would run `pkexec dpkg -i`, which does not exist on Arch). See ADR 0005.
+
+## Arch repository signing key
+
+- Dedicated key, signing only: `gpg --quick-gen-key "Basic Presence Repo <g0def@proton.me>" ed25519 sign 2y` (with a passphrase).
+- **Environment secrets** (environment `release`, not repository secrets): `ARCH_REPO_GPG_PRIVATE_KEY` = `gpg --armor --export-secret-keys <FPR>`, `ARCH_REPO_GPG_PASSPHRASE` = its passphrase.
+- Public key committed as `basicpresence-bin/basic-presence-repo.asc` (`gpg --armor --export <FPR>`); its fingerprint is printed in the README. Back up the private key in the password manager.
+- **Before expiry** (2 years): `gpg --quick-set-expire <FPR> 2y`, re-export the public key, update the secret. Users re-import the key (`pacman-key --add` + `--lsign-key`).
+- **Rotation / compromise**: new key, new secret, new `.asc` and README fingerprint, re-run the workflow from the latest tag; announce it in the release notes (users must trust the new key and `pacman-key --delete` the old one).
 
 ## Testing the update loop locally (before the first real release)
 
