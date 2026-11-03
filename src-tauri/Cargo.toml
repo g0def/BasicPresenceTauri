@@ -47,15 +47,10 @@ sha2 = "0.11"
 subtle = "2"
 
 # Scellement du keystore : clé de device stockée dans le trousseau OS.
-# `sync-secret-service` + `crypto-rust` => backend pur Rust (zbus), pas de
-# dépendance système à OpenSSL/libsecret au build (le Secret Service GNOME/KWallet
-# reste requis au runtime sous Linux).
-keyring = { version = "3", features = [
-    "apple-native",
-    "windows-native",
-    "sync-secret-service",
-    "crypto-rust",
-] }
+# keyring-core (API) + un store natif par plateforme (cf. la section
+# `[target.…]` plus bas) — l'intégration recommandée depuis keyring 4. Les
+# stores retrouvent les entrées écrites par keyring 3 (mêmes attributs).
+keyring-core = "1"
 
 # Aléatoire cryptographique, effacement mémoire, ids, erreurs, encodage
 getrandom = "0.4"
@@ -101,3 +96,15 @@ strip = true
 overflow-checks = true
 # `panic = "unwind"` (the default) is kept on purpose: unwinding runs the
 # `Zeroizing` destructors, so key material is wiped even on a panic.
+
+# Trousseau OS par plateforme (mêmes stores que la façade `v1` de keyring 4).
+# Linux : Secret Service en pur Rust (zbus + `crypto-rust`), sans OpenSSL ni
+# libsecret au build (GNOME Keyring/KWallet reste requis au runtime).
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "1", features = ["keychain"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = "1"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust"] }

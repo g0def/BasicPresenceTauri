@@ -1,4 +1,5 @@
-use keyring::{Entry, Error as KeyringError};
+use keyring_core::api::CredentialStoreApi as _;
+use keyring_core::{Entry, Error as KeyringError};
 use zeroize::Zeroizing;
 
 use crate::domain::error::DomainError;
@@ -6,6 +7,20 @@ use crate::domain::error::DomainError;
 /// Keychain coordinates for the per-device keystore-encryption key.
 const KEYRING_SERVICE: &str = "com.godef.basic-presence";
 const KEYRING_ACCOUNT: &str = "keystore-device-key";
+
+/// The keychain entry, in the OS's native store. These stores look items up by
+/// the same coordinates keyring 3 wrote them with (macOS generic password
+/// service/account, Windows target `{account}.{service}`, Secret Service
+/// `service`/`username` attributes), so existing device keys are found.
+fn keychain_entry() -> Result<Entry, KeyringError> {
+    #[cfg(target_os = "macos")]
+    let store = apple_native_keyring_store::keychain::Store::new()?;
+    #[cfg(target_os = "windows")]
+    let store = windows_native_keyring_store::Store::new()?;
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let store = zbus_secret_service_keyring_store::Store::new()?;
+    store.build(KEYRING_SERVICE, KEYRING_ACCOUNT, None)
+}
 
 /// Fetch the per-device key used to encrypt `keystore.db` at rest, generating
 /// and persisting a fresh random 32-byte key in the OS keychain on first run.
@@ -27,8 +42,7 @@ const KEYRING_ACCOUNT: &str = "keystore-device-key";
 /// would overwrite any chance of restoring the original entry, so this returns
 /// [`DomainError::KeystoreUnrecoverable`] instead.
 pub fn resolve_device_key(allow_create: bool) -> Result<Zeroizing<[u8; 32]>, DomainError> {
-    let entry = Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        .map_err(|e| DomainError::Keychain(e.to_string()))?;
+    let entry = keychain_entry().map_err(|e| DomainError::Keychain(e.to_string()))?;
 
     match entry.get_secret() {
         Ok(bytes) => {
@@ -53,5 +67,19 @@ pub fn resolve_device_key(allow_create: bool) -> Result<Zeroizing<[u8; 32]>, Dom
             Ok(key)
         }
         Err(e) => Err(DomainError::Keychain(e.to_string())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Reads this machine's real device key — written by an earlier build, e.g.
+    /// with keyring 3 — without ever creating one (`allow_create = false`), and
+    /// checks only its length (the key itself is never printed):
+    /// `cargo test reads_existing_device_key -- --ignored`
+    #[test]
+    #[ignore = "reads the real OS keychain; needs an existing device key"]
+    fn reads_existing_device_key() {
+        let key = super::resolve_device_key(false).expect("existing device key is found");
+        assert_eq!(key.len(), 32);
     }
 }
