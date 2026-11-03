@@ -2,7 +2,10 @@
   "name": "basic-presence",
   "private": true,
   "version": "0.2.0",
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@12.16.0",
+  "engines": {
+    "node": ">=24"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -54,7 +57,7 @@
     "@testing-library/jest-dom": "6.10.0",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
-    "@types/node": "25.9.9",
+    "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "4.7.0",
