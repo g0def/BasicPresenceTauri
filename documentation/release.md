@@ -17,24 +17,25 @@ Whoever can run the release job with the signing key can ship a signed update to
 
 1. *Settings → Environments → New environment* `release`.
 2. *Required reviewers*: add yourself (and enable *Prevent self-review* if a second maintainer exists). Every release run then waits for a manual approval before the key is exposed.
-3. *Deployment branches and tags*: *Selected branches and tags* → add the tag pattern `v*`.
+3. *Deployment branches and tags*: *Selected branches and tags* → add the tag pattern `v*` **and the branch `main`** (a version bump merged into `main` starts the release). `main` must be a protected branch (changes only through reviewed PRs).
 4. *Settings → Rules → Rulesets → New tag ruleset* targeting `v*`: restrict creation/update/deletion to maintainers (tags cannot be moved or recreated by a stolen token).
 5. Move both `TAURI_SIGNING_*` secrets into the environment and **delete the repository-level copies**.
 6. Account hygiene: hardware security key / passkey MFA on the GitHub account; no long-lived classic PAT with `repo` scope.
 
-The release workflow additionally: re-runs all CI gates on the tagged commit (`verify` job), uses **no dependency cache** in the signing job (cache poisoning), publishes a **build-provenance attestation** for every artifact (`gh attestation verify <file> -R g0def/BasicPresenceTauri`) and attaches a **CycloneDX SBOM** and a **`SHA256SUMS`** file to the draft release.
+The release workflow additionally: re-runs all CI gates on the release commit (`verify` job), uses **no dependency cache** in the signing job (cache poisoning), publishes a **build-provenance attestation** for every artifact (`gh attestation verify <file> -R g0def/BasicPresenceTauri`) and attaches a **CycloneDX SBOM** and a **`SHA256SUMS`** file to the draft release.
 
 Longer term, the strongest option is to sign locally: CI builds and uploads unsigned artifacts, and the maintainer signs them on a trusted machine with `pnpm tauri signer sign`.
 
 ## Releasing a new version
 
-1. Bump the version in **`package.json`** → `version`. This is the **single source of truth**: `src-tauri/tauri.conf.json` reads it through `"version": "../package.json"`, so there is nothing else to sync (`Cargo.toml` is not release-relevant — see the note above).
-2. Commit: `git commit -am "chore: bump to vX.Y.Z"`.
-3. Tag and push: `git tag vX.Y.Z && git push --tags`.
-4. The `.github/workflows/release.yml` workflow builds four matrix jobs (macOS arm64, macOS x86_64, Linux, Windows), signs updater artifacts, and creates a **draft** GitHub release with `latest.json`.
-5. Review the draft release on GitHub, then **publish** it. Publishing is the gate: `releases/latest/download/latest.json` only resolves once the release is non-draft and non-prerelease.
-6. Verify the update loop from an installed copy of the previous version (see below).
-7. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Nothing to do by hand; check the run (it waits for the `release` environment reviewer). To rebuild a version, run the workflow manually **from its tag**. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
+1. In a PR, bump the version in **`package.json`** → `version` (`chore: bump to X.Y.Z`). This is the **single source of truth**: `src-tauri/tauri.conf.json` reads it through `"version": "../package.json"`, so there is nothing else to sync (`Cargo.toml` is not release-relevant — see the note above).
+2. Merge the PR. On `main`, `.github/workflows/release.yml` starts because `package.json` changed; its `detect` job compares the version with the one before the push and **stops** unless it changed and no release `vX.Y.Z` exists yet (a dependency change in `package.json` releases nothing).
+3. Approve the run (*Review deployments*, environment `release`). The workflow re-runs the CI gates, builds four matrix jobs (macOS arm64, macOS x86_64, Linux, Windows), signs the updater artifacts and creates a **draft** release `vX.Y.Z` targeting the built commit, with `latest.json`, the SBOM and `SHA256SUMS`.
+4. Review the draft release on GitHub, then **publish** it. Publishing is the gate: it creates the `vX.Y.Z` tag on the built commit, and `releases/latest/download/latest.json` only resolves once the release is non-draft and non-prerelease. Nothing reaches users before this step.
+5. Verify the update loop from an installed copy of the previous version (see below).
+6. Arch: publishing triggers `.github/workflows/arch-repo.yml`, which repackages the verified `.deb` (checksum + provenance attestation from `release.yml` for the tag's commit) with `basicpresence-bin/PKGBUILD`, signs it and updates the pacman repository (release `arch-repo`). Approve its run too. To rebuild a version, run the workflow manually **from its tag**. When the AUR is used again, copy the `.deb` hash from `SHA256SUMS` into the PKGBUILD (`sha256sums_x86_64`) and bump `pkgver` before publishing there.
+
+**Fallback — releasing from a tag:** pushing a `vX.Y.Z` tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) runs the same workflow; `detect` then refuses a tag that does not match `package.json`. Use it to build a version whose bump is already on `main` (e.g. 1.1.0, merged before this trigger existed).
 
 ### Linux note
 

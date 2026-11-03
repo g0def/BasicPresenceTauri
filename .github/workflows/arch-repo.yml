@@ -52,9 +52,12 @@ jobs:
           persist-credentials: false
 
       # Same chain of trust as the release: the .deb must match the published
-      # SHA256SUMS AND carry a provenance attestation made by release.yml, for
-      # this very tag, on a GitHub-hosted runner.
+      # SHA256SUMS AND carry a provenance attestation made by release.yml, from
+      # the very commit the tag points to (whether the build was started by the
+      # version bump on main or by the tag), on a GitHub-hosted runner.
       - name: Download and verify the .deb
+        env:
+          TAG_COMMIT: ${{ github.sha }}
         run: |
           VERSION="${TAG#v}"
           DEB="basic-presence_${VERSION}_amd64.deb"
@@ -63,7 +66,7 @@ jobs:
           grep -E "  ${DEB}\$" SHA256SUMS | sha256sum -c -
           gh attestation verify "$DEB" --repo "$GH_REPO" \
               --signer-workflow "${GH_REPO}/.github/workflows/release.yml" \
-              --source-ref "refs/tags/${TAG}" \
+              --source-digest "$TAG_COMMIT" \
               --deny-self-hosted-runners
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "DEB_SHA256=$(sha256sum "$DEB" | cut -d' ' -f1)" >> "$GITHUB_ENV"

@@ -1,7 +1,14 @@
 name: Release
 
+# Two ways in, same pipeline:
+# - bumping `version` in package.json on main (the usual way: merge the PR);
+# - pushing a `v*` tag by hand (fallback, e.g. to rebuild a version).
+# Either way the result is a DRAFT release: publishing it stays manual and is
+# what ships the update (tag creation, latest.json, pacman repository).
 on:
   push:
+    branches: [main]
+    paths: [package.json]
     tags:
       - "v*"
 
@@ -14,10 +21,62 @@ concurrency:
 permissions: {}
 
 jobs:
-  # Same gates as CI, re-run on the exact tagged commit before anything is
-  # built or signed.
+  # Decides whether this push is a release and of which version. On main, only
+  # a changed `version` that has no release yet goes on (any other package.json
+  # change stops here). On a tag, the tag must match package.json.
+  detect:
+    name: Detect release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.detect.outputs.release }}
+      tag: ${{ steps.detect.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # to read package.json as it was before this push
+
+      - name: Compare versions
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version_at() { git show "$1:package.json" | jq -r .version; }
+          VERSION=$(jq -r .version package.json)
+          TAG="v${VERSION}"
+          if [ "$EVENT_REF_TYPE" = "tag" ]; then
+            if [ "$REF_NAME" != "$TAG" ]; then
+              echo "::error::tag $REF_NAME does not match package.json version $VERSION"
+              exit 1
+            fi
+          else
+            PREVIOUS=$(version_at "$BEFORE" 2>/dev/null || echo "")
+            if [ "$PREVIOUS" = "$VERSION" ]; then
+              echo "Version unchanged ($VERSION): not a release."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "::warning::release $TAG already exists: nothing to do."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Version bump ${PREVIOUS:-?} -> $VERSION: releasing $TAG."
+          fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  # Same gates as CI, re-run on the exact commit before anything is built or
+  # signed.
   verify:
-    name: Verify tagged commit
+    name: Verify release commit
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -72,10 +131,10 @@ jobs:
 
   release:
     name: Build & publish (${{ matrix.platform }} ${{ matrix.args }})
-    needs: verify
+    needs: [detect, verify]
     # The signing key lives in this protected environment (required reviewer,
-    # restricted to protected `v*` tags): a stolen GitHub token alone cannot
-    # produce a signed update. See documentation/release.md.
+    # restricted to protected `main` and `v*` tags): a stolen GitHub token alone
+    # cannot produce a signed update. See documentation/release.md.
     environment: release
     permissions:
       contents: write # create the draft release and upload artifacts
@@ -157,7 +216,10 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
+          tagName: ${{ needs.detect.outputs.tag }}
+          # The tag is created when the draft is published: pin it to the
+          # commit that was built, not to whatever main is at that moment.
+          releaseCommitish: ${{ github.sha }}
           releaseName: "BasicPresence v__VERSION__"
           # Draft so publishing is a manual final gate.
           # latest.json resolves for clients only once the release is published (non-prerelease).
@@ -174,7 +236,7 @@ jobs:
 
   sbom:
     name: SBOM + checksums
-    needs: release
+    needs: [detect, release]
     runs-on: ubuntu-latest
     permissions:
       contents: write # upload the SBOM / checksums to the draft release
@@ -188,7 +250,7 @@ jobs:
         with:
           path: .
           format: cyclonedx-json
-          output-file: basic-presence-${{ github.ref_name }}.cdx.json
+          output-file: basic-presence-${{ needs.detect.outputs.tag }}.cdx.json
           upload-artifact: false
           upload-release-assets: false
 
@@ -196,7 +258,7 @@ jobs:
       - name: Upload SBOM and checksums to the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.detect.outputs.tag }}
         run: |
           mkdir -p dist-release
           gh release download "$TAG" --dir dist-release --pattern '*.deb' --pattern '*.AppImage' --pattern '*.rpm' --pattern '*.dmg' --pattern '*.msi' --pattern '*.exe' -R "$GITHUB_REPOSITORY"
