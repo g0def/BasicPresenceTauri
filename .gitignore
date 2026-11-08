@@ -2,6 +2,7 @@
 node_modules
 
 # --- Build / sorties ---
+/target
 dist
 dist-ssr
 build
@@ -32,7 +33,8 @@ lerna-debug.log*
 # La persistance est 100% locale (libSQL) : aucune DB ne doit être versionnée
 *.db
 # On-disk compatibility fixtures (test-only data, sealed with a test key).
-!src-tauri/tests/fixtures/**/*.db
+!legacy/tauri-app/src-tauri/tests/fixtures/**/*.db
+!crates/core/tests/fixtures/**/*.db
 *.db-shm
 *.db-wal
 *.sqlite

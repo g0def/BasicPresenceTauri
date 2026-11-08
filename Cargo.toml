@@ -1,0 +1,30 @@
+# Workspace du portage Slint (branche feat/slint).
+# L'ancienne app Tauri + React est archivée, figée et autonome, dans
+# `legacy/tauri-app/` (son propre Cargo.lock) : elle est exclue du workspace.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+exclude = ["legacy"]
+
+[workspace.package]
+version = "2.0.0-alpha.0"
+edition = "2024"
+# Proprietary licence (see LICENCE); never published to crates.io.
+publish = false
+
+# Argon2 is ~10x slower unoptimized: keep dev logins (auth hash + 64 MiB KEK
+# derivation) responsive without changing the security parameters.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+# Smaller, harder-to-reverse binary; whole-program optimisation.
+lto = true
+codegen-units = 1
+strip = true
+# Arithmetic overflow panics instead of silently wrapping (CO2 / minutes maths).
+overflow-checks = true
+# `panic = "unwind"` (the default) is kept on purpose: unwinding runs the
+# `Zeroizing` destructors, so key material is wiped even on a panic.

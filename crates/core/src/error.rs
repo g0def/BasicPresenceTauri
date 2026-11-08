@@ -1,0 +1,64 @@
+use serde::Serialize;
+
+use crate::domain::error::DomainError;
+
+/// Erreur présentable à l'utilisateur. Les détails internes (SQL, crypto) sont
+/// réduits à un `INTERNAL` générique pour ne jamais fuiter dans l'UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AppError {
+    pub code: String,
+    pub message: String,
+}
+
+impl AppError {
+    pub fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+        }
+    }
+}
+
+impl From<DomainError> for AppError {
+    fn from(e: DomainError) -> Self {
+        match e {
+            DomainError::InvalidCredentials => {
+                AppError::new("INVALID_CREDENTIALS", "Identifiants invalides")
+            }
+            DomainError::AccountLocked { retry_after_ms } => AppError::new(
+                "ACCOUNT_LOCKED",
+                format!(
+                    "Compte verrouillé. Réessayez dans {} s.",
+                    (retry_after_ms / 1000).max(1)
+                ),
+            ),
+            DomainError::AccountAlreadyExists => {
+                AppError::new("ACCOUNT_EXISTS", "Un compte existe déjà sur cet appareil")
+            }
+            DomainError::Unauthorized => {
+                AppError::new("SESSION_EXPIRED", "Session expirée. Reconnectez-vous.")
+            }
+            DomainError::ProfileNotFound => AppError::new("NOT_FOUND", "Profil introuvable"),
+            DomainError::NotFound => AppError::new("NOT_FOUND", "Élément introuvable"),
+            DomainError::Validation(m) => AppError::new("VALIDATION", m),
+            DomainError::KeystoreUnrecoverable => AppError::new(
+                "KEYSTORE_UNRECOVERABLE",
+                "La clé sécurisée de cet appareil est manquante ou a changé : \
+                 le stockage local chiffré ne peut pas être ouvert.",
+            ),
+            DomainError::VaultTampered => AppError::new(
+                "VAULT_TAMPERED",
+                "L'intégrité du stockage chiffré a échoué : le fichier a été modifié.",
+            ),
+            DomainError::Export(_) => AppError::new(
+                "EXPORT_FAILED",
+                "Échec de l'export : le fichier n'a pas pu être écrit.",
+            ),
+            DomainError::Storage(_)
+            | DomainError::Hashing(_)
+            | DomainError::Crypto(_)
+            | DomainError::Token(_)
+            | DomainError::Keychain(_) => AppError::new("INTERNAL", "Erreur interne"),
+        }
+    }
+}

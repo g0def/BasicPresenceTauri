@@ -1,0 +1,144 @@
+use libsql::Connection;
+
+use crate::domain::error::DomainError;
+use crate::infrastructure::persistence::db::map_storage;
+
+pub struct Migration {
+    pub version: i64,
+    pub sql: &'static str,
+}
+
+pub const KEYSTORE_MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: include_str!("../../../migrations/keystore/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        sql: include_str!("../../../migrations/keystore/0002_add_mac_key.sql"),
+    },
+    Migration {
+        version: 3,
+        sql: include_str!("../../../migrations/keystore/0003_vault_integrity.sql"),
+    },
+    Migration {
+        version: 4,
+        sql: include_str!("../../../migrations/keystore/0004_key_material_versioning.sql"),
+    },
+    Migration {
+        version: 5,
+        sql: include_str!("../../../migrations/keystore/0005_security_events.sql"),
+    },
+];
+
+pub const VAULT_MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        sql: include_str!("../../../migrations/vault/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        sql: include_str!("../../../migrations/vault/0002_add_profiles.sql"),
+    },
+    Migration {
+        version: 3,
+        sql: include_str!("../../../migrations/vault/0003_add_presence.sql"),
+    },
+    Migration {
+        version: 4,
+        sql: include_str!("../../../migrations/vault/0004_add_co2.sql"),
+    },
+    Migration {
+        version: 5,
+        sql: include_str!("../../../migrations/vault/0005_add_work_hours.sql"),
+    },
+    Migration {
+        version: 6,
+        sql: include_str!("../../../migrations/vault/0006_add_work_schedule.sql"),
+    },
+    Migration {
+        version: 7,
+        sql: include_str!("../../../migrations/vault/0007_simplify_work_schedule.sql"),
+    },
+    Migration {
+        version: 8,
+        sql: include_str!("../../../migrations/vault/0008_store_end_minutes.sql"),
+    },
+    Migration {
+        version: 9,
+        sql: include_str!("../../../migrations/vault/0009_add_presence_note.sql"),
+    },
+    Migration {
+        version: 10,
+        sql: include_str!("../../../migrations/vault/0010_add_profile_settings.sql"),
+    },
+    Migration {
+        version: 11,
+        sql: include_str!("../../../migrations/vault/0011_add_co2_2026.sql"),
+    },
+];
+
+/// Idempotently apply migrations in version order, tracking applied versions in
+/// a `_migrations` table on the given connection.
+pub async fn run(conn: &Connection, migrations: &[Migration]) -> Result<(), DomainError> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)",
+        (),
+    )
+    .await
+    .map_err(map_storage)?;
+
+    // Scoped so the SELECT cursor is closed before any DDL runs: an open
+    // statement makes schema-changing migrations (DROP TABLE…) fail with
+    // "database table is locked".
+    let current: i64 = {
+        let mut rows = conn
+            .query("SELECT COALESCE(MAX(version), 0) FROM _migrations", ())
+            .await
+            .map_err(map_storage)?;
+        match rows.next().await.map_err(map_storage)? {
+            Some(row) => row.get(0).map_err(map_storage)?,
+            None => 0,
+        }
+    };
+
+    for m in migrations {
+        if m.version > current {
+            apply(conn, m).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Apply one migration atomically: its DDL/DML and the `_migrations` bookkeeping
+/// row commit together, so a crash mid-migration leaves the schema at the
+/// previous version (and the migration is simply re-run on the next start)
+/// instead of a half-applied schema that the bookkeeping does not know about.
+async fn apply(conn: &Connection, m: &Migration) -> Result<(), DomainError> {
+    conn.execute("BEGIN IMMEDIATE", ())
+        .await
+        .map_err(map_storage)?;
+    let result = async {
+        conn.execute_batch(m.sql).await.map_err(map_storage)?;
+        conn.execute(
+            "INSERT INTO _migrations (version, applied_at) \
+             VALUES (?1, CAST(strftime('%s','now') AS INTEGER) * 1000)",
+            libsql::params![m.version],
+        )
+        .await
+        .map_err(map_storage)?;
+        Ok::<(), DomainError>(())
+    }
+    .await;
+    match result {
+        Ok(()) => conn
+            .execute("COMMIT", ())
+            .await
+            .map(|_| ())
+            .map_err(map_storage),
+        Err(e) => {
+            let _ = conn.execute("ROLLBACK", ()).await;
+            Err(e)
+        }
+    }
+}

@@ -26,6 +26,10 @@ jobs:
   # change stops here). On a tag, the tag must match package.json.
   detect:
     name: Detect release
+    # Portage Slint (branche feat/slint) : ce workflow cible l'app Tauri, désormais
+    # archivée dans legacy/tauri-app. Désactivé jusqu'à sa réécriture
+    # (session S11, cf. documentation/portage-slint.md) ; tous les jobs en dépendent.
+    if: false
     runs-on: ubuntu-latest
     permissions:
       contents: read

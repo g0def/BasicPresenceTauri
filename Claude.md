@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+> 🚧 **Portage en cours vers Slint (branche `feat/slint`).** L'app Tauri + React décrite
+> ci-dessous est archivée, figée, dans `legacy/tauri-app/` (tag `v1.1.0-tauri`) ; le cœur
+> Rust vit désormais dans le workspace `crates/core`. **Lire d'abord
+> [documentation/portage-slint.md](documentation/portage-slint.md)** (état, règles, sessions).
+> Les chemins `src/` et `src-tauri/` de ce fichier sont à lire sous `legacy/tauri-app/`.
+
 Contexte projet pour Claude Code. Application desktop **Tauri v2** avec un backend
 **Rust** et un frontend **React + TypeScript**, organisée selon la **Clean Architecture**.
 

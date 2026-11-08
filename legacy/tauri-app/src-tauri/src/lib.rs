@@ -301,9 +301,9 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
         Arc::new(LibsqlWorkEntryRepository::new(vault_impl.clone()));
     let markdown: Arc<dyn MarkdownRenderer> = Arc::new(ComrakMarkdownRenderer::new());
     // App licence: static text embedded at compile time. The path is relative to
-    // this file (src-tauri/src/lib.rs), so `../../LICENCE` is the repo-root file —
+    // this file (src-tauri/src/lib.rs), so `../../../../LICENCE` is the repo-root file (app archived under legacy/tauri-app) —
     // the single source of truth, shown in-app rendered to sanitized HTML.
-    const LICENCE_MD: &str = include_str!("../../LICENCE");
+    const LICENCE_MD: &str = include_str!("../../../../LICENCE");
     let exporter: Arc<dyn SpreadsheetExporter> = Arc::new(OdsSpreadsheetExporter::new());
     let bundle_codec: Arc<dyn ProfileBundleCodec> = Arc::new(JsonProfileBundleCodec::new());
 

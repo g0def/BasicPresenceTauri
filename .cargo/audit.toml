@@ -1,0 +1,34 @@
+# Advisories acknowledged after review (audit du 14/10/2026, voir
+# documentation/audit-securite-2026-10.md). Each entry must state why it is not
+# reachable; re-check them whenever the parent crate is bumped.
+[advisories]
+ignore = [
+    # --- quick-xml 0.38 / 0.39 parsing DoS. spreadsheet-ods only *writes* our
+    # own .ods (never parses user input); plist (via syntect) only loads the
+    # themes embedded at compile time; calamine is a dev-dependency (tests).
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+
+    # --- Unmaintained / unsound transitive crates with no fix upstream,
+    # pulled by tauri (gtk/glib), syntect (bincode, yaml-rust) and macros.
+    "RUSTSEC-2025-0141", # bincode unmaintained (syntect dumps, trusted data)
+    "RUSTSEC-2024-0320", # yaml-rust unmaintained (syntect, trusted data)
+
+    # --- zip extraction flaws (fixed in zip 9). No untrusted archive is ever
+    # extracted: the updater extracts (Windows only) after verifying the
+    # minisign signature; spreadsheet-ods only writes; calamine is dev-only.
+    # Drop once tauri-plugin-updater >= 2.14.1 (zip 9) passes the 7-day rule.
+    "RUSTSEC-2026-0367",
+    "RUSTSEC-2026-0368",
+    "RUSTSEC-2026-0369",
+    "RUSTSEC-2026-0429",
+
+    # --- calamine CFB/OLE2 parser DoS (fixed in 0.38, under 7 days old).
+    # Dev-dependency: tests only parse the .ods files they generate.
+    "RUSTSEC-2026-0436",
+
+    # --- zbus 5 internals, merged into zbus 6; via tauri-plugin-opener.
+    "RUSTSEC-2026-0370", # zvariant unmaintained
+    "RUSTSEC-2026-0371", # zbus_names unmaintained
+    "RUSTSEC-2026-0372", # zvariant_derive unmaintained
+]

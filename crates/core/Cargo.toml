@@ -1,0 +1,70 @@
+[package]
+name = "basic-presence-core"
+description = "BasicPresence business core: domain, use cases and encrypted local persistence (UI-agnostic)"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+name = "basic_presence_core"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Persistance offline-first chiffrée (moteur libSQL / Turso), 100% locale en v1
+libsql = { version = "0.10", default-features = false, features = ["encryption"] }
+bytes = "1"
+
+# Hachage de mot de passe & dérivation de clé (Argon2id)
+# `zeroize`: Argon2's working memory is wiped after each derivation.
+argon2 = { version = "0.6", features = ["zeroize"] }
+
+# Envelope encryption du DEK (AEAD authentifié, nonce 192 bits)
+chacha20poly1305 = "0.11"
+
+# Évidence d'altération du vault au repos (HMAC-SHA256 sur le fichier + comparaison
+# constant-time). libSQL ne chiffre qu'en AES-256-CBC non authentifié.
+hmac = "0.13"
+sha2 = "0.11"
+subtle = "2"
+
+# Scellement du keystore : clé de device stockée dans le trousseau OS
+# (keyring-core + un store natif par plateforme, cf. `[target.…]`).
+keyring-core = "1"
+
+# Aléatoire cryptographique, effacement mémoire, ids, erreurs, encodage
+getrandom = "0.4"
+zeroize = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v7"] }
+thiserror = "2"
+base64 = "0.23"
+async-trait = "0.1"
+# Runtime async : n'est plus fourni par Tauri. Le binaire crée un runtime
+# multi-thread ; le core utilise `sync` (verrous), `rt` (spawn_blocking,
+# task_local) — libSQL exige d'être exécuté sur un runtime tokio.
+tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread"] }
+
+# Rendu des notes Markdown (source de vérité = Markdown brut). comrak sans
+# features par défaut (pas de CLI ni d'onig) + syntect `default-fancy`
+# (regex pur-Rust). Ammonia assainit le HTML tant que le port renvoie du HTML
+# (remplacé par un rendu en blocs en S2 du portage).
+comrak = { version = "0.59.0", default-features = false }
+ammonia = "4.1.4"
+syntect = { version = "5", default-features = false, features = ["default-fancy"] }
+spreadsheet-ods = "1.0.4"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+calamine = "0.37.0"
+
+# Trousseau OS par plateforme (mêmes stores que la façade `v1` de keyring 4).
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "1", features = ["keychain"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = "1"
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus-secret-service-keyring-store = { version = "1", features = ["crypto-rust"] }

@@ -1,0 +1,69 @@
+# cargo-deny — supply-chain policy for the Rust side (run in CI: `cargo deny check`).
+# Replaces the unpinned `cargo install cargo-audit` step: one tool for
+# advisories, licences, banned crates and allowed sources.
+
+[graph]
+all-features = false
+
+[advisories]
+# Same reviewed exceptions as `.cargo/audit.toml` (each one justified there).
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml parsing DoS: we only write our own .ods / load embedded themes" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml parsing DoS: we only write our own .ods / load embedded themes" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained: syntect dumps, trusted data embedded at build time" },
+    { id = "RUSTSEC-2024-0320", reason = "yaml-rust unmaintained: syntect, trusted data" },
+    # zip extraction flaws (fixed in zip 9). Never fed untrusted archives: the
+    # updater extracts (Windows only) after verifying the minisign signature,
+    # spreadsheet-ods only writes our .ods, calamine is a dev-dependency.
+    # Drop once tauri-plugin-updater >= 2.14.1 (zip 9) passes the 7-day rule.
+    { id = "RUSTSEC-2026-0367", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0368", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0369", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    { id = "RUSTSEC-2026-0429", reason = "zip: no untrusted archive is ever extracted (see above)" },
+    # calamine CFB/OLE2 parser DoS (fixed in 0.38, under 7 days old). Dev-only:
+    # tests read back the .ods files they generate themselves.
+    { id = "RUSTSEC-2026-0436", reason = "calamine dev-dependency, only parses test-generated files" },
+    # zbus 5 internals merged into zbus 6; pulled by tauri-plugin-opener, no fix upstream.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained: via tauri-plugin-opener (zbus 5)" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained: via tauri-plugin-opener (zbus 5)" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained: via tauri-plugin-opener (zbus 5)" },
+]
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "MPL-2.0",
+    "0BSD",
+    "Unlicense",
+    "CDLA-Permissive-2.0",
+]
+
+[[licenses.clarify]]
+# Only ships a `license-file` (plain Apache-2.0 text).
+crate = "color-rs2"
+expression = "Apache-2.0"
+license-files = [{ path = "LICENSE", hash = 0x86e2b4b4 }]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

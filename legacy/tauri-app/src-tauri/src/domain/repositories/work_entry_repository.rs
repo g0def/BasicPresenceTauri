@@ -1,0 +1,48 @@
+use std::collections::HashMap;
+
+use async_trait::async_trait;
+
+use crate::domain::entities::work_day_schedule::WorkDaySchedule;
+use crate::domain::entities::work_entry::WorkEntry;
+use crate::domain::error::DomainError;
+
+/// Persistence contract for a day's work hours (entries + optional start/end
+/// schedule), implemented over the unlocked vault connection. The day's entry
+/// set is replaced as a whole: entry ids are not surfaced as stable handles.
+#[async_trait]
+pub trait WorkEntryRepository: Send + Sync {
+    /// The entries recorded for a presence day, ordered by position.
+    async fn list_by_presence(&self, presence_id: &str) -> Result<Vec<WorkEntry>, DomainError>;
+
+    /// Every work entry of a profile, grouped by presence id (one query — exports).
+    async fn list_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, Vec<WorkEntry>>, DomainError>;
+
+    /// Every schedule of a profile, by presence id (one query — exports).
+    async fn list_schedules_by_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<HashMap<String, WorkDaySchedule>, DomainError>;
+
+    /// Atomically replace the full entry set of a presence day. Passing an
+    /// empty slice clears the day.
+    async fn replace_for_presence(
+        &self,
+        presence_id: &str,
+        entries: &[WorkEntry],
+    ) -> Result<(), DomainError>;
+
+    /// The day's start/end times, if the user set them.
+    async fn get_schedule(&self, presence_id: &str)
+    -> Result<Option<WorkDaySchedule>, DomainError>;
+
+    /// Create or update the day's start/end times.
+    async fn set_schedule(&self, schedule: &WorkDaySchedule) -> Result<(), DomainError>;
+
+    /// Remove the day's start/end times, if any. Idempotent. Used when a write
+    /// must leave a day with no schedule (e.g. a bundle import replacing a day
+    /// that previously had one with a day that doesn't).
+    async fn clear_schedule(&self, presence_id: &str) -> Result<(), DomainError>;
+}
