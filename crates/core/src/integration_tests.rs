@@ -11,6 +11,7 @@ use crate::application::dto::profile_bundle_dto::{
 use crate::application::dto::trip_dto::TripInputDto;
 use crate::application::dto::work_entry_dto::WorkEntryInputDto;
 use crate::domain::error::DomainError;
+use crate::domain::services::markdown::MdBlockKind;
 use crate::infrastructure::config::{AppConfig, AuthPolicy, IntegrityPolicy, KdfParams};
 use crate::infrastructure::persistence::db::open_plain_db;
 use crate::services::build_services as build_state;
@@ -1331,6 +1332,176 @@ fn work_entries_schedule_recompute_and_type_flip_cleanup() {
 }
 
 #[test]
+fn copy_day_replays_a_whole_day_in_one_transaction() {
+    block_on(async {
+        let (config, dir) = temp_config("copy-day");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("create profile");
+
+        const D: i64 = 86_400_000;
+        const SOURCE: i64 = 1_717_200_000_000;
+        const TARGET: i64 = SOURCE + D;
+        const OTHER_WORK: i64 = SOURCE + 2 * D;
+
+        // Source: an office day with a commute, a custom start and two tasks.
+        let trip = TripInputDto {
+            mode_id: "car_petrol".to_string(),
+            distance_km: 20.0,
+            round_trip: true,
+            occupants: Some(2),
+        };
+        let source = state
+            .set_presence
+            .execute(&profile.id, SOURCE, "office", vec![trip])
+            .await
+            .expect("set source");
+        state
+            .set_work_schedule
+            .execute(&source.id, 540)
+            .await
+            .expect("source start");
+        state
+            .set_work_entries
+            .execute(
+                &source.id,
+                vec![work_entry("Mails", 60), work_entry("Dev", 240)],
+            )
+            .await
+            .expect("source entries");
+
+        // The target was a vacation day: it is overwritten.
+        state
+            .set_presence
+            .execute(&profile.id, TARGET, "vacation", vec![])
+            .await
+            .expect("set target");
+
+        let copied = state
+            .copy_day
+            .execute(&source.id, TARGET)
+            .await
+            .expect("copy day");
+        assert_eq!(copied.day, TARGET);
+        assert_eq!(copied.kind, "office");
+        assert_eq!(copied.work_minutes, 300);
+        let source_now = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|p| p.id == source.id)
+            .unwrap();
+        assert_eq!(copied.co2_kg, source_now.co2_kg);
+
+        let trips = state.get_presence_trips.execute(&copied.id).await.unwrap();
+        assert_eq!(trips.len(), 1);
+        assert_eq!(trips[0].mode_id, "car_petrol");
+        assert_eq!(trips[0].occupants, 2);
+        assert!(trips[0].round_trip);
+        let schedule = state
+            .get_work_schedule
+            .execute(&copied.id)
+            .await
+            .unwrap()
+            .expect("copied schedule");
+        assert_eq!((schedule.start_minutes, schedule.end_minutes), (540, 840));
+        let titles: Vec<String> = state
+            .get_work_entries
+            .execute(&copied.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|e| e.title)
+            .collect();
+        assert_eq!(titles, ["Mails", "Dev"]);
+
+        // Pasting a non-work day over a work day wipes its hours.
+        let other = state
+            .set_presence
+            .execute(&profile.id, OTHER_WORK, "remote", vec![])
+            .await
+            .unwrap();
+        state
+            .set_work_entries
+            .execute(&other.id, vec![work_entry("Old", 30)])
+            .await
+            .unwrap();
+        let vacation = state
+            .set_presence
+            .execute(&profile.id, SOURCE + 3 * D, "vacation", vec![])
+            .await
+            .unwrap();
+        let pasted = state
+            .copy_day
+            .execute(&vacation.id, OTHER_WORK)
+            .await
+            .expect("paste vacation");
+        assert_eq!(pasted.kind, "vacation");
+        assert_eq!(pasted.work_minutes, 0);
+        assert!(
+            state
+                .get_work_schedule
+                .execute(&pasted.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            state
+                .get_presence_trips
+                .execute(&pasted.id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        // Errors: unknown source, invalid target day (nothing is written).
+        assert!(matches!(
+            state.copy_day.execute("does-not-exist", TARGET).await,
+            Err(DomainError::NotFound)
+        ));
+        let before = state
+            .list_presences
+            .execute(&profile.id)
+            .await
+            .unwrap()
+            .len();
+        assert!(matches!(
+            state.copy_day.execute(&source.id, TARGET + 1).await,
+            Err(DomainError::Validation(_))
+        ));
+        assert_eq!(
+            state
+                .list_presences
+                .execute(&profile.id)
+                .await
+                .unwrap()
+                .len(),
+            before
+        );
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
 fn office_day_seeds_default_start_time() {
     block_on(async {
         let (config, dir) = temp_config("seed-start");
@@ -1549,12 +1720,13 @@ fn day_note_persists_and_is_rendered_to_safe_html() {
             .await
             .expect("set office");
 
-        // A fresh day has no note: empty Markdown and empty HTML.
+        // A fresh day has no note: empty Markdown and no display block.
         let fresh = state.get_day_note.execute(&presence.id).await.unwrap();
         assert!(fresh.markdown.is_empty());
-        assert!(fresh.html.trim().is_empty());
+        assert!(fresh.blocks.is_empty());
 
-        // Saving renders Markdown to sanitized HTML; the raw Markdown round-trips.
+        // Saving renders Markdown to display blocks; the raw Markdown round-trips
+        // and embedded HTML stays inert literal text.
         let saved = state
             .set_day_note
             .execute(
@@ -1564,18 +1736,21 @@ fn day_note_persists_and_is_rendered_to_safe_html() {
             .await
             .expect("set note");
         assert!(saved.markdown.contains("# Titre"));
-        assert!(saved.html.contains("<h1>Titre</h1>"), "got: {}", saved.html);
-        assert!(saved.html.contains("<strong>bold</strong>"));
         assert!(
-            !saved.html.contains("<script"),
-            "script survived: {}",
-            saved.html
+            matches!(&saved.blocks[0].kind, MdBlockKind::Heading { level: 1, spans } if spans[0].text == "Titre"),
+            "got: {:?}",
+            saved.blocks
         );
+        let MdBlockKind::Paragraph { spans } = &saved.blocks[1].kind else {
+            panic!("paragraph expected: {:?}", saved.blocks);
+        };
+        assert!(spans[0].bold && spans[0].text == "bold");
+        assert!(spans.iter().all(|s| s.link.is_none()));
 
         // The note is persisted and re-rendered identically on read.
         let read = state.get_day_note.execute(&presence.id).await.unwrap();
         assert_eq!(read.markdown, saved.markdown);
-        assert_eq!(read.html, saved.html);
+        assert_eq!(read.blocks, saved.blocks);
 
         // A blank note clears the column (stored as NULL).
         let cleared = state

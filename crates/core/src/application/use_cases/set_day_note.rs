@@ -8,7 +8,7 @@ use crate::domain::services::clock::Clock;
 use crate::domain::services::markdown::MarkdownRenderer;
 
 /// Persist a day's raw Markdown note (a blank note clears it) and return it
-/// alongside its freshly rendered, sanitized HTML.
+/// alongside its freshly rendered display blocks.
 pub struct SetDayNoteUseCase {
     presences: Arc<dyn PresenceRepository>,
     markdown: Arc<dyn MarkdownRenderer>,
@@ -43,7 +43,7 @@ impl SetDayNoteUseCase {
             .await?;
 
         let markdown = stored.unwrap_or_default();
-        let html = self.markdown.render_to_safe_html(&markdown);
-        Ok(DayNoteDto { markdown, html })
+        let blocks = self.markdown.render_blocks(&markdown);
+        Ok(DayNoteDto { markdown, blocks })
     }
 }

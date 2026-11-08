@@ -5,7 +5,7 @@ use crate::domain::error::DomainError;
 use crate::domain::repositories::presence_repository::PresenceRepository;
 use crate::domain::services::markdown::MarkdownRenderer;
 
-/// Fetch a day's raw Markdown note and its backend-rendered, sanitized HTML.
+/// Fetch a day's raw Markdown note and its backend-rendered display blocks.
 pub struct GetDayNoteUseCase {
     presences: Arc<dyn PresenceRepository>,
     markdown: Arc<dyn MarkdownRenderer>,
@@ -34,7 +34,7 @@ impl GetDayNoteUseCase {
             .get_note(presence_id)
             .await?
             .unwrap_or_default();
-        let html = self.markdown.render_to_safe_html(&markdown);
-        Ok(DayNoteDto { markdown, html })
+        let blocks = self.markdown.render_blocks(&markdown);
+        Ok(DayNoteDto { markdown, blocks })
     }
 }

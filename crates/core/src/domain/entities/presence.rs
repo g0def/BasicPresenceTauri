@@ -11,6 +11,19 @@ pub enum PresenceType {
 }
 
 impl PresenceType {
+    /// Every type, in canonical display order.
+    pub const ALL: [PresenceType; 4] = [
+        PresenceType::Office,
+        PresenceType::Remote,
+        PresenceType::Vacation,
+        PresenceType::Holiday,
+    ];
+
+    /// Office and remote days carry a commute, a schedule and work hours.
+    pub fn is_work(self) -> bool {
+        matches!(self, PresenceType::Office | PresenceType::Remote)
+    }
+
     /// Lowercase wire/storage representation.
     pub fn as_str(&self) -> &'static str {
         match self {

@@ -19,6 +19,21 @@ pub struct ExportOptionsDto {
     pub include_timestamps: bool,
 }
 
+/// Sensible defaults: everything but the audit timestamps (rarely useful to a
+/// human reader, and noisier in the spreadsheet).
+impl Default for ExportOptionsDto {
+    fn default() -> Self {
+        Self {
+            include_carbon: true,
+            include_hours: true,
+            include_tasks: true,
+            include_trips: true,
+            include_notes: true,
+            include_timestamps: false,
+        }
+    }
+}
+
 impl From<ExportOptionsDto> for ExportOptions {
     fn from(d: ExportOptionsDto) -> Self {
         ExportOptions {

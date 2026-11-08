@@ -45,12 +45,11 @@ async-trait = "0.1"
 # task_local) — libSQL exige d'être exécuté sur un runtime tokio.
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread"] }
 
-# Rendu des notes Markdown (source de vérité = Markdown brut). comrak sans
-# features par défaut (pas de CLI ni d'onig) + syntect `default-fancy`
-# (regex pur-Rust). Ammonia assainit le HTML tant que le port renvoie du HTML
-# (remplacé par un rendu en blocs en S2 du portage).
+# Rendu des notes Markdown (source de vérité = Markdown brut) en blocs
+# d'affichage inertes (pas de HTML : l'UI native n'en interprète pas). comrak
+# sans features par défaut (pas de CLI ni d'onig) + syntect `default-fancy`
+# (regex pur-Rust) pour colorer les blocs de code.
 comrak = { version = "0.59.0", default-features = false }
-ammonia = "4.1.4"
 syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 spreadsheet-ods = "1.0.4"
 chrono = { version = "0.4.45", default-features = false, features = ["std"] }

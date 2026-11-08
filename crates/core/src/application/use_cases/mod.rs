@@ -1,6 +1,7 @@
 pub mod account_exists;
 pub mod change_password;
 pub mod check_session;
+pub mod copy_day;
 pub mod create_commute;
 pub mod create_profile;
 pub mod create_task_preset;

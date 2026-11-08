@@ -56,13 +56,7 @@ un commit sur `feat/slint`.
 ## Sessions
 
 - [x] **S1 — Archivage, branche et workspace** (2026-11-08)
-- [ ] **S2 — Logique TS → core** :
-  - `stats/domain/aggregate.ts`, `profile-transfer/.../bundle.ts`,
-    `worked-examples.ts`, `commuteToTrips`, `duration-format.ts`,
-    `donut-geometry.ts`, `build-export-labels.ts` ;
-  - totaux mensuels (`routes/_authenticated.tsx`) ;
-  - use case `copy_day` (transactionnel) ;
-  - `MarkdownRenderer` → blocs (`MdBlock`), en retirant ammonia.
+- [x] **S2 — Logique TS → core** (2026-11-08)
 - [ ] **S3 — Socle Slint + login → go/no-go** :
   - `slint-build`, bridge tokio, thème, i18n `.po` + test de parité, navigation ;
   - **mesure de la RAM (PSS)** legacy vs Slint, VM sans GPU, touches mortes.
@@ -80,9 +74,12 @@ un commit sur `feat/slint`.
   liens `https` via `open`.
 - [ ] **S9 — Statistiques** : `BarChart` maison (zoom, moyenne, tooltip), donut,
   filtres.
-- [ ] **S10 — Export .ods et transferts de bundle** : `rfd` ; re-porter
-  `sanitize_file_name` / `with_extension` et leurs 3 tests
-  (`legacy/.../presentation/file_dialogs.rs`).
+- [ ] **S10 — Export .ods et transferts de bundle** :
+  - `rfd` ;
+  - re-porter `sanitize_file_name` / `with_extension` et leurs 3 tests
+    (`legacy/.../presentation/file_dialogs.rs`) ;
+  - porter `build-export-labels.ts` (libellés traduits → `ExportLabelsDto`, avec
+    `Lang::decimal_separator`), reporté de S2 car il dépend de l'i18n.
 - [ ] **S11 — Packaging et CI de release** :
   - `cargo-packager`, rpm, PKGBUILD ;
   - réécrire puis réactiver `release.yml` (désactivé par `if: false` sur `detect`).
@@ -120,3 +117,44 @@ un commit sur `feat/slint`.
   zip, zbus et quick-xml dont la justification cite des crates Tauri.
 - CI : le job `backend` porte sur le workspace. Les jobs `legacy-*` ne tournent
   qu'en `workflow_dispatch`.
+
+### S2
+
+- **Markdown** : le port `MarkdownRenderer` expose maintenant
+  `render_blocks(&str) -> Vec<MdBlock>` (`domain/services/markdown.rs`) au lieu
+  de `render_to_safe_html`.
+  - Les blocs (titre, paragraphe, élément de liste avec puce / numéro / case
+    à cocher, code coloré, règle, tableau) portent `indent` (profondeur de liste)
+    et `quote_depth` (citations). Chaque `MdSpan` porte gras, italique, barré,
+    code et lien.
+  - Le HTML brut est rendu en **texte littéral**, jamais interprété. Seuls les
+    liens `http`, `https` et `mailto` sont conservés (`is_safe_link`). Les images
+    sont réduites à leur texte alternatif.
+  - `DayNoteDto.html` devient `blocks`, et `GetLicenceUseCase::execute()` renvoie
+    `Vec<MdBlock>`.
+  - **ammonia est retiré** du core.
+- **`copy_day`** (`application/use_cases/copy_day.rs`, `Services::copy_day`) :
+  `execute(source_presence_id, target_day)` recopie le type, les trajets,
+  l'heure de début et les tâches. Tout s'exécute dans **une seule transaction**,
+  car les sous-use cases rejoignent la transaction ambiante. Les heures d'un
+  ancien jour travaillé sont purgées par les triggers SQL de changement de type.
+  Couvert par un test d'intégration.
+- **`application::view`** (nouveau) : helpers d'affichage purs, testés.
+  - `format` : `format_minutes`, `parse_clock_time`, `format_clock_time`,
+    `format_co2`, et `Lang` avec ses séparateurs décimal et de milliers (espace
+    fine insécable en FR, comme `Intl`).
+  - `period_stats` :
+    - `Granularity`, `bucket_presences` (buckets mois / semaine ISO comblés,
+      `until`) ;
+    - `period_key`, `breakdown_by_type`, `month_totals` (pastilles du header) ;
+    - `civil_date` / `day_ms` (jour en ms UTC ↔ `NaiveDate`).
+    - Les clés de mois valent maintenant `année*100 + mois`, au lieu du
+      `Date.UTC` du TypeScript.
+  - `donut` : `compute_donut_arcs`.
+  - `bundle_selection` : `BundleCategory`, `BundleSelection` (`effective`,
+    `from_manifest`, conversions vers les DTO), `present_categories`.
+  - `methodology` : `factors_by_category`, `worked_examples`.
+- `CommuteDto::to_trips()` (port de `commuteToTrips`), `ExportOptionsDto::default()`,
+  `PresenceType::ALL` et `PresenceType::is_work()`.
+- Reporté en S10 : `build-export-labels.ts`, qui dépend des traductions.
+- Bilan : 171 tests au vert, contre 135 en S1.

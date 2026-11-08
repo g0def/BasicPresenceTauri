@@ -8,6 +8,7 @@ use crate::application::services::credentials::CredentialGate;
 use crate::application::use_cases::account_exists::AccountExistsUseCase;
 use crate::application::use_cases::change_password::ChangePasswordUseCase;
 use crate::application::use_cases::check_session::CheckSessionUseCase;
+use crate::application::use_cases::copy_day::CopyDayUseCase;
 use crate::application::use_cases::create_commute::CreateCommuteUseCase;
 use crate::application::use_cases::create_profile::CreateProfileUseCase;
 use crate::application::use_cases::create_task_preset::CreateTaskPresetUseCase;
@@ -108,6 +109,8 @@ pub struct Services {
     pub set_presence: SetPresenceUseCase,
     pub list_presences: ListPresencesUseCase,
     pub delete_presence: DeletePresenceUseCase,
+    /// Replays a whole day (type, trips, start time, tasks) onto another day.
+    pub copy_day: CopyDayUseCase,
     pub list_emission_factors: ListEmissionFactorsUseCase,
     pub list_co2_referential: ListCo2ReferentialUseCase,
     pub create_commute: CreateCommuteUseCase,
@@ -274,6 +277,21 @@ pub async fn build_services(config: AppConfig, device_key: &[u8]) -> Result<Serv
         ),
         list_presences: ListPresencesUseCase::new(presences.clone()),
         delete_presence: DeletePresenceUseCase::new(presences.clone()),
+        copy_day: CopyDayUseCase::new(
+            presences.clone(),
+            work_entries.clone(),
+            SetPresenceUseCase::new(
+                presences.clone(),
+                factors.clone(),
+                profile_settings.clone(),
+                work_entries.clone(),
+                clock.clone(),
+                uow.clone(),
+            ),
+            SetWorkScheduleUseCase::new(work_entries.clone(), presences.clone()),
+            SetWorkEntriesUseCase::new(work_entries.clone(), presences.clone(), uow.clone()),
+            uow.clone(),
+        ),
         list_emission_factors: ListEmissionFactorsUseCase::new(factors.clone()),
         list_co2_referential: ListCo2ReferentialUseCase::new(factors.clone()),
         create_commute: CreateCommuteUseCase::new(commutes.clone(), clock.clone()),
