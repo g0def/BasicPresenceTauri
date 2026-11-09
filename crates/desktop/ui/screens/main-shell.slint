@@ -1,7 +1,10 @@
 import { Theme } from "../theme.slint";
 import { Button, ButtonVariant } from "../components/button.slint";
 import { MenuItem, MenuLabel, MenuSeparator } from "../components/menu.slint";
-import { AppState, AuthState, Page, ProfileState } from "../state.slint";
+import { AppState, AuthState, Page, PresenceState, ProfileState } from "../state.slint";
+import { Icon, Icons } from "../components/icon.slint";
+import { PresenceCalendarPage } from "../pages/presence-calendar.slint";
+import { DayDialog } from "../dialogs/day-dialog.slint";
 import { AboutPage } from "../pages/about.slint";
 import { EmptyProfilePage } from "../pages/empty-profile.slint";
 import { PlaceholderPage } from "../pages/placeholder.slint";
@@ -9,6 +12,47 @@ import { SettingsPage } from "../pages/settings.slint";
 import { ConfirmDialog } from "../dialogs/confirm.slint";
 import { ProfileFormDialog } from "../dialogs/profile-form.slint";
 import { SecurityNoticeDialog } from "../dialogs/security-notice.slint";
+
+// Month total shown in the header (hours / CO₂).
+component Pill inherits VerticalLayout {
+    in property <image> icon;
+    in property <string> text;
+    in property <color> accent;
+    in property <string> tooltip;
+    alignment: center;
+    Rectangle {
+        height: 28px;
+        width: row.preferred-width;
+        border-radius: 14px;
+        border-width: 1px;
+        border-color: root.accent.with-alpha(0.25);
+        background: root.accent.with-alpha(0.06);
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.text;
+        accessible-description: root.tooltip;
+        row := HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 12px;
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: root.icon;
+                    color: root.accent;
+                    width: 14px;
+                    height: 14px;
+                }
+            }
+            Text {
+                text: root.text;
+                vertical-alignment: center;
+                font-size: Theme.text-xs;
+                font-weight: 600;
+                color: root.accent;
+            }
+        }
+    }
+}
 
 // Account menu (port of `profile-badge.tsx`).
 component AccountMenu inherits Rectangle {
@@ -74,6 +118,20 @@ component AccountMenu inherits Rectangle {
                 MenuItem {
                     text: Theme.dark ? @tr("theme.light") : @tr("theme.dark");
                     activated => { Theme.dark = !Theme.dark; }
+                }
+                if ProfileState.profiles.length > 0: MenuSeparator { }
+                if ProfileState.profiles.length > 0: MenuLabel { text: @tr("cellDisplay.label"); }
+                if ProfileState.profiles.length > 0: MenuItem {
+                    text: @tr("cellDisplay.co2");
+                    checkable: true;
+                    checked: !PresenceState.show-hours;
+                    activated => { PresenceState.set-show-hours(false); }
+                }
+                if ProfileState.profiles.length > 0: MenuItem {
+                    text: @tr("cellDisplay.hours");
+                    checkable: true;
+                    checked: PresenceState.show-hours;
+                    activated => { PresenceState.set-show-hours(true); }
                 }
                 MenuSeparator { }
 
@@ -168,6 +226,22 @@ export component MainShell inherits Rectangle {
                 }
             }
 
+            if AppState.page == Page.presence && ProfileState.profiles.length > 0: HorizontalLayout {
+                spacing: 8px;
+                Pill {
+                    icon: Icons.clock;
+                    text: PresenceState.month-hours;
+                    accent: Theme.primary;
+                    tooltip: @tr("summary.hoursWorkedTooltip");
+                }
+                Pill {
+                    icon: Icons.leaf;
+                    text: PresenceState.month-co2;
+                    accent: Theme.success;
+                    tooltip: @tr("summary.co2EmittedTooltip");
+                }
+            }
+
             Text {
                 text: @tr("session.label", AuthState.session-remaining);
                 vertical-alignment: center;
@@ -196,8 +270,12 @@ export component MainShell inherits Rectangle {
             if ProfileState.loaded && ProfileState.profiles.length == 0
                 && AppState.page != Page.settings && AppState.page != Page.about: EmptyProfilePage { }
 
-            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.presence: PlaceholderPage {
-                title: ProfileState.current-name;
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.presence: PresenceCalendarPage { }
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.work-hours: PlaceholderPage {
+                title: @tr("workHours.encodeButton");
+            }
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.stats: PlaceholderPage {
+                title: @tr("stats.open");
             }
             if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.commutes: PlaceholderPage {
                 title: @tr("commute.menuItem");
@@ -225,6 +303,16 @@ export component MainShell inherits Rectangle {
         busy: ProfileState.busy;
         close => { ProfileState.delete-open = false; }
         confirmed => { ProfileState.delete(ProfileState.delete-id); }
+    }
+    if PresenceState.dialog-open: DayDialog { }
+    if PresenceState.paste-confirm-open: ConfirmDialog {
+        title: @tr("presence.copyMode.replaceTitle");
+        description: @tr("presence.copyMode.replaceBody");
+        confirm-text: @tr("presence.copyMode.replaceConfirm");
+        cancel-text: @tr("presence.copyMode.replaceCancel");
+        busy: PresenceState.busy;
+        close => { PresenceState.paste-confirm-open = false; }
+        confirmed => { PresenceState.confirm-paste(); }
     }
     if AuthState.notice-open: SecurityNoticeDialog { }
 }

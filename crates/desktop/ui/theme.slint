@@ -48,4 +48,26 @@ export global Theme {
     out property <length> text-base: 16px;
     out property <length> text-lg: 18px;
     out property <length> text-xl: 20px;
+
+    /// Cell background / foreground of a presence type.
+    public pure function presence-bg(kind: string) -> color {
+        if (kind == "office") { return primary; }
+        if (kind == "remote") { return success; }
+        if (kind == "vacation") { return warning; }
+        if (kind == "holiday") { return destructive; }
+        return card;
+    }
+    public pure function presence-fg(kind: string) -> color {
+        if (kind == "office") { return primary-foreground; }
+        if (kind == "remote") { return success-foreground; }
+        if (kind == "vacation" || kind == "holiday") { return #ffffff; }
+        return card-foreground;
+    }
+    /// Accent color of a presence type (icons in legend, dialog).
+    public pure function presence-accent(kind: string) -> color {
+        if (kind == "office") { return primary; }
+        if (kind == "remote") { return success; }
+        if (kind == "vacation") { return warning; }
+        return destructive;
+    }
 }

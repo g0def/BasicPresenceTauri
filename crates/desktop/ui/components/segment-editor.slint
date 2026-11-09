@@ -1,0 +1,116 @@
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "button.slint";
+import { Icon, Icons } from "icon.slint";
+import { ModeSelect } from "mode-select.slint";
+import { ModeOption, SegmentDraft } from "../state.slint";
+
+// List of commute legs: transport mode, one-way distance and, for car modes,
+// occupants (port of `segment-editor.tsx`).
+export component SegmentEditor inherits VerticalLayout {
+    in property <[SegmentDraft]> segments;
+    in property <[ModeOption]> modes;
+    in property <bool> enabled: true;
+    callback set-mode(int, string);
+    callback set-distance(int, string);
+    callback set-occupants(int, string);
+    callback add();
+    callback remove(int);
+
+    spacing: 10px;
+
+    for segment[index] in root.segments: Rectangle {
+        border-radius: Theme.radius-md;
+        border-width: 1px;
+        border-color: Theme.border;
+
+        VerticalLayout {
+            padding: 10px;
+            spacing: 6px;
+
+            Text {
+                text: @tr("commute.segment.type");
+                font-size: Theme.text-xs;
+                color: Theme.muted-foreground;
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                ModeSelect {
+                    horizontal-stretch: 1;
+                    current-label: segment.mode-label;
+                    placeholder: @tr("commute.segment.typePlaceholder");
+                    options: root.modes;
+                    enabled: root.enabled;
+                    selected(id) => { root.set-mode(index, id); }
+                }
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: Theme.radius-md;
+                    background: remove-touch.has-hover ? Theme.accent : transparent;
+                    accessible-role: button;
+                    accessible-label: @tr("commute.segment.remove");
+                    accessible-action-default => { root.remove(index); }
+                    Icon {
+                        source: Icons.trash;
+                        color: Theme.muted-foreground;
+                    }
+                    remove-touch := TouchArea {
+                        enabled: root.enabled;
+                        mouse-cursor: pointer;
+                        clicked => { root.remove(index); }
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 4px;
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                    Text {
+                        text: @tr("commute.segment.distance");
+                        font-size: Theme.text-xs;
+                        color: Theme.muted-foreground;
+                    }
+                    LineEdit {
+                        min-width: 60px;
+                        text: segment.distance;
+                        input-type: decimal;
+                        enabled: root.enabled;
+                        accessible-label: @tr("commute.segment.distance");
+                        edited(text) => { root.set-distance(index, text); }
+                    }
+                }
+                if segment.is-car: VerticalLayout {
+                    spacing: 4px;
+                    width: 110px;
+                    Text {
+                        text: @tr("commute.segment.occupants");
+                        font-size: Theme.text-xs;
+                        color: Theme.muted-foreground;
+                    }
+                    LineEdit {
+                        min-width: 60px;
+                        text: segment.occupants;
+                        input-type: number;
+                        placeholder-text: "1";
+                        enabled: root.enabled;
+                        accessible-label: @tr("commute.segment.occupants");
+                        edited(text) => { root.set-occupants(index, text); }
+                    }
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: start;
+        Button {
+            variant: ButtonVariant.outline;
+            text: "+ " + @tr("commute.segment.add");
+            enabled: root.enabled;
+            clicked => { root.add(); }
+        }
+    }
+}

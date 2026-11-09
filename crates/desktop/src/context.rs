@@ -3,7 +3,7 @@
 //! `done` callbacks of [`Bridge::run`].
 
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use basic_presence_core::domain::error::DomainError;
 use basic_presence_core::services::Services;
@@ -18,9 +18,34 @@ pub struct Ctx {
     pub ui: slint::Weak<AppWindow>,
     pub bridge: Bridge,
     pub session: Session,
+    /// Data the controllers share (active profile, loaded month, …).
+    pub shared: Arc<Mutex<Shared>>,
+}
+
+/// State shared between the feature controllers. Only touched on the UI
+/// thread in practice; the mutex makes [`Ctx`] `Send`.
+#[derive(Default)]
+pub struct Shared {
+    pub lang: crate::i18n::Lang,
+    /// Active profile (the one whose data is shown).
+    pub profile_id: Option<String>,
+    pub presence: crate::presence::PresenceData,
 }
 
 impl Ctx {
+    pub fn new(ui: slint::Weak<AppWindow>, bridge: Bridge, session: Session) -> Self {
+        Self {
+            ui,
+            bridge,
+            session,
+            shared: Arc::default(),
+        }
+    }
+
+    pub fn shared(&self) -> MutexGuard<'_, Shared> {
+        self.shared.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
     /// Run a use case, then `done` on the UI thread (skipped if the window
     /// is gone).
     pub fn call<T, Fut>(

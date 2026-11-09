@@ -4,7 +4,7 @@
 export enum Screen { loading, login, main, startup-error }
 
 /// Pages of the signed-in app.
-export enum Page { presence, commutes, settings, methodology, licence, about }
+export enum Page { presence, work-hours, stats, commutes, settings, methodology, licence, about }
 
 export struct ProfileItem {
     id: string,
@@ -121,4 +121,98 @@ export global ProfileState {
 
     /// Name of the active profile (shown in the header menu button).
     in property <string> current-name;
+}
+
+/// One day of the month grid (whole weeks, Monday first).
+export struct DayCell {
+    /// The day as epoch-ms at UTC midnight (as text: it does not fit an int).
+    key: string,
+    day: int,
+    in-month: bool,
+    today: bool,
+    weekend: bool,
+    /// Presence type ("office", "remote", "vacation", "holiday") or "".
+    kind: string,
+    /// Hours or CO₂ shown in the cell (may be empty).
+    value: string,
+    /// Accessible name: date — type.
+    label: string,
+}
+
+/// A saved commute offered in the day dialog.
+export struct CommuteChoice {
+    id: string,
+    name: string,
+    co2: string,
+    summary: string,
+}
+
+/// Entry of the transport-mode picker: a category header or a mode.
+export struct ModeOption {
+    id: string,
+    label: string,
+    header: bool,
+}
+
+/// One leg being edited (custom trip, commute form).
+export struct SegmentDraft {
+    mode-id: string,
+    mode-label: string,
+    distance: string,
+    occupants: string,
+    is-car: bool,
+}
+
+export global PresenceState {
+    // --- Month grid ---
+    in property <string> month-title;
+    in property <[string]> weekdays;
+    in property <[DayCell]> cells;
+    /// Cell display: worked hours (true) or CO₂ (false).
+    in property <bool> show-hours;
+    // Header totals of the displayed month.
+    in property <string> month-hours;
+    in property <string> month-co2;
+    in property <bool> busy;
+    in-out property <string> error-code;
+    in property <string> error-arg;
+
+    // --- Copy / paste of days: "idle", "picking", "pasting" ---
+    in property <string> clipboard: "idle";
+    in-out property <bool> paste-confirm-open;
+
+    callback prev-month();
+    callback next-month();
+    callback day-clicked(string);
+    callback toggle-copy();
+    callback cancel-copy();
+    callback confirm-paste();
+    callback set-show-hours(bool);
+
+    // --- Day dialog: step "type", then "commute" for office / remote ---
+    in-out property <bool> dialog-open;
+    in property <string> dialog-title;
+    in property <string> dialog-step: "type";
+    /// Type already saved for the day ("" if none).
+    in property <string> dialog-kind;
+    in property <string> dialog-choice;
+    in property <[CommuteChoice]> commutes;
+    in property <[ModeOption]> modes;
+    in property <[SegmentDraft]> segments;
+    in property <bool> round-trip: true;
+    in property <bool> can-confirm;
+
+    callback select-type(string);
+    callback choose(string);
+    callback back();
+    callback confirm();
+    callback delete();
+    callback encode-hours();
+    callback close-dialog();
+    callback set-segment-mode(int, string);
+    callback set-segment-distance(int, string);
+    callback set-segment-occupants(int, string);
+    callback add-segment();
+    callback remove-segment(int);
+    callback set-round-trip(bool);
 }

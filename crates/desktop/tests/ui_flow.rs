@@ -16,8 +16,8 @@ use std::time::{Duration, Instant};
 use basic_presence::bridge::Bridge;
 use basic_presence::session::{IDLE_TIMEOUT_MS, now_ms};
 use basic_presence::{
-    AppState, AppWindow, AuthState, Page, ProfileState, Screen, Theme, auth, wire_features,
-    wire_window,
+    AppState, AppWindow, AuthState, DayCell, Page, PresenceState, ProfileState, Screen, Theme,
+    auth, wire_features, wire_window,
 };
 use basic_presence_core::infrastructure::config::AppConfig;
 use basic_presence_core::services::build_services;
@@ -289,6 +289,103 @@ fn app_flows_render_and_work_end_to_end() {
     profiles.invoke_delete(ada.id.clone());
     h.pump_until("deleted", || profiles.get_profiles().row_count() == 1);
     assert!(!profiles.get_delete_open());
+
+    // ---------- Presence calendar (S5) ----------
+    let presence = ui.global::<PresenceState>();
+    app.set_page(Page::Presence);
+    h.pump_until("calendar loaded", || {
+        presence.get_cells().row_count() >= 28 && !presence.get_month_title().is_empty()
+    });
+    let cell = |day: i32| -> DayCell {
+        presence
+            .get_cells()
+            .iter()
+            .find(|c| c.in_month && c.day == day)
+            .unwrap()
+    };
+    assert_eq!(presence.get_weekdays().row_data(0).unwrap(), "lu");
+    assert_eq!(presence.get_month_co2(), "0 kg");
+    h.snapshot("12-calendar-empty");
+
+    // Office day with a custom car trip (two steps).
+    presence.invoke_day_clicked(cell(10).key);
+    assert!(presence.get_dialog_open());
+    assert_eq!(presence.get_dialog_step(), "type");
+    h.snapshot("13-day-dialog-type");
+    presence.invoke_select_type("office".into());
+    assert_eq!(presence.get_dialog_step(), "commute");
+    assert!(!presence.get_can_confirm());
+    presence.invoke_choose("custom".into());
+    assert!(presence.get_modes().iter().any(|m| m.header));
+    presence.invoke_set_segment_mode(0, "car_petrol".into());
+    presence.invoke_set_segment_distance(0, "20".into());
+    assert!(presence.get_can_confirm());
+    assert!(presence.get_segments().row_data(0).unwrap().is_car);
+    h.snapshot("14-day-dialog-commute");
+    presence.invoke_confirm();
+    h.pump_until("office saved", || {
+        !presence.get_dialog_open() && cell(10).kind == "office"
+    });
+    assert!(
+        cell(10).value.ends_with("kg"),
+        "co2 shown: {}",
+        cell(10).value
+    );
+    assert_ne!(presence.get_month_co2(), "0 kg");
+
+    // Vacation is saved straight from the first step.
+    presence.invoke_day_clicked(cell(11).key);
+    presence.invoke_select_type("vacation".into());
+    h.pump_until("vacation saved", || cell(11).kind == "vacation");
+    assert_eq!(cell(11).value, "");
+
+    // Copy day 10, paste onto an empty day, then over a filled one.
+    presence.invoke_toggle_copy();
+    assert_eq!(presence.get_clipboard(), "picking");
+    presence.invoke_day_clicked(cell(13).key); // empty: nothing to copy
+    assert_eq!(presence.get_clipboard(), "picking");
+    presence.invoke_day_clicked(cell(10).key);
+    assert_eq!(presence.get_clipboard(), "pasting");
+    presence.invoke_day_clicked(cell(12).key);
+    h.pump_until("pasted on empty day", || cell(12).kind == "office");
+    presence.invoke_day_clicked(cell(11).key);
+    assert!(presence.get_paste_confirm_open());
+    h.snapshot("15-paste-confirm");
+    presence.invoke_confirm_paste();
+    h.pump_until("pasted over vacation", || cell(11).kind == "office");
+    presence.invoke_cancel_copy();
+    assert_eq!(presence.get_clipboard(), "idle");
+    h.snapshot("16-calendar-filled");
+
+    // Cell display: worked hours (persisted in the profile settings).
+    presence.invoke_set_show_hours(true);
+    h.pump_until("hours mode", || presence.get_show_hours());
+    assert_eq!(cell(10).value, "");
+
+    // Re-opening an office day pre-fills its trip; then delete it.
+    presence.invoke_day_clicked(cell(12).key);
+    h.pump_until("trips prefilled", || {
+        presence.get_dialog_choice() == "custom"
+    });
+    assert_eq!(presence.get_segments().row_data(0).unwrap().distance, "20");
+    assert_eq!(presence.get_dialog_kind(), "office");
+    presence.invoke_delete();
+    h.pump_until("deleted day", || cell(12).kind.is_empty());
+
+    // Rust-computed texts follow the language.
+    app.invoke_set_lang("en".into());
+    assert!(
+        presence
+            .get_month_title()
+            .chars()
+            .next()
+            .unwrap()
+            .is_uppercase(),
+        "{}",
+        presence.get_month_title()
+    );
+    assert_eq!(presence.get_weekdays().row_data(0).unwrap(), "Mo");
+    app.invoke_set_lang("fr".into());
 
     // ---------- Change password ----------
     auth_state.invoke_change_password("password123".into(), "short".into(), "short".into());

@@ -13,6 +13,9 @@
 //!
 //! The build fails if fr and en do not have the same keys, or if a `.slint`
 //! file uses a key that does not exist (Slint would silently show the key).
+//!
+//! It also emits `$OUT_DIR/strings.rs`, the same catalogs for texts that Rust
+//! computes (see `src/i18n.rs`).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -64,6 +67,28 @@ fn main() {
         std::fs::create_dir_all(&dir).expect("create translations dir");
         std::fs::write(dir.join(format!("{DOMAIN}.po")), po).expect("write .po");
     }
+
+    // The same strings for the Rust side (texts computed in Rust: mode
+    // labels, commute summaries, accessible day labels…), sorted by key for
+    // binary search, i18next placeholders kept as is (`{{name}}`).
+    let mut rs = String::new();
+    for (lang, flat) in &catalogs {
+        writeln!(
+            rs,
+            "pub static {}: &[(&str, &str)] = &[",
+            lang.to_uppercase()
+        )
+        .unwrap();
+        for (k, v) in flat {
+            writeln!(rs, "    ({k:?}, {v:?}),").unwrap();
+        }
+        writeln!(rs, "];").unwrap();
+    }
+    std::fs::write(
+        PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("strings.rs"),
+        rs,
+    )
+    .expect("write strings.rs");
 
     check_slint_keys(&manifest.join("ui"), &catalogs["fr"]);
 

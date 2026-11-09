@@ -9,6 +9,7 @@ pub mod bridge;
 pub mod context;
 pub mod errors;
 pub mod i18n;
+pub mod presence;
 pub mod profiles;
 pub mod session;
 
@@ -63,13 +64,23 @@ pub fn wire_window(ui: &AppWindow, lang: &str) {
 /// Wire every feature controller on the backend services. The returned timer
 /// drives the session countdown / inactivity check: keep it alive.
 pub fn wire_features(ui: &AppWindow, bridge: bridge::Bridge) -> (context::Ctx, slint::Timer) {
-    let ctx = context::Ctx {
-        ui: ui.as_weak(),
-        bridge,
-        session: session::Session::default(),
-    };
+    let ctx = context::Ctx::new(ui.as_weak(), bridge, session::Session::default());
+    ctx.shared().lang = i18n::Lang::from_code(&ui.global::<AppState>().get_lang());
     auth::wire(&ctx);
     profiles::wire(&ctx);
+    presence::wire(&ctx);
+
+    // Language switch: also re-render the texts computed in Rust.
+    let c = ctx.clone();
+    ui.global::<AppState>().on_set_lang(move |lang| {
+        let lang = i18n::normalize(&lang);
+        i18n::select(lang);
+        c.shared().lang = i18n::Lang::from_code(lang);
+        if let Some(ui) = c.ui.upgrade() {
+            ui.global::<AppState>().set_lang(lang.into());
+            presence::render(&c, &ui);
+        }
+    });
 
     let timer = slint::Timer::default();
     let c = ctx.clone();

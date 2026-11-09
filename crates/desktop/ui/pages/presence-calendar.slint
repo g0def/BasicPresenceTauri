@@ -1,0 +1,236 @@
+import { Theme } from "../theme.slint";
+import { Icon, Icons } from "../components/icon.slint";
+import { AppState, Page, PresenceState, DayCell } from "../state.slint";
+
+// Square icon button (month navigation, toolbar).
+component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <brush> icon-color: Theme.foreground;
+    in property <bool> pressed;
+    callback clicked();
+
+    width: 36px;
+    height: 36px;
+    border-radius: Theme.radius-md;
+    background: touch.has-hover || root.pressed ? Theme.accent : transparent;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-action-default => { root.clicked(); }
+
+    Icon {
+        source: root.icon;
+        color: root.icon-color;
+        width: 18px;
+        height: 18px;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component DayCellView inherits Rectangle {
+    in property <DayCell> cell;
+    in property <string> clipboard;
+    callback clicked();
+
+    property <bool> filled: root.cell.kind != "";
+
+    border-radius: Theme.radius;
+    border-width: root.cell.today ? 2px : (root.cell.in-month ? 1px : 0px);
+    border-color: root.cell.today || touch.has-hover ? Theme.ring : Theme.border;
+    background: root.filled ? Theme.presence-bg(root.cell.kind)
+        : touch.has-hover ? Theme.accent
+        : root.cell.weekend ? Theme.muted
+        : Theme.card;
+    opacity: root.cell.in-month ? 1 : 0.4;
+    accessible-role: button;
+    accessible-label: root.cell.label;
+    accessible-action-default => { root.clicked(); }
+    animate background { duration: 200ms; }
+
+    Text {
+        x: 8px;
+        y: 6px;
+        text: root.cell.day;
+        font-weight: 500;
+        color: root.filled ? Theme.presence-fg(root.cell.kind) : Theme.card-foreground;
+    }
+    if root.cell.value != "": Text {
+        text: root.cell.value;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-weight: 600;
+        color: Theme.presence-fg(root.cell.kind);
+    }
+    if root.filled: Icon {
+        x: parent.width - self.width - 8px;
+        y: parent.height - self.height - 8px;
+        width: 20px;
+        height: 20px;
+        source: Icons.presence(root.cell.kind);
+        color: Theme.presence-fg(root.cell.kind);
+        opacity: 0.8;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: root.clipboard == "picking" ? (root.filled ? copy : not-allowed)
+            : root.clipboard == "pasting" ? copy : pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Month calendar (port of `presence-calendar.tsx`): whole weeks, Monday
+// first; a click opens the day dialog, or copies / pastes a day in copy mode.
+export component PresenceCalendarPage inherits Rectangle {
+    property <length> gap: 8px;
+    property <int> weeks: max(1, PresenceState.cells.length / 7);
+
+    forward-focus: keys;
+    keys := FocusScope {
+        // Leave copy mode on Escape.
+        key-pressed(event) => {
+            if (event.text == Key.Escape && PresenceState.clipboard != "idle") {
+                PresenceState.cancel-copy();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    VerticalLayout {
+        padding-top: 8px;
+        padding-bottom: 16px;
+        spacing: 10px;
+
+        // Month navigation + toolbar.
+        HorizontalLayout {
+            height: 40px;
+            spacing: 8px;
+            Rectangle { horizontal-stretch: 1; }
+            IconButton {
+                icon: Icons.chevron-left;
+                label: @tr("presence.prevMonth");
+                clicked => { PresenceState.prev-month(); }
+            }
+            Text {
+                min-width: 200px;
+                text: PresenceState.month-title;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: Theme.text-xl;
+                font-weight: 600;
+                color: Theme.foreground;
+            }
+            IconButton {
+                icon: Icons.chevron-right;
+                label: @tr("presence.nextMonth");
+                clicked => { PresenceState.next-month(); }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 4px;
+                    IconButton {
+                        icon: Icons.chart;
+                        label: @tr("stats.open");
+                        clicked => { AppState.page = Page.stats; }
+                    }
+                    IconButton {
+                        icon: PresenceState.clipboard == "pasting" ? Icons.x : Icons.copy;
+                        pressed: PresenceState.clipboard != "idle";
+                        icon-color: PresenceState.clipboard == "picking" ? Theme.warning
+                            : PresenceState.clipboard == "pasting" ? Theme.destructive
+                            : Theme.foreground;
+                        label: PresenceState.clipboard == "pasting" ? @tr("presence.copyMode.paste")
+                            : PresenceState.clipboard == "picking" ? @tr("presence.copyMode.pick")
+                            : @tr("presence.copyMode.start");
+                        clicked => {
+                            PresenceState.toggle-copy();
+                            keys.focus();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Copy-mode hint (the former tooltip).
+        if PresenceState.clipboard != "idle": Text {
+            text: (PresenceState.clipboard == "pasting" ? @tr("presence.copyMode.paste") : @tr("presence.copyMode.pick"))
+                + " — " + @tr("presence.copyMode.help");
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            font-size: Theme.text-xs;
+            color: PresenceState.clipboard == "picking" ? Theme.warning : Theme.destructive;
+        }
+
+        if PresenceState.error-code != "": Text {
+            text: AppState.error-text(PresenceState.error-code, PresenceState.error-arg);
+            horizontal-alignment: center;
+            color: Theme.destructive;
+        }
+
+        // Weekday headers.
+        HorizontalLayout {
+            spacing: root.gap;
+            for name in PresenceState.weekdays: Text {
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                min-width: 0px;
+                text: name;
+                horizontal-alignment: center;
+                font-size: Theme.text-xs;
+                font-weight: 500;
+                color: Theme.muted-foreground;
+            }
+        }
+
+        // Day grid.
+        grid := Rectangle {
+            vertical-stretch: 1;
+            min-height: 280px;
+            property <length> cell-w: (self.width - 6 * root.gap) / 7;
+            property <length> cell-h: (self.height - (root.weeks - 1) * root.gap) / root.weeks;
+
+            for cell[i] in PresenceState.cells: DayCellView {
+                x: mod(i, 7) * (grid.cell-w + root.gap);
+                y: floor(i / 7) * (grid.cell-h + root.gap);
+                width: grid.cell-w;
+                height: grid.cell-h;
+                cell: cell;
+                clipboard: PresenceState.clipboard;
+                clicked => {
+                    PresenceState.day-clicked(cell.key);
+                    keys.focus();
+                }
+            }
+        }
+
+        // Legend.
+        HorizontalLayout {
+            alignment: center;
+            spacing: 20px;
+            for kind in ["office", "remote", "vacation", "holiday"]: HorizontalLayout {
+                spacing: 6px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.presence(kind);
+                        color: Theme.presence-accent(kind);
+                    }
+                }
+                Text {
+                    text: kind == "office" ? @tr("presence.types.office")
+                        : kind == "remote" ? @tr("presence.types.remote")
+                        : kind == "vacation" ? @tr("presence.types.vacation")
+                        : @tr("presence.types.holiday");
+                    vertical-alignment: center;
+                    font-size: Theme.text-xs;
+                    color: Theme.muted-foreground;
+                }
+            }
+        }
+    }
+}

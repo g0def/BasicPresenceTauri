@@ -1,0 +1,105 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { ModeOption } from "../state.slint";
+
+// Transport-mode picker with category headers (port of the grouped Radix
+// Select of `segment-editor.tsx`).
+export component ModeSelect inherits Rectangle {
+    in property <string> current-label;
+    in property <string> placeholder;
+    in property <[ModeOption]> options;
+    in property <bool> enabled: true;
+    callback selected(string);
+
+    height: 36px;
+    border-radius: Theme.radius-md;
+    border-width: 1px;
+    border-color: focus.has-focus ? Theme.ring : Theme.input;
+    background: Theme.card;
+    opacity: root.enabled ? 1 : 0.5;
+    accessible-role: combobox;
+    accessible-label: root.current-label != "" ? root.current-label : root.placeholder;
+    accessible-action-default => { root.open(); }
+    forward-focus: focus;
+
+    function open() {
+        if (root.enabled) { popup.show(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        Text {
+            text: root.current-label != "" ? root.current-label : root.placeholder;
+            vertical-alignment: center;
+            overflow: elide;
+            color: root.current-label != "" ? Theme.card-foreground : Theme.muted-foreground;
+        }
+        Text {
+            text: "▾";
+            vertical-alignment: center;
+            color: Theme.muted-foreground;
+        }
+    }
+
+    TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { focus.focus(); root.open(); }
+    }
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " " || event.text == Key.DownArrow) {
+                root.open();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    popup := PopupWindow {
+        x: 0;
+        y: root.height + 2px;
+        width: root.width;
+        height: min(280px, list.preferred-height + 8px);
+
+        Rectangle {
+            background: Theme.popover;
+            border-radius: Theme.radius-md;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: 12px;
+            drop-shadow-color: #00000030;
+
+            ScrollView {
+                list := VerticalLayout {
+                    padding: 4px;
+                    for option in root.options: Rectangle {
+                        height: option.header ? 26px : 30px;
+                        border-radius: Theme.radius-sm;
+                        background: !option.header && row.has-hover ? Theme.accent : transparent;
+                        accessible-role: AccessibleRole.list-item;
+                        accessible-label: option.label;
+                        Text {
+                            x: option.header ? 6px : 14px;
+                            text: option.label;
+                            vertical-alignment: center;
+                            font-size: option.header ? Theme.text-xs : Theme.text-sm;
+                            font-weight: option.header ? 600 : 400;
+                            color: option.header ? Theme.muted-foreground : Theme.popover-foreground;
+                        }
+                        row := TouchArea {
+                            enabled: !option.header;
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.selected(option.id);
+                                popup.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

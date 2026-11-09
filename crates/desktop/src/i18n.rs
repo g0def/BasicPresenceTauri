@@ -1,5 +1,38 @@
-//! UI language: the strings are bundled at build time (see `build.rs`); this
-//! picks the active catalog.
+//! UI language. The strings are bundled at build time (see `build.rs`):
+//! Slint's `@tr` for the static texts of the UI, and [`tr`] / [`tr_with`]
+//! for the texts Rust computes. Both come from `i18n/{fr,en}.json`.
+
+pub use basic_presence_core::application::view::format::Lang;
+
+mod strings {
+    include!(concat!(env!("OUT_DIR"), "/strings.rs"));
+}
+
+/// Translation of `key` (the key itself if unknown).
+pub fn tr(lang: Lang, key: &str) -> String {
+    lookup(lang, key).unwrap_or(key).to_string()
+}
+
+/// Translation of `key`, or `None` if the key does not exist.
+pub fn lookup(lang: Lang, key: &str) -> Option<&'static str> {
+    let table = match lang {
+        Lang::Fr => strings::FR,
+        Lang::En => strings::EN,
+    };
+    table
+        .binary_search_by(|(k, _)| (*k).cmp(key))
+        .ok()
+        .map(|i| table[i].1)
+}
+
+/// Translation with `{{name}}` placeholders filled in.
+pub fn tr_with(lang: Lang, key: &str, args: &[(&str, &str)]) -> String {
+    let mut text = tr(lang, key);
+    for (name, value) in args {
+        text = text.replace(&format!("{{{{{name}}}}}"), value);
+    }
+    text
+}
 
 /// Language of the OS session (`LC_ALL`, `LC_MESSAGES`, `LANG`), French by
 /// default. Persisting the user's choice comes with the preferences (S6).
@@ -32,7 +65,19 @@ pub fn select(lang: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize;
+    use super::*;
+
+    #[test]
+    fn rust_side_translations() {
+        assert_eq!(tr(Lang::Fr, "presence.types.office"), "Bureau");
+        assert_eq!(tr(Lang::En, "presence.types.office"), "Office");
+        assert_eq!(tr(Lang::Fr, "no.such.key"), "no.such.key");
+        assert_eq!(lookup(Lang::En, "no.such.key"), None);
+        assert_eq!(
+            tr_with(Lang::En, "profile.deleteConfirmBody", &[("name", "Ada")]),
+            "The profile \"Ada\" will be permanently deleted."
+        );
+    }
 
     #[test]
     fn normalizes_locales() {

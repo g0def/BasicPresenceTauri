@@ -1,0 +1,225 @@
+import { CheckBox, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Icon, Icons } from "../components/icon.slint";
+import { Modal } from "../components/modal.slint";
+import { SegmentEditor } from "../components/segment-editor.slint";
+import { AppState, PresenceState } from "../state.slint";
+
+// Selectable card (presence type, commute choice).
+component Choice inherits Rectangle {
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <string> label;
+    callback clicked();
+
+    border-radius: Theme.radius-md;
+    border-width: root.active ? 2px : 1px;
+    border-color: root.active || touch.has-hover ? Theme.ring : Theme.border;
+    background: touch.has-hover ? Theme.accent : transparent;
+    opacity: root.enabled ? 1 : 0.5;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.active;
+    accessible-action-default => { root.clicked(); }
+
+    @children
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component TypeChoice inherits Choice {
+    in property <string> kind;
+    height: 46px;
+    HorizontalLayout {
+        padding-left: 12px;
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                source: Icons.presence(root.kind);
+                color: Theme.presence-accent(root.kind);
+            }
+        }
+        Text {
+            text: root.label;
+            vertical-alignment: center;
+            font-weight: 500;
+            color: Theme.popover-foreground;
+        }
+    }
+}
+
+// Day dialog (port of `presence-day-dialog.tsx`): pick the presence type;
+// office / remote then pick the commute (none, a saved one, or custom legs).
+export component DayDialog inherits Modal {
+    title: PresenceState.dialog-title;
+    description: PresenceState.dialog-step == "type" ? @tr("presence.chooseType") : @tr("commute.step.title");
+    card-width: PresenceState.dialog-step == "type" ? 400px : 480px;
+    dismissable: !PresenceState.busy;
+    close => { PresenceState.close-dialog(); }
+
+    // ----- Step 1: presence type -----
+    if PresenceState.dialog-step == "type": VerticalLayout {
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            TypeChoice {
+                kind: "office";
+                label: @tr("presence.types.office");
+                active: PresenceState.dialog-kind == "office";
+                enabled: !PresenceState.busy;
+                clicked => { PresenceState.select-type("office"); }
+            }
+            TypeChoice {
+                kind: "remote";
+                label: @tr("presence.types.remote");
+                active: PresenceState.dialog-kind == "remote";
+                enabled: !PresenceState.busy;
+                clicked => { PresenceState.select-type("remote"); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            TypeChoice {
+                kind: "vacation";
+                label: @tr("presence.types.vacation");
+                active: PresenceState.dialog-kind == "vacation";
+                enabled: !PresenceState.busy;
+                clicked => { PresenceState.select-type("vacation"); }
+            }
+            TypeChoice {
+                kind: "holiday";
+                label: @tr("presence.types.holiday");
+                active: PresenceState.dialog-kind == "holiday";
+                enabled: !PresenceState.busy;
+                clicked => { PresenceState.select-type("holiday"); }
+            }
+        }
+    }
+
+    // ----- Step 2: commute -----
+    if PresenceState.dialog-step == "commute": ScrollView {
+        height: min(380px, choices.preferred-height);
+        choices := VerticalLayout {
+            spacing: 8px;
+            padding-right: 4px;
+            Choice {
+                height: 42px;
+                label: @tr("commute.step.none");
+                active: PresenceState.dialog-choice == "none";
+                clicked => { PresenceState.choose("none"); }
+                Text {
+                    x: 12px;
+                    text: @tr("commute.step.none");
+                    vertical-alignment: center;
+                    font-weight: 500;
+                    color: Theme.popover-foreground;
+                }
+            }
+            for commute in PresenceState.commutes: Choice {
+                label: commute.name;
+                active: PresenceState.dialog-choice == commute.id;
+                clicked => { PresenceState.choose(commute.id); }
+                VerticalLayout {
+                    padding: 10px;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        Text {
+                            text: commute.name;
+                            font-weight: 500;
+                            horizontal-stretch: 1;
+                            color: Theme.popover-foreground;
+                        }
+                        Text {
+                            text: commute.co2;
+                            font-size: Theme.text-xs;
+                            font-weight: 600;
+                            color: Theme.primary;
+                        }
+                    }
+                    Text {
+                        text: commute.summary;
+                        wrap: word-wrap;
+                        font-size: Theme.text-xs;
+                        color: Theme.muted-foreground;
+                    }
+                }
+            }
+            Choice {
+                height: 42px;
+                label: @tr("commute.step.custom");
+                active: PresenceState.dialog-choice == "custom";
+                clicked => { PresenceState.choose("custom"); }
+                Text {
+                    x: 12px;
+                    text: @tr("commute.step.custom");
+                    vertical-alignment: center;
+                    font-weight: 500;
+                    color: Theme.popover-foreground;
+                }
+            }
+            if PresenceState.dialog-choice == "custom": VerticalLayout {
+                spacing: 10px;
+                SegmentEditor {
+                    segments: PresenceState.segments;
+                    modes: PresenceState.modes;
+                    enabled: !PresenceState.busy;
+                    set-mode(i, id) => { PresenceState.set-segment-mode(i, id); }
+                    set-distance(i, text) => { PresenceState.set-segment-distance(i, text); }
+                    set-occupants(i, text) => { PresenceState.set-segment-occupants(i, text); }
+                    add => { PresenceState.add-segment(); }
+                    remove(i) => { PresenceState.remove-segment(i); }
+                }
+                CheckBox {
+                    text: @tr("commute.form.roundTrip");
+                    checked: PresenceState.round-trip;
+                    toggled => { PresenceState.set-round-trip(self.checked); }
+                }
+            }
+        }
+    }
+
+    if PresenceState.error-code != "": Text {
+        text: AppState.error-text(PresenceState.error-code, PresenceState.error-arg);
+        wrap: word-wrap;
+        color: Theme.destructive;
+    }
+
+    // ----- Footer -----
+    if PresenceState.dialog-step == "type" && PresenceState.dialog-kind != "": HorizontalLayout {
+        spacing: 8px;
+        if PresenceState.dialog-kind == "office" || PresenceState.dialog-kind == "remote": Button {
+            variant: ButtonVariant.outline;
+            text: @tr("workHours.encodeButton");
+            enabled: !PresenceState.busy;
+            clicked => { PresenceState.encode-hours(); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            variant: ButtonVariant.destructive;
+            text: @tr("presence.delete");
+            enabled: !PresenceState.busy;
+            clicked => { PresenceState.delete(); }
+        }
+    }
+    if PresenceState.dialog-step == "commute": HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            variant: ButtonVariant.outline;
+            text: @tr("commute.step.back");
+            enabled: !PresenceState.busy;
+            clicked => { PresenceState.back(); }
+        }
+        Button {
+            text: @tr("commute.step.confirm");
+            enabled: !PresenceState.busy && PresenceState.can-confirm;
+            clicked => { PresenceState.confirm(); }
+        }
+    }
+}

@@ -184,6 +184,116 @@ pub fn format_datetime(epoch_ms: i64, utc_offset_minutes: i32, lang: Lang) -> St
     }
 }
 
+const MONTHS_LONG_FR: [&str; 12] = [
+    "janvier",
+    "février",
+    "mars",
+    "avril",
+    "mai",
+    "juin",
+    "juillet",
+    "août",
+    "septembre",
+    "octobre",
+    "novembre",
+    "décembre",
+];
+const MONTHS_LONG_EN: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+const WEEKDAYS_FR: [&str; 7] = [
+    "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche",
+];
+const WEEKDAYS_EN: [&str; 7] = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+];
+
+/// First letter in upper case (`"novembre 2026"` → `"Novembre 2026"`).
+pub fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+/// Month heading of the calendar: `"novembre 2026"` / `"November 2026"`.
+pub fn format_month_year(date: chrono::NaiveDate, lang: Lang) -> String {
+    use chrono::Datelike;
+    let names = match lang {
+        Lang::Fr => MONTHS_LONG_FR,
+        Lang::En => MONTHS_LONG_EN,
+    };
+    format!("{} {}", names[date.month0() as usize], date.year())
+}
+
+/// Short weekday headers, Monday first: `lu ma me je ve sa di` / `Mo Tu …`.
+pub fn weekday_initials(lang: Lang) -> [String; 7] {
+    let names = match lang {
+        Lang::Fr => WEEKDAYS_FR,
+        Lang::En => WEEKDAYS_EN,
+    };
+    names.map(|n| n.chars().take(2).collect())
+}
+
+fn ordinal_suffix(day: u32) -> &'static str {
+    match (day % 10, day % 100) {
+        (_, 11..=13) => "th",
+        (1, _) => "st",
+        (2, _) => "nd",
+        (3, _) => "rd",
+        _ => "th",
+    }
+}
+
+/// Medium date: `"9 novembre 2026"` / `"November 9th, 2026"`.
+pub fn format_date(date: chrono::NaiveDate, lang: Lang) -> String {
+    use chrono::Datelike;
+    match lang {
+        Lang::Fr => format!(
+            "{} {} {}",
+            date.day(),
+            MONTHS_LONG_FR[date.month0() as usize],
+            date.year()
+        ),
+        Lang::En => format!(
+            "{} {}{}, {}",
+            MONTHS_LONG_EN[date.month0() as usize],
+            date.day(),
+            ordinal_suffix(date.day()),
+            date.year()
+        ),
+    }
+}
+
+/// Full date with the weekday: `"lundi 9 novembre 2026"` /
+/// `"Monday, November 9th, 2026"`.
+pub fn format_long_date(date: chrono::NaiveDate, lang: Lang) -> String {
+    use chrono::Datelike;
+    let i = date.weekday().num_days_from_monday() as usize;
+    match lang {
+        Lang::Fr => format!("{} {}", WEEKDAYS_FR[i], format_date(date, lang)),
+        Lang::En => format!("{}, {}", WEEKDAYS_EN[i], format_date(date, lang)),
+    }
+}
+
 /// Remaining time as `m:ss` (the session countdown); negative clamps to `0:00`.
 pub fn format_countdown(remaining_ms: i64) -> String {
     let total = remaining_ms.max(0) / 1000;
@@ -280,6 +390,33 @@ mod tests {
         assert_eq!(format_countdown(61_500), "1:01");
         assert_eq!(format_countdown(999), "0:00");
         assert_eq!(format_countdown(-5), "0:00");
+    }
+
+    #[test]
+    fn calendar_names() {
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 11, 9).unwrap();
+        assert_eq!(format_month_year(d, Lang::Fr), "novembre 2026");
+        assert_eq!(capitalize(&format_month_year(d, Lang::Fr)), "Novembre 2026");
+        assert_eq!(format_month_year(d, Lang::En), "November 2026");
+        assert_eq!(weekday_initials(Lang::Fr)[0], "lu");
+        assert_eq!(weekday_initials(Lang::En)[6], "Su");
+        assert_eq!(format_date(d, Lang::Fr), "9 novembre 2026");
+        assert_eq!(format_date(d, Lang::En), "November 9th, 2026");
+        assert_eq!(format_long_date(d, Lang::Fr), "lundi 9 novembre 2026");
+        assert_eq!(format_long_date(d, Lang::En), "Monday, November 9th, 2026");
+        let ordinal = |day| {
+            format_date(
+                chrono::NaiveDate::from_ymd_opt(2026, 1, day).unwrap(),
+                Lang::En,
+            )
+        };
+        assert_eq!(ordinal(1), "January 1st, 2026");
+        assert_eq!(ordinal(2), "January 2nd, 2026");
+        assert_eq!(ordinal(3), "January 3rd, 2026");
+        assert_eq!(ordinal(11), "January 11th, 2026");
+        assert_eq!(ordinal(22), "January 22nd, 2026");
+        assert_eq!(capitalize(""), "");
+        assert_eq!(capitalize("été"), "Été");
     }
 
     #[test]

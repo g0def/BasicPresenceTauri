@@ -190,6 +190,7 @@ pub fn end_session(ctx: &Ctx, ui: &AppWindow, expired: bool) {
         }),
     );
     crate::profiles::reset(ui);
+    crate::presence::reset(ctx, ui);
     let app = ui.global::<AppState>();
     app.set_page(Page::Presence);
     app.set_screen(Screen::Login);

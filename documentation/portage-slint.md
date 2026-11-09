@@ -62,10 +62,10 @@ un commit sur `feat/slint`.
   - `slint-build`, bridge tokio, thème, i18n `.po` + test de parité, navigation ;
   - **mesure de la RAM (PSS)** legacy vs Slint, VM sans GPU, touches mortes.
 - [x] **S4 — Coquille applicative, session, profils, À propos** (2026-11-09)
-- [ ] **S5 — Calendrier de présence** : dialog jour en 2 étapes, copier/coller,
-  pastilles du mois.
+- [x] **S5 — Calendrier de présence** (2026-11-09)
 - [ ] **S6 — Trajets et réglages** : préférences locales dans un fichier de config
-  du data dir.
+  du data dir. Réutiliser `SegmentEditor` / `ModeSelect` (déjà écrits en S5) pour
+  le formulaire de trajet.
 - [ ] **S7 — Heures de travail** : presets, sliders, donut, sélecteur d'heure,
   autosave.
 - [ ] **S8 — Note du jour, licence, méthodologie** : `MarkdownView`, `TextEdit`,
@@ -302,3 +302,60 @@ un commit sur `feat/slint`.
   - 11 captures.
 - **Non couvert par le test** : le rendu de la `PopupWindow` du menu. À vérifier à
   la main.
+
+### S5
+
+- **Calendrier** (`ui/pages/presence-calendar.slint`, contrôleur
+  `src/presence.rs`) :
+  - la grille est calculée en Rust (`grid_days` : semaines entières, lundi en
+    premier) et placée en coordonnées absolues (`mod(i, 7)`, `floor(i / 7)`) ;
+  - chaque cellule porte sa couleur et son icône selon le type, la valeur en
+    heures ou en CO₂ (« ~ » si le chiffre est estimé), et le marquage week-end,
+    aujourd'hui et hors mois ;
+  - la page affiche aussi la navigation par mois, la légende et un bouton vers
+    les statistiques (placeholder jusqu'en S9).
+- **Dialogue du jour** (`ui/dialogs/day-dialog.slint`), en deux étapes :
+  1. le **type** : congé et jour férié sont enregistrés tout de suite ;
+  2. le **trajet** pour bureau et télétravail : aucun, un trajet enregistré, ou
+     un trajet personnalisé.
+  - Le télétravail propose « aucun » par défaut. Un jour déjà encodé pré-remplit
+    le trajet personnalisé à partir de ses trajets.
+  - Boutons « Supprimer » et « Encoder les heures » (qui ouvre la page
+    `work-hours`, un placeholder jusqu'en S7).
+  - **Composants réutilisables** : `ModeSelect` (sélecteur de mode avec en-têtes
+    de catégories, dans une `PopupWindow`) et `SegmentEditor` (segments, distance
+    acceptant `,` ou `.`, occupants pour la voiture).
+- **Copier-coller** (`Clipboard::{Idle, Picking, Pasting}`) via le use case
+  `copy_day`. La confirmation d'écrasement est demandée une seule fois par
+  collage. Échap annule.
+- **Totaux du mois dans l'en-tête** : heures et CO₂, calculés avec `month_totals`.
+- **Mode d'affichage des cellules** (heures ou CO₂) : c'est un **réglage du
+  profil** (`cell_display_mode`, via `set_profile_settings`), modifiable depuis le
+  menu du compte.
+- **État partagé** : `Ctx.shared` (`Shared { lang, profile_id, presence }`).
+  Changer de profil actif recharge les présences, les réglages, les trajets et
+  les facteurs. Changer de langue relance le rendu des textes calculés en Rust.
+- **Traduction côté Rust** : `build.rs` génère `$OUT_DIR/strings.rs` (les mêmes
+  JSON). `i18n::tr`, `tr_with` et `lookup` servent aux libellés de modes, aux
+  résumés de trajets et aux libellés accessibles.
+- **Core** : formats de calendrier ajoutés (`format_month_year`,
+  `weekday_initials`, `format_date`, `format_long_date` avec les ordinaux
+  anglais, `capitalize`).
+- **Icônes** : 21 icônes Lucide extraites en SVG (`assets/icons/lucide/`, licence
+  ISC jointe), recolorées via `colorize` (`ui/components/icon.slint`).
+- **Pièges Slint** :
+  - `Rectangle` a déjà une propriété `color` (dépréciée) : nommer autrement les
+    propriétés de couleur ;
+  - `accessible-role` doit être une constante ;
+  - dans un élément qui a une propriété `text`, écrire `AccessibleRole.text` ;
+  - le `LineEdit` du style Fluent a une largeur minimale élevée : fixer
+    `min-width` ;
+  - `width: 0` fige l'élément à une largeur nulle : utiliser `preferred-width: 0`
+    avec un `horizontal-stretch`.
+- **Test headless** : grille, dialogue en deux étapes avec un trajet personnalisé,
+  congé enregistré directement, copie ignorée sur un jour vide, collage sur un
+  jour vide puis sur un jour rempli avec confirmation, mode heures,
+  pré-remplissage, suppression, traduction du titre et des jours. 16 captures.
+- **Disque plein (100 %)** pendant la session : l'édition de liens échouait avec
+  « Bus error ». Corrigé par `cargo clean` dans `legacy/tauri-app/src-tauri`
+  (58 Go de cache de build régénérable).

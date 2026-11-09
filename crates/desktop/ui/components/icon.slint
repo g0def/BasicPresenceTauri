@@ -1,0 +1,42 @@
+// Lucide icons (ISC licence, see assets/icons/lucide/LICENSE), recolored to
+// the theme with `colorize`.
+
+export global Icons {
+    out property <image> building: @image-url("../../assets/icons/lucide/building.svg");
+    out property <image> house: @image-url("../../assets/icons/lucide/house.svg");
+    out property <image> palm: @image-url("../../assets/icons/lucide/tree-palm.svg");
+    out property <image> party: @image-url("../../assets/icons/lucide/party-popper.svg");
+    out property <image> copy: @image-url("../../assets/icons/lucide/copy.svg");
+    out property <image> x: @image-url("../../assets/icons/lucide/x.svg");
+    out property <image> chevron-left: @image-url("../../assets/icons/lucide/chevron-left.svg");
+    out property <image> chevron-right: @image-url("../../assets/icons/lucide/chevron-right.svg");
+    out property <image> chart: @image-url("../../assets/icons/lucide/chart-column.svg");
+    out property <image> trash: @image-url("../../assets/icons/lucide/trash.svg");
+    out property <image> plus: @image-url("../../assets/icons/lucide/plus.svg");
+    out property <image> clock: @image-url("../../assets/icons/lucide/clock-4.svg");
+    out property <image> leaf: @image-url("../../assets/icons/lucide/leaf.svg");
+    out property <image> car: @image-url("../../assets/icons/lucide/car.svg");
+    out property <image> bike: @image-url("../../assets/icons/lucide/bike.svg");
+    out property <image> bus: @image-url("../../assets/icons/lucide/bus.svg");
+    out property <image> train: @image-url("../../assets/icons/lucide/train-front.svg");
+    out property <image> plane: @image-url("../../assets/icons/lucide/plane.svg");
+    out property <image> help: @image-url("../../assets/icons/lucide/circle-question-mark.svg");
+    out property <image> check: @image-url("../../assets/icons/lucide/check.svg");
+    out property <image> calendar: @image-url("../../assets/icons/lucide/calendar.svg");
+
+    /// Icon of a presence type.
+    public pure function presence(kind: string) -> image {
+        if (kind == "office") { return building; }
+        if (kind == "remote") { return house; }
+        if (kind == "vacation") { return palm; }
+        return party;
+    }
+}
+
+export component Icon inherits Image {
+    in property <brush> color;
+    width: 16px;
+    height: 16px;
+    colorize: root.color;
+    accessible-role: none;
+}

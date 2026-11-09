@@ -9,7 +9,7 @@ use crate::errors::UiError;
 use crate::{AppWindow, ProfileItem, ProfileState};
 
 /// Show the profiles; the active one (else the first) names the header menu.
-fn apply(ui: &AppWindow, dto: ProfilesDto) {
+fn apply(ctx: &Ctx, ui: &AppWindow, dto: ProfilesDto) {
     let active = dto
         .active_profile_id
         .clone()
@@ -33,8 +33,10 @@ fn apply(ui: &AppWindow, dto: ProfilesDto) {
         .unwrap_or_default();
     let state = ui.global::<ProfileState>();
     state.set_current_name(current.into());
+    let active_id = items.iter().find(|p| p.active).map(|p| p.id.to_string());
     state.set_profiles(ModelRc::new(VecModel::from(items)));
     state.set_loaded(true);
+    crate::presence::set_profile(ctx, active_id);
 }
 
 fn show_error(ui: &AppWindow, e: UiError) {
@@ -46,10 +48,11 @@ fn show_error(ui: &AppWindow, e: UiError) {
 
 /// (Re)load the profile list.
 pub fn load(ctx: &Ctx) {
+    let c = ctx.clone();
     ctx.call_authed(
         |s| async move { s.list_profiles.execute().await },
-        |ui, result| match result {
-            Ok(dto) => apply(ui, dto),
+        move |ui, result| match result {
+            Ok(dto) => apply(&c, ui, dto),
             Err(e) => show_error(ui, e),
         },
     );
@@ -80,18 +83,19 @@ fn mutate<Fut>(
     let state = ui.global::<ProfileState>();
     state.set_busy(true);
     state.set_error_code("".into());
+    let c = ctx.clone();
     ctx.call_authed(
         move |s| async move {
             work(s.clone()).await?;
             s.list_profiles.execute().await
         },
-        |ui, result| match result {
+        move |ui, result| match result {
             Ok(dto) => {
                 let state = ui.global::<ProfileState>();
                 state.set_busy(false);
                 state.set_form_open(false);
                 state.set_delete_open(false);
-                apply(ui, dto);
+                apply(&c, ui, dto);
             }
             Err(e) => show_error(ui, e),
         },
