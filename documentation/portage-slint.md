@@ -57,7 +57,8 @@ un commit sur `feat/slint`.
 
 - [x] **S1 — Archivage, branche et workspace** (2026-11-08)
 - [x] **S2 — Logique TS → core** (2026-11-08)
-- [ ] **S3 — Socle Slint + login → go/no-go** :
+- [x] **S3 — Socle Slint + login** (2026-11-09) — ⚠️ **go/no-go RAM reporté**
+  (voir les notes S3). Prévu à l'origine :
   - `slint-build`, bridge tokio, thème, i18n `.po` + test de parité, navigation ;
   - **mesure de la RAM (PSS)** legacy vs Slint, VM sans GPU, touches mortes.
 - [ ] **S4 — Coquille applicative** :
@@ -158,3 +159,85 @@ un commit sur `feat/slint`.
   `PresenceType::ALL` et `PresenceType::is_work()`.
 - Reporté en S10 : `build-export-labels.ts`, qui dépend des traductions.
 - Bilan : 171 tests au vert, contre 135 en S1.
+
+### S3
+
+- **Crate `crates/desktop`** (bibliothèque `basic_presence` + binaire `basic-presence`).
+  Slint `=1.18.1` sans les features par défaut, pour ne pas tirer Qt. Il embarque
+  le backend winit (Wayland, X11, Windows, macOS), les renderers femtovg et
+  logiciel, et l'accessibilité.
+  - **Renderer logiciel**, pour les postes sans GPU : `SLINT_BACKEND=winit-software`.
+  - **Dossier de données** : `dirs::data_dir()/com.godef.basic-presence`, le même que
+    l'`app_data_dir` de Tauri.
+  - **`BASIC_PRESENCE_DATA_DIR`** remplace ce dossier : à utiliser pour les tests et
+    les mesures, pour ne jamais toucher au vrai coffre. Avec une clé d'appareil déjà
+    présente dans le trousseau, celle-ci est relue sans jamais être réécrite.
+- **Pont tokio** (`src/bridge.rs`) : `Bridge::run(work, done)` exécute le use case
+  sur le runtime (2 workers), puis `done` sur le thread UI via
+  `invoke_from_event_loop`. `lock_blocking()` est appelé à la sortie, une fois la
+  boucle d'événements terminée.
+- **Erreurs** (`src/errors.rs`) : `UiError { code, arg }`, avec les mêmes codes que
+  l'ancien `AppError`. Elles sont traduites côté Slint par `AppState.error-text`.
+  Les erreurs internes partent sur stderr, jamais dans l'UI. Un échec au démarrage
+  affiche un écran dédié (`startup-error.slint`) au lieu d'un dialogue natif.
+- **i18n** : source de vérité dans `crates/desktop/i18n/{fr,en}.json` (les JSON
+  i18next, avec de nouvelles clés `errors.codes.*`, `startup.*` et `home.*`).
+  - **Génération** : `build.rs` produit les `.po` dans `OUT_DIR` ; les msgids sont
+    les clés pointées, sans contexte de traduction
+    (`DefaultTranslationContext::None`).
+  - **Variables** : `{{x}}` devient `{0}`, `{1}`… numérotés dans l'ordre
+    d'apparition dans la chaîne française.
+  - **Pluriels** : `key_one` / `key_other` donnent
+    `@tr("key_one" | "key_other" % n)`.
+  - **Contrôles à la compilation** : le build échoue si `fr` et `en` n'ont pas les
+    mêmes clés, ou si un `@tr("…")` d'un `.slint` cite une clé inconnue.
+  - **Langue** : celle du système (`LC_ALL`, `LC_MESSAGES`, `LANG`), changeable à
+    chaud. Sa persistance est prévue en S6.
+- **Thème** : `ui/theme.slint` reprend les tokens oklch de l'ancien `index.css`
+  convertis en hex (script de conversion : sRGB via OKLab).
+  - Au démarrage, il suit le schéma de couleurs du système.
+  - **Piège** : il faut **figer `Palette.color-scheme`** sur `Theme.dark`. Sinon les
+    widgets standard passent seuls en sombre quand le système annonce tardivement
+    son schéma, et deviennent invisibles sur une page claire.
+- **Composants** : `Button` (variantes, clavier, accessibilité), `Card`, `Field`
+  (un `LineEdit` du style Fluent, avec son libellé).
+  - **Écrans** : connexion / inscription, accueil provisoire, erreur de démarrage.
+  - **Mot de passe** : le champ est vidé dès la soumission. Côté Rust, il est
+    enveloppé dans `Zeroizing`. **Limite** : la copie interne `SharedString` de
+    Slint n'est pas effacée.
+- **Test d'UI headless** (`crates/desktop/tests/ui_flow.rs`) : plateforme Slint
+  minimale avec renderer logiciel et file d'événements pompée à la main, branchée
+  sur les vrais services (coffre temporaire, clé fixe).
+  - **Parcours couvert** : inscription, refus avec erreur traduite, bascule FR → EN
+    et thème sombre, connexion, accueil, déconnexion.
+  - **Captures PNG** : `BP_SNAPSHOT_DIR=<dir> cargo test -p basic-presence --test ui_flow`.
+    **À réutiliser pour vérifier chaque écran**, sans piloter le bureau de
+    l'utilisateur.
+- **CI** : installation de `libfontconfig1-dev`, `libxkbcommon-dev` et `pkg-config`
+  pour compiler Slint.
+- **Mesure de la RAM : reportée, à la demande de l'utilisateur.** C'est une
+  condition du go/no-go, à faire avant d'aller loin dans S4–S5.
+  - **Outils** :
+    - binaires release : `cargo build --release -p basic-presence` et
+      `cd legacy/tauri-app && pnpm tauri build --no-bundle` ;
+    - lancement sur des données jetables : `XDG_DATA_HOME=<tmp>` pour Tauri,
+      `BASIC_PRESENCE_DATA_DIR=<tmp>` pour Slint ;
+    - mesure : somme du `Pss` de `/proc/<pid>/smaps_rollup` sur tout l'arbre de
+      processus, avec les processus WebKit pour Tauri.
+  - **Premier point, isolé et non concluant** (écran de connexion, KDE Wayland,
+    release, 8 s) :
+    - Slint en femtovg : ≈ 120 Mo de PSS, sans doute surtout le pilote OpenGL.
+    - Tauri : le seul processus principal pèse déjà ≈ 100 Mo de PSS, auxquels
+      s'ajoutent WebKitNetworkProcess et WebKitWebProcess (RSS ≈ 175 et ≈ 300 Mo).
+  - **À comparer aussi** : le renderer logiciel (`SLINT_BACKEND=winit-software`),
+    et le renderer Skia si femtovg reste lourd.
+- Tests manuels encore à faire par l'utilisateur : VM sans GPU, touches mortes
+  FR, lecteur d'écran (Orca).
+- **cargo-deny** :
+  - **Licences autorisées** : `BSL-1.0` (clipboard-win, error-code, via winit) et
+    `LicenseRef-Slint-Royalty-free-2.0` (Slint, avec l'attribution `AboutSlint`
+    exigée en S4).
+  - **Exceptions d'audit** :
+    - `RUSTSEC-2026-0441` (pin-utils) : uniquement à la compilation ;
+    - `RUSTSEC-2026-0192` (ttf-parser) : décorations de fenêtre winit, polices de
+      confiance.

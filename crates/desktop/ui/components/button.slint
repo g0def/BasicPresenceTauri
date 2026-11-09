@@ -1,0 +1,77 @@
+import { Theme } from "../theme.slint";
+
+export enum ButtonVariant { primary, outline, ghost, destructive }
+
+// Themed push button: mouse, keyboard (Enter / Space when focused) and
+// accessibility (role, label, default action).
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <ButtonVariant> variant: ButtonVariant.primary;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    property <bool> active: root.enabled && touch.has-hover;
+
+    min-height: 36px;
+    border-radius: Theme.radius-md;
+    border-width: root.variant == ButtonVariant.outline ? 1px : 0px;
+    border-color: Theme.input;
+    opacity: root.enabled ? 1.0 : 0.5;
+    background: root.variant == ButtonVariant.primary
+        ? (root.active ? Theme.primary.darker(15%) : Theme.primary)
+        : root.variant == ButtonVariant.destructive
+        ? (root.active ? Theme.destructive.darker(15%) : Theme.destructive)
+        : (root.active ? Theme.accent : transparent);
+
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { root.activate(); }
+
+    forward-focus: focus;
+
+    function activate() {
+        if (root.enabled) {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        alignment: center;
+        Text {
+            text: root.text;
+            font-size: Theme.text-sm;
+            font-weight: 600;
+            vertical-alignment: center;
+            color: root.variant == ButtonVariant.primary ? Theme.primary-foreground
+                : root.variant == ButtonVariant.destructive ? #ffffff
+                : (root.active ? Theme.accent-foreground : Theme.foreground);
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => { focus.focus(); root.activate(); }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == " ") {
+                root.activate();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    // Focus ring.
+    Rectangle {
+        border-radius: root.border-radius;
+        border-width: focus.has-focus ? 2px : 0px;
+        border-color: Theme.ring;
+    }
+}

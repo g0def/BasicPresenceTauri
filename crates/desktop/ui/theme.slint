@@ -1,0 +1,51 @@
+// Design tokens of BasicPresence, converted from the oklch variables of the
+// former `src/index.css` (light `:root` / dark `.dark`). Keep in sync by hand.
+
+export global Theme {
+    /// Dark mode. Initialized from the OS color scheme, toggled by the user.
+    in-out property <bool> dark: false;
+
+    out property <color> background: dark ? #131613 : #f7fff7;
+    out property <color> foreground: dark ? #f2f6f2 : #171c18;
+    out property <color> card: dark ? #222a21 : #ffffff;
+    out property <color> card-foreground: dark ? #f2f6f2 : #171c18;
+    out property <color> popover: dark ? #222a21 : #ffffff;
+    out property <color> popover-foreground: dark ? #f2f6f2 : #171c18;
+    out property <color> primary: dark ? #1b6f8e : #015377;
+    out property <color> primary-foreground: dark ? #ffffff : #ffffff;
+    out property <color> secondary: dark ? #283129 : #e4ebe4;
+    out property <color> secondary-foreground: dark ? #f2f6f2 : #262e27;
+    out property <color> muted: dark ? #283129 : #f2f6f2;
+    out property <color> muted-foreground: dark ? #a6b4a9 : #627365;
+    out property <color> accent: dark ? #24332a : #ecf4ed;
+    out property <color> accent-foreground: dark ? #d3e6d6 : #26442b;
+    out property <color> destructive: dark ? #b95044 : #b24a3c;
+    out property <color> border: dark ? #ffffff1a : #cdd7ce;
+    out property <color> input: dark ? #ffffff26 : #cdd7ce;
+    out property <color> ring: dark ? #5fa0b8 : #015377;
+    out property <color> success: dark ? #5fa869 : #4b7f52;
+    out property <color> success-foreground: dark ? #0c2010 : #ffffff;
+    out property <color> warning: dark ? #d7a23f : #c68a2e;
+    out property <color> warning-foreground: dark ? #2a1c04 : #3a2706;
+    out property <color> info: dark ? #5fa0b8 : #015377;
+    out property <color> info-foreground: dark ? #06222e : #ffffff;
+    out property <color> chart-1: dark ? #6fb377 : #4b7f52;
+    out property <color> chart-2: dark ? #a7c766 : #7fa94e;
+    out property <color> chart-3: dark ? #ddb85b : #cba53c;
+    out property <color> chart-4: dark ? #dc9a5e : #cc7f3d;
+    out property <color> chart-5: dark ? #b95044 : #b24a3c;
+
+    // Radii (base --radius = 0.625rem = 10px).
+    out property <length> radius-sm: 6px;
+    out property <length> radius-md: 8px;
+    out property <length> radius: 10px;
+    out property <length> radius-xl: 14px;
+
+    // Typography.
+    out property <string> brand-font: "JetBrains Mono";
+    out property <length> text-xs: 12px;
+    out property <length> text-sm: 14px;
+    out property <length> text-base: 16px;
+    out property <length> text-lg: 18px;
+    out property <length> text-xl: 20px;
+}

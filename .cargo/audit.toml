@@ -31,4 +31,8 @@ ignore = [
     "RUSTSEC-2026-0370", # zvariant unmaintained
     "RUSTSEC-2026-0371", # zbus_names unmaintained
     "RUSTSEC-2026-0372", # zvariant_derive unmaintained
+
+    # --- Slint UI: unmaintained, no flaw, no fix upstream.
+    "RUSTSEC-2026-0441", # pin-utils (spin_on in slint-macros, build time only)
+    "RUSTSEC-2026-0192", # ttf-parser (winit window decorations, trusted fonts)
 ]

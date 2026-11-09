@@ -1,0 +1,53 @@
+import { Theme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+import { Card } from "../components/card.slint";
+
+// Shown when the backend cannot start (no OS keychain, lost device key,
+// unreadable data directory…): a readable message instead of a crash.
+export component StartupErrorScreen inherits Rectangle {
+    in property <string> reason;
+    in property <string> detail;
+    callback quit();
+
+    background: Theme.background;
+
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            width: min(520px, root.width - 32px);
+            Card {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 14px;
+                    Text {
+                        text: @tr("startup.title");
+                        font-size: Theme.text-lg;
+                        font-weight: 600;
+                        color: Theme.destructive;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.reason;
+                        wrap: word-wrap;
+                        font-size: Theme.text-sm;
+                        color: Theme.foreground;
+                    }
+                    Text {
+                        text: @tr("startup.detail", root.detail);
+                        wrap: word-wrap;
+                        font-size: Theme.text-xs;
+                        color: Theme.muted-foreground;
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        Button {
+                            text: @tr("startup.quit");
+                            clicked => { root.quit(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

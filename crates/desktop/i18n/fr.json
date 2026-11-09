@@ -1,0 +1,524 @@
+{
+  "common": {
+    "loading": "Chargement…"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue",
+    "unknown": "Une erreur inconnue est survenue",
+    "loginFailed": "Échec de la connexion",
+    "registerFailed": "Échec de la création du compte",
+    "codes": {
+      "INVALID_CREDENTIALS": "Identifiants invalides",
+      "ACCOUNT_LOCKED": "Compte verrouillé. Réessayez dans {{seconds}} s.",
+      "ACCOUNT_EXISTS": "Un compte existe déjà sur cet appareil",
+      "SESSION_EXPIRED": "Session expirée. Reconnectez-vous.",
+      "NOT_FOUND": "Élément introuvable",
+      "VALIDATION": "Donnée invalide : {{detail}}",
+      "KEYSTORE_UNRECOVERABLE": "La clé sécurisée de cet appareil est manquante ou a changé : le stockage local chiffré ne peut pas être ouvert.",
+      "VAULT_TAMPERED": "L'intégrité du stockage chiffré a échoué : le fichier a été modifié.",
+      "EXPORT_FAILED": "Échec de l'export : le fichier n'a pas pu être écrit.",
+      "INTERNAL": "Erreur interne"
+    }
+  },
+  "auth": {
+    "loginSubtitle": "Entrez votre mot de passe pour déverrouiller vos données.",
+    "registerSubtitle": "Première utilisation : créez votre compte propriétaire.",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "submitting": "Veuillez patienter…",
+    "submitRegister": "Créer le compte",
+    "submitLogin": "Se connecter",
+    "tagline": "Suivez vos présences, mesurez votre empreinte carbone.",
+    "carbon": "CO₂",
+    "local": "100% local · chiffré",
+    "noRecoveryWarning": "Vos données sont chiffrées avec ce mot de passe : s'il est perdu, elles ne peuvent pas être récupérées. Notez-le en lieu sûr (gestionnaire de mots de passe).",
+    "changePassword": {
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "confirm": "Confirmer le nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "done": "Mot de passe changé.",
+      "mismatch": "Les deux nouveaux mots de passe ne correspondent pas.",
+      "tooShort": "Le mot de passe doit contenir au moins {{min}} caractères."
+    },
+    "securityNotice": {
+      "title": "Depuis votre dernière connexion",
+      "failedAttempts_one": "{{count}} tentative de connexion échouée",
+      "failedAttempts_other": "{{count}} tentatives de connexion échouées",
+      "dismiss": "J'ai compris",
+      "kinds": {
+        "account_locked": "Compte verrouillé après trop de tentatives",
+        "unclean_shutdown": "L'application s'est arrêtée sans fermeture propre (plantage, coupure)",
+        "tamper_detected": "Une modification du stockage chiffré a été détectée",
+        "tamper_tolerated": "Une modification du stockage chiffré a été tolérée",
+        "password_changed": "Mot de passe changé"
+      }
+    }
+  },
+  "home": {
+    "logout": "Se déconnecter",
+    "signedInAs": "Connecté en tant que {{name}}",
+    "profiles": "Profils sur cet appareil : {{count}}",
+    "portInProgress": "Les écrans de l’application arrivent dans les prochaines étapes du portage."
+  },
+  "session": {
+    "label": "Session : {{time}}",
+    "tooltip": "Temps restant avant déconnexion automatique"
+  },
+  "language": {
+    "label": "Langue",
+    "fr": "Français",
+    "en": "English"
+  },
+  "theme": {
+    "toggle": "Basculer le thème",
+    "dark": "Mode sombre",
+    "light": "Mode clair"
+  },
+  "cellDisplay": {
+    "label": "Affichage du calendrier",
+    "co2": "Émissions (kgCO2)",
+    "hours": "Heures travaillées"
+  },
+  "noteFont": {
+    "label": "Police des notes",
+    "sans": "Sans",
+    "serif": "Serif",
+    "mono": "Monospace"
+  },
+  "settings": {
+    "menuItem": "Paramètres",
+    "title": "Paramètres",
+    "back": "Retour au calendrier",
+    "profilesSection": "Profils",
+    "logHourSection": "Heures de travail",
+    "defaultStartTime": "Heure de départ par défaut",
+    "defaultStartTimeHint": "Heure appliquée automatiquement à chaque nouvelle journée de travail (bureau ou télétravail).",
+    "noteFontSection": "Police des notes",
+    "cellDisplaySection": "Affichage des cellules",
+    "co2Section": "Configuration CO2",
+    "co2": {
+      "gridCountry": "Pays du réseau électrique",
+      "carOccupancy": "Occupants par voiture (par défaut)",
+      "radiativeForcing": "Inclure le forçage radiatif (aviation)",
+      "countries": {
+        "FR": "France",
+        "BE": "Belgique",
+        "DE": "Allemagne",
+        "EU": "Europe"
+      }
+    },
+    "securitySection": "Sécurité"
+  },
+  "profile": {
+    "menu": "Menu du compte",
+    "emptyTitle": "Aucun profil",
+    "emptySubtitle": "Créez un profil pour commencer à gérer vos présences.",
+    "add": "Ajouter un profil",
+    "edit": "Modifier le profil",
+    "delete": "Supprimer le profil",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "addTitle": "Nouveau profil",
+    "editTitle": "Modifier le profil",
+    "formSubtitle": "Renseignez les informations du profil.",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "enterprise": "Entreprise",
+    "poste": "Poste",
+    "optional": "(optionnel)",
+    "profilesLabel": "Profils",
+    "active": "Actif",
+    "deleteConfirmTitle": "Supprimer ce profil ?",
+    "deleteConfirmBody": "Le profil « {{name}} » sera définitivement supprimé."
+  },
+  "presence": {
+    "chooseType": "Choisissez un type de présence pour ce jour.",
+    "delete": "Supprimer",
+    "prevMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "copyMode": {
+      "start": "Copier un jour",
+      "pick": "Choisissez le jour à copier",
+      "paste": "Cliquez les jours à remplir — cliquez pour quitter",
+      "help": "Remplissez vite le calendrier : choisissez un jour déjà encodé pour le copier (type, trajet, horaire et tâches), puis cliquez les jours vides pour y coller la même configuration.",
+      "replaceTitle": "Remplacer ce jour ?",
+      "replaceBody": "Ce jour est déjà encodé. Le remplacer par le jour copié ? Les jours déjà remplis suivants seront ensuite remplacés sans confirmation.",
+      "replaceConfirm": "Remplacer",
+      "replaceCancel": "Annuler"
+    },
+    "types": {
+      "office": "Bureau",
+      "remote": "Télétravail",
+      "vacation": "Congés",
+      "holiday": "Jour férié"
+    }
+  },
+  "summary": {
+    "hoursWorked": "{{hours}}",
+    "co2Emitted": "{{co2}}",
+    "hoursWorkedTooltip": "Total des heures travaillées sur le mois affiché",
+    "co2EmittedTooltip": "Émissions de CO₂ estimées de vos trajets sur le mois affiché"
+  },
+  "stats": {
+    "open": "Statistiques",
+    "title": "Statistiques",
+    "back": "Retour au calendrier",
+    "co2Title": "Émissions de CO₂",
+    "hoursTitle": "Heures travaillées",
+    "breakdownTitle": "Répartition des journées",
+    "average": "Moyenne",
+    "weekLabel": "S{{week}}",
+    "empty": "Pas encore de données à afficher.",
+    "from": "De",
+    "to": "à",
+    "granularity": {
+      "month": "Par mois",
+      "week": "Par semaine"
+    }
+  },
+  "transfer": {
+    "section": "Partage de profil (.json)",
+    "sectionHint": "Exportez votre profil dans un fichier .json pour l'envoyer à quelqu'un, ou importez un profil reçu.",
+    "fields": {
+      "includeDays": "Présences (jours)",
+      "includeTrips": "Trajets",
+      "includeWorkHours": "Heures & tâches",
+      "includeNotes": "Notes",
+      "includeTaskPresets": "Modèles de tâches",
+      "includeCommutes": "Trajets enregistrés",
+      "includeSettings": "Paramètres du profil"
+    },
+    "export": {
+      "menuItem": "Exporter le profil (.json)",
+      "title": "Exporter le profil",
+      "description": "Génère un fichier .json partageable. Cochez les données à inclure.",
+      "fileBaseName": "profil",
+      "exportButton": "Exporter",
+      "exporting": "Export en cours…",
+      "cancel": "Annuler",
+      "done": "Terminé",
+      "result": "Profil exporté : {{days}} jour(s), {{trips}} trajet(s), {{workEntries}} tâche(s), {{notes}} note(s), {{taskPresets}} modèle(s), {{commutes}} trajet(s) enregistré(s).",
+      "resultSettings": "Paramètres inclus."
+    },
+    "import": {
+      "menuItem": "Importer un profil (.json)",
+      "title": "Importer un profil",
+      "description": "Sélectionnez un fichier de profil (.json) exporté depuis l'application.",
+      "chooseFile": "Choisir un fichier…",
+      "importing": "Importation…",
+      "importButton": "Importer",
+      "cancel": "Annuler",
+      "done": "Terminé",
+      "fileFrom": "Fichier de « {{name}} »",
+      "categoriesHeading": "Données à importer",
+      "incompatible": "Ce fichier a été créé par une version plus récente de l'application et ne peut pas être importé.",
+      "unknownModes": "{{count}} mode(s) de transport inconnu(s) : l'empreinte est conservée, mais ces jours ne seront pas modifiables.",
+      "target": {
+        "heading": "Destination",
+        "new": "Nouveau profil",
+        "existing": "Fusionner dans un profil existant",
+        "selectProfile": "Choisir un profil"
+      },
+      "conflict": {
+        "heading": "Si des jours existent déjà dans ce profil :",
+        "skip": "Ignorer les existants",
+        "replace": "Remplacer les existants"
+      },
+      "result": "Profil importé. Jours : {{imported}} ajouté(s), {{replaced}} remplacé(s), {{skipped}} ignoré(s)."
+    }
+  },
+  "export": {
+    "menuItem": "Exporter des données",
+    "title": "Exporter les données",
+    "description": "Génère un fichier OpenDocument (.ods) ouvrable dans Excel ou LibreOffice, avec un onglet par type de données.",
+    "fileBaseName": "presences",
+    "fields": {
+      "includeCarbon": "Empreinte carbone (CO₂ et estimation)",
+      "includeHours": "Heures travaillées",
+      "includeTasks": "Tâches du jour",
+      "includeTrips": "Trajets (résumé par jour + détail des déplacements)",
+      "includeNotes": "Notes",
+      "includeTimestamps": "Dates de création et de modification"
+    },
+    "sheet": {
+      "presences": "Présences",
+      "tasks": "Tâches",
+      "trips": "Trajets",
+      "notes": "Notes",
+      "yes": "Oui",
+      "no": "Non",
+      "trip": {
+        "join": " + ",
+        "unitKm": "km",
+        "roundTripSuffix": "(A/R)",
+        "oneWaySuffix": "(aller simple)"
+      },
+      "cols": {
+        "date": "Date",
+        "type": "Type",
+        "co2": "CO₂ (kg)",
+        "estimated": "Estimé",
+        "tripSummary": "Déplacement",
+        "hours": "Heures",
+        "created": "Créé le",
+        "updated": "Modifié le",
+        "title": "Titre",
+        "description": "Description",
+        "minutes": "Minutes",
+        "color": "Couleur",
+        "order": "Ordre",
+        "mode": "Mode (code)",
+        "modeLabel": "Mode (libellé)",
+        "distanceOneWay": "Distance aller (km)",
+        "roundTrip": "Aller-retour",
+        "distanceCounted": "Distance comptabilisée (km)",
+        "occupants": "Occupants",
+        "factorYear": "Année facteur",
+        "note": "Note"
+      }
+    },
+    "exportButton": "Exporter",
+    "exporting": "Export en cours…",
+    "cancel": "Annuler",
+    "done": "Terminé",
+    "result": "Export réussi : {{days}} jour(s), {{tasks}} tâche(s), {{trips}} trajet(s).",
+    "errors": {
+      "failed": "Échec de l'export : le fichier n'a pas pu être écrit."
+    },
+    "unencryptedWarning": "Le fichier exporté n'est pas chiffré : conservez-le en lieu sûr et supprimez-le quand il n'est plus utile."
+  },
+  "commute": {
+    "menuItem": "Modes de déplacement",
+    "manager": {
+      "title": "Modes de déplacement",
+      "subtitle": "Enregistrez vos trajets réutilisables (ex. 30 km train + 5 km vélo).",
+      "empty": "Aucun mode enregistré pour l'instant.",
+      "add": "Ajouter",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "roundTripBadge": "aller-retour",
+      "deleteConfirmTitle": "Supprimer ce mode de déplacement ?",
+      "notFound": "Ce mode de déplacement n'existe plus."
+    },
+    "form": {
+      "addTitle": "Nouveau mode de déplacement",
+      "editTitle": "Modifier le mode de déplacement",
+      "subtitle": "Donnez un nom et ajoutez les segments du trajet (distance aller simple).",
+      "name": "Nom",
+      "roundTrip": "Aller-retour",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "cancel": "Annuler"
+    },
+    "segment": {
+      "type": "Transport",
+      "typePlaceholder": "Choisir un transport",
+      "distance": "Distance (km)",
+      "occupants": "Occupants",
+      "add": "Ajouter un segment",
+      "remove": "Supprimer le segment"
+    },
+    "categories": {
+      "car": "Voiture",
+      "active": "Vélo & marche",
+      "public_transport": "Transport en commun",
+      "rail": "Train",
+      "air": "Avion",
+      "other": "Autre"
+    },
+    "modes": {
+      "car_petrol": "Voiture — essence",
+      "car_diesel": "Voiture — diesel",
+      "car_average": "Voiture — motorisation moyenne",
+      "car_phev": "Voiture — hybride rechargeable",
+      "car_ev": "Voiture — électrique",
+      "taxi": "Taxi / VTC",
+      "walk": "À pied",
+      "bike": "Vélo musculaire",
+      "ebike": "Vélo électrique",
+      "escooter": "Trottinette électrique",
+      "scooter_elec": "Scooter électrique",
+      "public_transport": "Transport en commun",
+      "bus": "Bus urbain",
+      "coach": "Autocar longue distance",
+      "metro_tram": "Métro / tram",
+      "train_sncb": "Train Intercity (SNCB)",
+      "train_ter": "Train régional (TER)",
+      "train_hs_fr": "TGV",
+      "train_eurostar": "Eurostar",
+      "train_thalys": "Thalys",
+      "plane_domestic": "Avion — intérieur",
+      "plane_short": "Avion — court-courrier",
+      "plane_medium": "Avion — moyen-courrier",
+      "plane_long": "Avion — long-courrier",
+      "office_day": "Jour au bureau (énergie bâtiment)",
+      "home_day": "Jour télétravail (énergie domicile)"
+    },
+    "step": {
+      "title": "Choisissez un mode de déplacement.",
+      "none": "Aucun déplacement",
+      "custom": "Personnalisé",
+      "back": "Retour",
+      "confirm": "Confirmer"
+    },
+    "back": "Retour au calendrier",
+    "validation": {
+      "nameRequired": "Le nom est requis.",
+      "minSegment": "Ajoutez au moins un segment.",
+      "modeRequired": "Choisissez un transport pour chaque segment.",
+      "distancePositive": "La distance doit être supérieure à 0."
+    }
+  },
+  "licence": {
+    "menuItem": "Licence",
+    "title": "Licence d'utilisation",
+    "back": "Retour au calendrier",
+    "loading": "Chargement de la licence…",
+    "error": "Impossible de charger la licence."
+  },
+  "methodology": {
+    "menuItem": "Méthodologie & sources",
+    "title": "Méthodologie & sources du calcul CO₂",
+    "back": "Retour au calendrier",
+    "intro": "L'empreinte est calculée par jour de présence (bureau ou télétravail). Référentiel actif : {{year}} · forçage radiatif ×{{rf}}.",
+    "introGeneric": "L'empreinte est calculée par jour de présence (bureau ou télétravail), à partir d'un référentiel de facteurs d'émission versionné par année.",
+    "loading": "Chargement du référentiel…",
+    "error": "Impossible de charger le référentiel des facteurs.",
+    "noProfile": "Sélectionnez un profil pour afficher le référentiel des facteurs.",
+    "formula": {
+      "title": "Comment l'impact est calculé",
+      "tripTitle": "Par trajet (segment)",
+      "trip": "co2 = distance × facteur × (aller-retour ? 2 : 1) ÷ occupants",
+      "tripNote": "La distance est un aller simple ; l'aller-retour la double. La division par les occupants ne s'applique qu'aux facteurs « par véhicule » (covoiturage). Un mode inconnu retombe sur la voiture moyenne (résultat estimé).",
+      "dayTitle": "Total de la journée",
+      "day": "total = Σ trajets + énergie du bâtiment (si activée)",
+      "dayNote": "Les jours de congé et fériés valent toujours 0. L'énergie du bâtiment (bureau/télétravail) n'est ajoutée que si l'option est activée."
+    },
+    "params": {
+      "title": "Paramètres du calcul",
+      "radiativeForcing": "Forçage radiatif (aviation)",
+      "radiativeForcingDesc": "Les facteurs aériens incluent le forçage radiatif (×{{rf}} pour le millésime {{year}}). Le désactiver divise par ce multiplicateur pour ne garder que le CO₂ direct.",
+      "carpool": "Covoiturage",
+      "carpoolDesc": "L'empreinte d'un trajet en voiture est divisée par le nombre d'occupants.",
+      "roundTrip": "Aller-retour",
+      "roundTripDesc": "Double la distance du trajet.",
+      "building": "Énergie du bâtiment",
+      "buildingDesc": "Forfait quotidien optionnel (chauffage, électricité) ajouté aux jours bureau/télétravail, hors trajet.",
+      "gridCountry": "Pays de recharge",
+      "gridCountryDesc": "Pour la voiture électrique, l'empreinte dépend du mix électrique du pays de recharge.",
+      "year": "Millésime",
+      "yearDesc": "Le référentiel est versionné par année ; les jours déjà encodés gardent leur empreinte figée."
+    },
+    "table": {
+      "title": "Référentiel des facteurs d'émission",
+      "subtitle": "Millésime {{year}} — valeurs telles qu'utilisées par l'application.",
+      "mode": "Mode",
+      "value": "Facteur",
+      "scope": "Périmètre",
+      "source": "Source",
+      "categories": {
+        "car": "Voiture",
+        "active": "Vélo & marche",
+        "public_transport": "Transport en commun",
+        "rail": "Train",
+        "air": "Avion",
+        "building": "Énergie du bâtiment"
+      }
+    },
+    "examples": {
+      "title": "Exemples",
+      "car": "Voiture essence, {{km}} km aller-retour : {{km}} × 2 × {{factor}} = {{total}} kg",
+      "carpool": "Même trajet à 3 personnes (covoiturage) : ÷ 3 = {{total}} kg",
+      "train": "TGV, {{km}} km aller-retour : {{km}} × 2 × {{factor}} = {{total}} kg",
+      "plane": "Avion court-courrier, {{km}} km : {{km}} × {{factor}} = {{total}} kg (forçage radiatif inclus)"
+    },
+    "sources": {
+      "title": "Sources",
+      "intro": "Les facteurs proviennent de référentiels publics. Cliquez pour ouvrir la source dans votre navigateur."
+    },
+    "transparency": {
+      "title": "Transparence & limites",
+      "intro": "Choix de modélisation et écarts connus :",
+      "item1": "Les facteurs voiture thermique reprennent un millésime ADEME antérieur (l'outil 2025 actuel est plus bas) ; l'ordre de grandeur reste correct.",
+      "item2": "L'hybride rechargeable suppose un usage majoritairement électrique (estimation optimiste).",
+      "item3": "Le train SNCB reflète une donnée de traction historique ; le chiffre courant (électricité verte) est plus bas.",
+      "item4": "« Transport en commun (mix) » est une moyenne pondérée interne, pas un facteur ADEME publié.",
+      "item5": "Les facteurs aériens incluent le forçage radiatif ; le moyen-courrier est une interpolation (pas de bande DEFRA dédiée)."
+    }
+  },
+  "updater": {
+    "availableTitle": "Mise à jour disponible — v{{version}}",
+    "availableBody": "Version actuelle : {{current}}",
+    "download": "Télécharger et installer",
+    "downloading": "Téléchargement… {{percent}}%",
+    "installed": "Mise à jour installée",
+    "restart": "Redémarrer maintenant",
+    "later": "Plus tard",
+    "checking": "Vérification des mises à jour…",
+    "upToDate": "Vous êtes à jour",
+    "error": "Échec de la vérification",
+    "badgeUpToDate": "Version {{version}} — à jour",
+    "badgeOutdated": "Mise à jour disponible — v{{version}}",
+    "packageManaged": "Cette installation est gérée par pacman. Pour mettre à jour, lancez :"
+  },
+  "workHours": {
+    "encodeButton": "Encoder les heures",
+    "title": "Heures de la journée",
+    "back": "Retour au calendrier",
+    "notEligible": "Ce jour n'est pas un jour de travail encodé.",
+    "totalLabel": "au total",
+    "emptyHint": "Ajoutez une tâche pour remplir l'anneau.",
+    "saving": "Enregistrement…",
+    "note": {
+      "title": "Notes du jour",
+      "empty": "Ajouter une note…",
+      "placeholder": "Écrivez votre journée en Markdown — # Titre, **gras**, listes…",
+      "edit": "Modifier",
+      "done": "Terminé"
+    },
+    "presets": {
+      "title": "Tâches enregistrées",
+      "empty": "Aucune tâche enregistrée pour l'instant.",
+      "add": "Nouvelle tâche",
+      "edit": "Modifier la tâche",
+      "delete": "Supprimer la tâche",
+      "hint": "Cette tâche sera réutilisable pour les prochaines journées."
+    },
+    "custom": {
+      "add": "Tâche ponctuelle",
+      "hint": "Cette tâche est ajoutée à la journée sans être enregistrée."
+    },
+    "form": {
+      "title": "Titre",
+      "description": "Description",
+      "duration": "Durée",
+      "color": "Couleur",
+      "customColor": "Couleur personnalisée",
+      "save": "Enregistrer",
+      "add": "Ajouter",
+      "cancel": "Annuler"
+    },
+    "entries": {
+      "title": "Déroulé de la journée",
+      "empty": "Aucune tâche encodée pour cette journée.",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "remove": "Retirer"
+    },
+    "schedule": {
+      "start": "Début de journée",
+      "startHint": "Tapez une heure (ex. 8h30) — flèches ↑/↓ pour ajuster par 5 min, Shift pour 1 h",
+      "end": "Fin de journée"
+    }
+  },
+  "startup": {
+    "title": "BasicPresence ne peut pas démarrer",
+    "keychain": "Le trousseau sécurisé du système est indisponible. Sous Linux, un service Secret Service (GNOME Keyring ou KWallet) doit être démarré et déverrouillé. Démarrez-le, puis relancez BasicPresence.",
+    "keystoreLost": "La clé de cet appareil est introuvable ou a changé dans le trousseau du système : les données ne peuvent pas être déverrouillées. Restaurez l'entrée « com.godef.basic-presence » du trousseau, puis relancez BasicPresence. Vos fichiers n'ont pas été modifiés.",
+    "generic": "Les données locales de BasicPresence sont inaccessibles.",
+    "detail": "Détail technique : {{detail}}",
+    "quit": "Quitter"
+  }
+}

@@ -27,6 +27,10 @@ ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained: via tauri-plugin-opener (zbus 5)" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained: via tauri-plugin-opener (zbus 5)" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained: via tauri-plugin-opener (zbus 5)" },
+    # Slint UI (portage, voir documentation/portage-slint.md) : crates non
+    # maintenues sans faille, pas de correctif amont.
+    { id = "RUSTSEC-2026-0441", reason = "pin-utils unmaintained: via spin_on in slint-macros, build time only" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser unmaintained: winit/sctk-adwaita window decorations, parses only system/embedded fonts" },
 ]
 
 [licenses]
@@ -47,6 +51,11 @@ allow = [
     "0BSD",
     "Unlicense",
     "CDLA-Permissive-2.0",
+    # Boost licence (permissive): clipboard-win / error-code, via Slint's winit backend.
+    "BSL-1.0",
+    # Slint UI toolkit, used under its royalty-free licence for desktop apps:
+    # requires the AboutSlint attribution (see documentation/portage-slint.md).
+    "LicenseRef-Slint-Royalty-free-2.0",
 ]
 
 [[licenses.clarify]]

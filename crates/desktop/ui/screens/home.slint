@@ -1,0 +1,51 @@
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Card } from "../components/card.slint";
+
+// Temporary home shown after login until the real screens are ported (S4+).
+export component HomeScreen inherits Rectangle {
+    in property <string> username;
+    in property <int> profile-count;
+    callback logout();
+
+    background: Theme.background;
+
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            width: min(440px, root.width - 32px);
+            Card {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+                    Text {
+                        text: @tr("home.signedInAs", root.username);
+                        font-size: Theme.text-lg;
+                        font-weight: 600;
+                        color: Theme.foreground;
+                    }
+                    Text {
+                        text: @tr("home.profiles", root.profile-count);
+                        font-size: Theme.text-sm;
+                        color: Theme.foreground;
+                    }
+                    Text {
+                        text: @tr("home.portInProgress");
+                        wrap: word-wrap;
+                        font-size: Theme.text-sm;
+                        color: Theme.muted-foreground;
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        Button {
+                            variant: ButtonVariant.outline;
+                            text: @tr("home.logout");
+                            clicked => { root.logout(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

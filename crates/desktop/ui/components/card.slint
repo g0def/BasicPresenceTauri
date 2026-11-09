@@ -1,0 +1,13 @@
+import { Theme } from "../theme.slint";
+
+// Surface with the theme's card colors, a hairline border and a soft shadow.
+export component Card inherits Rectangle {
+    background: Theme.card;
+    border-radius: Theme.radius-xl;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: 16px;
+    drop-shadow-offset-y: 4px;
+    drop-shadow-color: Theme.dark ? #00000060 : #0000001a;
+    @children
+}

@@ -1,0 +1,524 @@
+{
+  "common": {
+    "loading": "Loading…"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "unknown": "An unknown error occurred",
+    "loginFailed": "Sign-in failed",
+    "registerFailed": "Account creation failed",
+    "codes": {
+      "INVALID_CREDENTIALS": "Invalid credentials",
+      "ACCOUNT_LOCKED": "Account locked. Try again in {{seconds}} s.",
+      "ACCOUNT_EXISTS": "An account already exists on this device",
+      "SESSION_EXPIRED": "Session expired. Please sign in again.",
+      "NOT_FOUND": "Item not found",
+      "VALIDATION": "Invalid data: {{detail}}",
+      "KEYSTORE_UNRECOVERABLE": "This device's secure key is missing or has changed: the encrypted local storage cannot be opened.",
+      "VAULT_TAMPERED": "The encrypted storage failed its integrity check: the file was modified.",
+      "EXPORT_FAILED": "Export failed: the file could not be written.",
+      "INTERNAL": "Internal error"
+    }
+  },
+  "auth": {
+    "loginSubtitle": "Enter your password to unlock your data.",
+    "registerSubtitle": "First time here: create your owner account.",
+    "username": "Username",
+    "password": "Password",
+    "submitting": "Please wait…",
+    "submitRegister": "Create account",
+    "submitLogin": "Sign in",
+    "tagline": "Track your presence, measure your carbon footprint.",
+    "carbon": "CO₂",
+    "local": "100% local · encrypted",
+    "noRecoveryWarning": "Your data is encrypted with this password: if you lose it, the data cannot be recovered. Keep it somewhere safe (a password manager).",
+    "changePassword": {
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm the new password",
+      "submit": "Change password",
+      "done": "Password changed.",
+      "mismatch": "The two new passwords do not match.",
+      "tooShort": "The password must be at least {{min}} characters long."
+    },
+    "securityNotice": {
+      "title": "Since your last sign-in",
+      "failedAttempts_one": "{{count}} failed sign-in attempt",
+      "failedAttempts_other": "{{count}} failed sign-in attempts",
+      "dismiss": "Got it",
+      "kinds": {
+        "account_locked": "Account locked after too many attempts",
+        "unclean_shutdown": "The app stopped without closing cleanly (crash, power loss)",
+        "tamper_detected": "A modification of the encrypted storage was detected",
+        "tamper_tolerated": "A modification of the encrypted storage was tolerated",
+        "password_changed": "Password changed"
+      }
+    }
+  },
+  "home": {
+    "logout": "Log out",
+    "signedInAs": "Signed in as {{name}}",
+    "profiles": "Profiles on this device: {{count}}",
+    "portInProgress": "The app screens arrive in the next steps of the port."
+  },
+  "session": {
+    "label": "Session: {{time}}",
+    "tooltip": "Time left before automatic logout"
+  },
+  "language": {
+    "label": "Language",
+    "fr": "Français",
+    "en": "English"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "dark": "Dark mode",
+    "light": "Light mode"
+  },
+  "cellDisplay": {
+    "label": "Calendar display",
+    "co2": "Emissions (kgCO2)",
+    "hours": "Work hours"
+  },
+  "noteFont": {
+    "label": "Notes font",
+    "sans": "Sans",
+    "serif": "Serif",
+    "mono": "Monospace"
+  },
+  "settings": {
+    "menuItem": "Settings",
+    "title": "Settings",
+    "back": "Back to calendar",
+    "profilesSection": "Profiles",
+    "logHourSection": "Work hours",
+    "defaultStartTime": "Default start time",
+    "defaultStartTimeHint": "Time applied automatically to each new worked day (office or remote).",
+    "noteFontSection": "Note font",
+    "cellDisplaySection": "Cell display",
+    "co2Section": "CO2 configuration",
+    "co2": {
+      "gridCountry": "Electricity grid country",
+      "carOccupancy": "Car occupants (default)",
+      "radiativeForcing": "Include radiative forcing (aviation)",
+      "countries": {
+        "FR": "France",
+        "BE": "Belgium",
+        "DE": "Germany",
+        "EU": "Europe"
+      }
+    },
+    "securitySection": "Security"
+  },
+  "profile": {
+    "menu": "Account menu",
+    "emptyTitle": "No profile",
+    "emptySubtitle": "Create a profile to start managing your presence.",
+    "add": "Add a profile",
+    "edit": "Edit profile",
+    "delete": "Delete profile",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "addTitle": "New profile",
+    "editTitle": "Edit profile",
+    "formSubtitle": "Fill in the profile details.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "enterprise": "Company",
+    "poste": "Role",
+    "optional": "(optional)",
+    "profilesLabel": "Profiles",
+    "active": "Active",
+    "deleteConfirmTitle": "Delete this profile?",
+    "deleteConfirmBody": "The profile \"{{name}}\" will be permanently deleted."
+  },
+  "presence": {
+    "chooseType": "Choose a presence type for this day.",
+    "delete": "Delete",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "copyMode": {
+      "start": "Copy a day",
+      "pick": "Pick the day to copy",
+      "paste": "Click days to fill — click to exit",
+      "help": "Quickly fill the calendar: pick an already-encoded day to copy it (type, commute, schedule and tasks), then click empty days to paste the same setup onto them.",
+      "replaceTitle": "Replace this day?",
+      "replaceBody": "This day is already encoded. Replace it with the copied day? Subsequent already-filled days will then be replaced without confirmation.",
+      "replaceConfirm": "Replace",
+      "replaceCancel": "Cancel"
+    },
+    "types": {
+      "office": "Office",
+      "remote": "Remote",
+      "vacation": "Vacation",
+      "holiday": "Holiday"
+    }
+  },
+  "summary": {
+    "hoursWorked": "{{hours}}",
+    "co2Emitted": "{{co2}}",
+    "hoursWorkedTooltip": "Total hours worked for the displayed month",
+    "co2EmittedTooltip": "Estimated CO₂ emissions from your commutes for the displayed month"
+  },
+  "stats": {
+    "open": "Statistics",
+    "title": "Statistics",
+    "back": "Back to calendar",
+    "co2Title": "CO₂ emissions",
+    "hoursTitle": "Hours worked",
+    "breakdownTitle": "Day breakdown",
+    "average": "Average",
+    "weekLabel": "W{{week}}",
+    "empty": "No data to display yet.",
+    "from": "From",
+    "to": "to",
+    "granularity": {
+      "month": "By month",
+      "week": "By week"
+    }
+  },
+  "transfer": {
+    "section": "Profile sharing (.json)",
+    "sectionHint": "Export your profile to a .json file to send it to someone, or import a profile you received.",
+    "fields": {
+      "includeDays": "Presences (days)",
+      "includeTrips": "Trips",
+      "includeWorkHours": "Hours & tasks",
+      "includeNotes": "Notes",
+      "includeTaskPresets": "Task presets",
+      "includeCommutes": "Saved commutes",
+      "includeSettings": "Profile settings"
+    },
+    "export": {
+      "menuItem": "Export profile (.json)",
+      "title": "Export profile",
+      "description": "Produces a shareable .json file. Tick the data to include.",
+      "fileBaseName": "profile",
+      "exportButton": "Export",
+      "exporting": "Exporting…",
+      "cancel": "Cancel",
+      "done": "Done",
+      "result": "Profile exported: {{days}} day(s), {{trips}} trip(s), {{workEntries}} task(s), {{notes}} note(s), {{taskPresets}} preset(s), {{commutes}} saved commute(s).",
+      "resultSettings": "Settings included."
+    },
+    "import": {
+      "menuItem": "Import profile (.json)",
+      "title": "Import profile",
+      "description": "Select a profile file (.json) exported from the app.",
+      "chooseFile": "Choose a file…",
+      "importing": "Importing…",
+      "importButton": "Import",
+      "cancel": "Cancel",
+      "done": "Done",
+      "fileFrom": "File from \"{{name}}\"",
+      "categoriesHeading": "Data to import",
+      "incompatible": "This file was created by a newer version of the app and cannot be imported.",
+      "unknownModes": "{{count}} unknown transport mode(s): the footprint is kept, but those days won't be editable.",
+      "target": {
+        "heading": "Destination",
+        "new": "New profile",
+        "existing": "Merge into an existing profile",
+        "selectProfile": "Choose a profile"
+      },
+      "conflict": {
+        "heading": "If days already exist in this profile:",
+        "skip": "Skip existing",
+        "replace": "Replace existing"
+      },
+      "result": "Profile imported. Days: {{imported}} added, {{replaced}} replaced, {{skipped}} skipped."
+    }
+  },
+  "export": {
+    "menuItem": "Export data",
+    "title": "Export data",
+    "description": "Generates an OpenDocument (.ods) file you can open in Excel or LibreOffice, with one sheet per data type.",
+    "fileBaseName": "presence",
+    "fields": {
+      "includeCarbon": "Carbon footprint (CO₂ and estimation)",
+      "includeHours": "Worked hours",
+      "includeTasks": "Daily tasks",
+      "includeTrips": "Trips (daily summary + commute details)",
+      "includeNotes": "Notes",
+      "includeTimestamps": "Created and updated dates"
+    },
+    "sheet": {
+      "presences": "Presence",
+      "tasks": "Tasks",
+      "trips": "Trips",
+      "notes": "Notes",
+      "yes": "Yes",
+      "no": "No",
+      "trip": {
+        "join": " + ",
+        "unitKm": "km",
+        "roundTripSuffix": "(round trip)",
+        "oneWaySuffix": "(one way)"
+      },
+      "cols": {
+        "date": "Date",
+        "type": "Type",
+        "co2": "CO₂ (kg)",
+        "estimated": "Estimated",
+        "tripSummary": "Commute",
+        "hours": "Hours",
+        "created": "Created",
+        "updated": "Updated",
+        "title": "Title",
+        "description": "Description",
+        "minutes": "Minutes",
+        "color": "Color",
+        "order": "Order",
+        "mode": "Mode (code)",
+        "modeLabel": "Mode (label)",
+        "distanceOneWay": "One-way distance (km)",
+        "roundTrip": "Round trip",
+        "distanceCounted": "Counted distance (km)",
+        "occupants": "Occupants",
+        "factorYear": "Factor year",
+        "note": "Note"
+      }
+    },
+    "exportButton": "Export",
+    "exporting": "Exporting…",
+    "cancel": "Cancel",
+    "done": "Done",
+    "result": "Export complete: {{days}} day(s), {{tasks}} task(s), {{trips}} trip(s).",
+    "errors": {
+      "failed": "Export failed: the file could not be written."
+    },
+    "unencryptedWarning": "The exported file is not encrypted: keep it somewhere safe and delete it once you no longer need it."
+  },
+  "commute": {
+    "menuItem": "Commute modes",
+    "manager": {
+      "title": "Commute modes",
+      "subtitle": "Save your reusable trips (e.g. 30 km train + 5 km bike).",
+      "empty": "No commute mode saved yet.",
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "roundTripBadge": "round trip",
+      "deleteConfirmTitle": "Delete this commute mode?",
+      "notFound": "This commute no longer exists."
+    },
+    "form": {
+      "addTitle": "New commute mode",
+      "editTitle": "Edit commute mode",
+      "subtitle": "Name it and add the trip segments (one-way distance).",
+      "name": "Name",
+      "roundTrip": "Round trip",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "segment": {
+      "type": "Transport",
+      "typePlaceholder": "Choose a transport",
+      "distance": "Distance (km)",
+      "occupants": "Occupants",
+      "add": "Add a segment",
+      "remove": "Remove segment"
+    },
+    "categories": {
+      "car": "Car",
+      "active": "Bike & walk",
+      "public_transport": "Public transport",
+      "rail": "Train",
+      "air": "Plane",
+      "other": "Other"
+    },
+    "modes": {
+      "car_petrol": "Car — petrol",
+      "car_diesel": "Car — diesel",
+      "car_average": "Car — average engine",
+      "car_phev": "Car — plug-in hybrid",
+      "car_ev": "Car — electric",
+      "taxi": "Taxi / ride-hailing",
+      "walk": "Walking",
+      "bike": "Bicycle",
+      "ebike": "Electric bike",
+      "escooter": "Electric scooter",
+      "scooter_elec": "Electric moped",
+      "public_transport": "Public transport",
+      "bus": "City bus",
+      "coach": "Long-distance coach",
+      "metro_tram": "Metro / tram",
+      "train_sncb": "Intercity train (SNCB)",
+      "train_ter": "Regional train (TER)",
+      "train_hs_fr": "High-speed train (TGV)",
+      "train_eurostar": "Eurostar",
+      "train_thalys": "Thalys",
+      "plane_domestic": "Plane — domestic",
+      "plane_short": "Plane — short-haul",
+      "plane_medium": "Plane — medium-haul",
+      "plane_long": "Plane — long-haul",
+      "office_day": "Office day (building energy)",
+      "home_day": "Remote day (home energy)"
+    },
+    "step": {
+      "title": "Choose a commute mode.",
+      "none": "No trip",
+      "custom": "Custom",
+      "back": "Back",
+      "confirm": "Confirm"
+    },
+    "back": "Back to calendar",
+    "validation": {
+      "nameRequired": "Name is required.",
+      "minSegment": "Add at least one segment.",
+      "modeRequired": "Choose a transport for each segment.",
+      "distancePositive": "Distance must be greater than 0."
+    }
+  },
+  "licence": {
+    "menuItem": "License",
+    "title": "Software license",
+    "back": "Back to calendar",
+    "loading": "Loading the license…",
+    "error": "Could not load the license."
+  },
+  "methodology": {
+    "menuItem": "Methodology & sources",
+    "title": "CO₂ calculation methodology & sources",
+    "back": "Back to calendar",
+    "intro": "The footprint is computed per presence day (office or remote). Active referential: {{year}} · radiative forcing ×{{rf}}.",
+    "introGeneric": "The footprint is computed per presence day (office or remote), from a year-versioned referential of emission factors.",
+    "loading": "Loading the referential…",
+    "error": "Could not load the emission-factor referential.",
+    "noProfile": "Select a profile to display the emission-factor referential.",
+    "formula": {
+      "title": "How the impact is computed",
+      "tripTitle": "Per trip (segment)",
+      "trip": "co2 = distance × factor × (round trip ? 2 : 1) ÷ occupants",
+      "tripNote": "Distance is one-way; a round trip doubles it. The division by occupants only applies to per-vehicle factors (carpooling). An unknown mode falls back to the average car (estimated result).",
+      "dayTitle": "Day total",
+      "day": "total = Σ trips + building energy (if enabled)",
+      "dayNote": "Vacation and holiday days are always 0. Building energy (office/remote) is added only when the option is enabled."
+    },
+    "params": {
+      "title": "Calculation parameters",
+      "radiativeForcing": "Radiative forcing (aviation)",
+      "radiativeForcingDesc": "Aviation factors include radiative forcing (×{{rf}} for the {{year}} referential). Disabling it divides by this multiplier to keep direct CO₂ only.",
+      "carpool": "Carpooling",
+      "carpoolDesc": "A car trip's footprint is divided by the number of occupants.",
+      "roundTrip": "Round trip",
+      "roundTripDesc": "Doubles the trip distance.",
+      "building": "Building energy",
+      "buildingDesc": "Optional daily amount (heating, electricity) added to office/remote days, excluding the commute.",
+      "gridCountry": "Charging country",
+      "gridCountryDesc": "For electric cars, the footprint depends on the charging country's electricity mix.",
+      "year": "Referential year",
+      "yearDesc": "The referential is versioned by year; already-encoded days keep their frozen footprint."
+    },
+    "table": {
+      "title": "Emission-factor referential",
+      "subtitle": "Year {{year}} — values exactly as used by the app.",
+      "mode": "Mode",
+      "value": "Factor",
+      "scope": "Scope",
+      "source": "Source",
+      "categories": {
+        "car": "Car",
+        "active": "Bike & walking",
+        "public_transport": "Public transport",
+        "rail": "Train",
+        "air": "Plane",
+        "building": "Building energy"
+      }
+    },
+    "examples": {
+      "title": "Examples",
+      "car": "Petrol car, {{km}} km round trip: {{km}} × 2 × {{factor}} = {{total}} kg",
+      "carpool": "Same trip with 3 people (carpool): ÷ 3 = {{total}} kg",
+      "train": "High-speed train, {{km}} km round trip: {{km}} × 2 × {{factor}} = {{total}} kg",
+      "plane": "Short-haul flight, {{km}} km: {{km}} × {{factor}} = {{total}} kg (radiative forcing included)"
+    },
+    "sources": {
+      "title": "Sources",
+      "intro": "Factors come from public referentials. Click to open the source in your browser."
+    },
+    "transparency": {
+      "title": "Transparency & limitations",
+      "intro": "Modelling choices and known gaps:",
+      "item1": "Combustion-car factors use an earlier ADEME vintage (the current 2025 tool is lower); the order of magnitude remains correct.",
+      "item2": "The plug-in hybrid assumes mostly-electric usage (optimistic estimate).",
+      "item3": "The SNCB train reflects a historical traction figure; the current value (green electricity) is lower.",
+      "item4": "\"Public transport (mix)\" is an internal weighted average, not a published ADEME factor.",
+      "item5": "Aviation factors include radiative forcing; medium-haul is an interpolation (no dedicated DEFRA band)."
+    }
+  },
+  "updater": {
+    "availableTitle": "Update available — v{{version}}",
+    "availableBody": "Current version: {{current}}",
+    "download": "Download & install",
+    "downloading": "Downloading… {{percent}}%",
+    "installed": "Update installed",
+    "restart": "Restart now",
+    "later": "Later",
+    "checking": "Checking for updates…",
+    "upToDate": "You are up to date",
+    "error": "Update check failed",
+    "badgeUpToDate": "Version {{version}} — up to date",
+    "badgeOutdated": "Update available — v{{version}}",
+    "packageManaged": "This installation is managed by pacman. To update, run:"
+  },
+  "workHours": {
+    "encodeButton": "Log hours",
+    "title": "Hours of the day",
+    "back": "Back to calendar",
+    "notEligible": "This day is not an encoded work day.",
+    "totalLabel": "total",
+    "emptyHint": "Add a task to fill the ring.",
+    "saving": "Saving…",
+    "note": {
+      "title": "Day notes",
+      "empty": "Add a note…",
+      "placeholder": "Write your day in Markdown — # Heading, **bold**, lists…",
+      "edit": "Edit",
+      "done": "Done"
+    },
+    "presets": {
+      "title": "Saved tasks",
+      "empty": "No saved tasks yet.",
+      "add": "New task",
+      "edit": "Edit task",
+      "delete": "Delete task",
+      "hint": "This task will be reusable on future days."
+    },
+    "custom": {
+      "add": "One-off task",
+      "hint": "This task is added to the day without being saved."
+    },
+    "form": {
+      "title": "Title",
+      "description": "Description",
+      "duration": "Duration",
+      "color": "Color",
+      "customColor": "Custom color",
+      "save": "Save",
+      "add": "Add",
+      "cancel": "Cancel"
+    },
+    "entries": {
+      "title": "Day timeline",
+      "empty": "No tasks logged for this day.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove"
+    },
+    "schedule": {
+      "start": "Start of day",
+      "startHint": "Type a time (e.g. 8:30) — ↑/↓ arrows adjust by 5 min, Shift for 1 h",
+      "end": "End of day"
+    }
+  },
+  "startup": {
+    "title": "BasicPresence cannot start",
+    "keychain": "The system's secure keychain is unavailable. On Linux, a Secret Service provider (GNOME Keyring or KWallet) must be running and unlocked. Start it, then relaunch BasicPresence.",
+    "keystoreLost": "This device's key is missing or has changed in the system keychain: the data cannot be unlocked. Restore the “com.godef.basic-presence” keychain entry, then relaunch BasicPresence. Your files were not modified.",
+    "generic": "BasicPresence's local data is not accessible.",
+    "detail": "Technical detail: {{detail}}",
+    "quit": "Quit"
+  }
+}

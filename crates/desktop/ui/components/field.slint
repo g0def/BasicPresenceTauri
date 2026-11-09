@@ -1,0 +1,33 @@
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+// Labelled single-line text field.
+export component Field inherits VerticalLayout {
+    in property <string> label;
+    in property <InputType> input-type: InputType.text;
+    in property <bool> enabled: true;
+    in-out property <string> text <=> edit.text;
+    callback edited(string);
+    callback accepted(string);
+
+    spacing: 6px;
+
+    Text {
+        text: root.label;
+        font-size: Theme.text-sm;
+        font-weight: 500;
+        color: Theme.foreground;
+    }
+
+    edit := LineEdit {
+        input-type: root.input-type;
+        enabled: root.enabled;
+        accessible-label: root.label;
+        edited(text) => { root.edited(text); }
+        accepted(text) => { root.accepted(text); }
+    }
+
+    public function focus-input() {
+        edit.focus();
+    }
+}

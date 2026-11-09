@@ -1,0 +1,116 @@
+// Root of the BasicPresence UI. Rust drives it through the `AppState` global
+// (state in, user intents out as callbacks); screens stay presentational.
+
+import "../assets/fonts/JetBrainsMono-Regular.ttf";
+import "../assets/fonts/JetBrainsMono-SemiBold.ttf";
+import { Palette } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { LoginScreen } from "screens/login.slint";
+import { HomeScreen } from "screens/home.slint";
+import { StartupErrorScreen } from "screens/startup-error.slint";
+
+export { Theme }
+
+export enum Screen { loading, login, home, startup-error }
+
+export global AppState {
+    in-out property <Screen> screen: Screen.loading;
+    /// Active UI language ("fr" or "en").
+    in-out property <string> lang: "fr";
+
+    // --- Authentication ---
+    in property <bool> account-exists: true;
+    in property <bool> busy;
+    /// Error to show, as a backend code + argument (see `error-text`).
+    in-out property <string> error-code;
+    in-out property <string> error-arg;
+    in property <string> username;
+    in property <int> profile-count;
+
+    // --- Startup failure ---
+    /// "keychain", "keystore-lost" or "generic".
+    in property <string> startup-reason;
+    in property <string> startup-detail;
+
+    callback login(string, string);
+    callback register(string, string);
+    callback logout();
+    callback set-lang(string);
+    callback quit();
+
+    /// Localized text of a backend error code (`AppError` codes).
+    public pure function error-text(code: string, arg: string) -> string {
+        if (code == "") { return ""; }
+        if (code == "INVALID_CREDENTIALS") { return @tr("errors.codes.INVALID_CREDENTIALS"); }
+        if (code == "ACCOUNT_LOCKED") { return @tr("errors.codes.ACCOUNT_LOCKED", arg); }
+        if (code == "ACCOUNT_EXISTS") { return @tr("errors.codes.ACCOUNT_EXISTS"); }
+        if (code == "SESSION_EXPIRED") { return @tr("errors.codes.SESSION_EXPIRED"); }
+        if (code == "NOT_FOUND") { return @tr("errors.codes.NOT_FOUND"); }
+        if (code == "VALIDATION") { return @tr("errors.codes.VALIDATION", arg); }
+        if (code == "KEYSTORE_UNRECOVERABLE") { return @tr("errors.codes.KEYSTORE_UNRECOVERABLE"); }
+        if (code == "VAULT_TAMPERED") { return @tr("errors.codes.VAULT_TAMPERED"); }
+        if (code == "EXPORT_FAILED") { return @tr("errors.codes.EXPORT_FAILED"); }
+        return @tr("errors.codes.INTERNAL");
+    }
+
+    public pure function startup-text(reason: string) -> string {
+        if (reason == "keychain") { return @tr("startup.keychain"); }
+        if (reason == "keystore-lost") { return @tr("startup.keystoreLost"); }
+        return @tr("startup.generic");
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Basic Presence";
+    icon: @image-url("../assets/icons/icon-512.png");
+    preferred-width: 1100px;
+    preferred-height: 800px;
+    min-width: 420px;
+    min-height: 560px;
+    background: Theme.background;
+    default-font-size: Theme.text-sm;
+
+    // Follow the OS color scheme at startup, then pin the std widgets' scheme
+    // to `Theme.dark` (otherwise they could switch alone when the OS reports
+    // its scheme late, and render dark widgets on a light page).
+    init => {
+        Theme.dark = Palette.color-scheme == ColorScheme.dark;
+        Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light;
+    }
+    property <bool> dark: Theme.dark;
+    changed dark => {
+        Palette.color-scheme = self.dark ? ColorScheme.dark : ColorScheme.light;
+    }
+
+    if AppState.screen == Screen.login: LoginScreen {
+        register-mode: !AppState.account-exists;
+        busy: AppState.busy;
+        error: AppState.error-text(AppState.error-code, AppState.error-arg);
+        lang: AppState.lang;
+        submit(user, password) => {
+            if (AppState.account-exists) {
+                AppState.login(user, password);
+            } else {
+                AppState.register(user, password);
+            }
+        }
+        edited => {
+            AppState.error-code = "";
+            AppState.error-arg = "";
+        }
+        toggle-theme => { Theme.dark = !Theme.dark; }
+        set-lang(lang) => { AppState.set-lang(lang); }
+    }
+
+    if AppState.screen == Screen.home: HomeScreen {
+        username: AppState.username;
+        profile-count: AppState.profile-count;
+        logout => { AppState.logout(); }
+    }
+
+    if AppState.screen == Screen.startup-error: StartupErrorScreen {
+        reason: AppState.startup-text(AppState.startup-reason);
+        detail: AppState.startup-detail;
+        quit => { AppState.quit(); }
+    }
+}

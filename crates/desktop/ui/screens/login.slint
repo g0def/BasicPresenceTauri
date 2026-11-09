@@ -1,0 +1,158 @@
+import { ComboBox } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Card } from "../components/card.slint";
+import { Field } from "../components/field.slint";
+
+// Login / first-run registration (port of `features/auth/.../login-page.tsx`).
+// The password field is cleared as soon as it is submitted.
+export component LoginScreen inherits Rectangle {
+    in property <bool> register-mode;
+    in property <bool> busy;
+    in property <string> error;
+    in property <string> lang;
+    callback submit(string, string);
+    callback edited();
+    callback toggle-theme();
+    callback set-lang(string);
+
+    background: Theme.background;
+
+    function do-submit() {
+        if (root.busy || username.text == "" || password.text == "") {
+            return;
+        }
+        root.submit(username.text, password.text);
+        password.text = "";
+    }
+
+    init => { username.focus-input(); }
+
+    // Language & theme switches.
+    HorizontalLayout {
+        x: parent.width - self.width - 16px;
+        y: 16px;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        spacing: 8px;
+        ComboBox {
+            width: 130px;
+            accessible-label: @tr("language.label");
+            model: [@tr("language.fr"), @tr("language.en")];
+            current-index: root.lang == "en" ? 1 : 0;
+            selected(value) => { root.set-lang(self.current-index == 1 ? "en" : "fr"); }
+        }
+        Button {
+            variant: ButtonVariant.ghost;
+            text: Theme.dark ? @tr("theme.light") : @tr("theme.dark");
+            clicked => { root.toggle-theme(); }
+        }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            width: min(380px, root.width - 32px);
+            spacing: 20px;
+
+            Card {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+
+                    // Header: logo, name, subtitle.
+                    VerticalLayout {
+                        spacing: 8px;
+                        alignment: center;
+                        HorizontalLayout {
+                            alignment: center;
+                            Image {
+                                width: 80px;
+                                height: 80px;
+                                source: Theme.dark ? @image-url("../../assets/icons/icon-512-dark.png") : @image-url("../../assets/icons/icon-512.png");
+                                accessible-role: none;
+                            }
+                        }
+                        Text {
+                            text: "Basic Presence";
+                            horizontal-alignment: center;
+                            font-family: Theme.brand-font;
+                            font-size: Theme.text-lg;
+                            font-weight: 600;
+                            color: Theme.foreground;
+                        }
+                        Text {
+                            text: root.register-mode ? @tr("auth.registerSubtitle") : @tr("auth.loginSubtitle");
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                            font-size: Theme.text-sm;
+                            color: Theme.muted-foreground;
+                        }
+                    }
+
+                    username := Field {
+                        label: @tr("auth.username");
+                        enabled: !root.busy;
+                        edited => { root.edited(); }
+                        accepted => { password.focus-input(); }
+                    }
+
+                    password := Field {
+                        label: @tr("auth.password");
+                        input-type: InputType.password;
+                        enabled: !root.busy;
+                        edited => { root.edited(); }
+                        accepted => { root.do-submit(); }
+                    }
+
+                    if root.register-mode: Text {
+                        text: @tr("auth.noRecoveryWarning");
+                        wrap: word-wrap;
+                        font-size: Theme.text-xs;
+                        color: Theme.muted-foreground;
+                    }
+
+                    if root.error != "": Text {
+                        text: root.error;
+                        wrap: word-wrap;
+                        font-size: Theme.text-sm;
+                        color: Theme.destructive;
+                        accessible-role: text;
+                    }
+
+                    Button {
+                        text: root.busy ? @tr("auth.submitting")
+                            : root.register-mode ? @tr("auth.submitRegister") : @tr("auth.submitLogin");
+                        enabled: !root.busy && username.text != "" && password.text != "";
+                        clicked => { root.do-submit(); }
+                    }
+                }
+            }
+
+            // Tagline and the "local & encrypted" promise.
+            VerticalLayout {
+                spacing: 8px;
+                Text {
+                    text: @tr("auth.tagline");
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                    font-size: Theme.text-sm;
+                    color: Theme.muted-foreground;
+                }
+                Text {
+                    text: @tr("presence.types.remote") + "  ·  " + @tr("presence.types.office") + "  ·  " + @tr("auth.carbon");
+                    horizontal-alignment: center;
+                    font-size: Theme.text-xs;
+                    color: Theme.muted-foreground;
+                }
+                Text {
+                    text: @tr("auth.local");
+                    horizontal-alignment: center;
+                    font-size: 11px;
+                    color: Theme.muted-foreground;
+                }
+            }
+        }
+    }
+}
