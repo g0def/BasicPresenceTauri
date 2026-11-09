@@ -1,0 +1,22 @@
+import { Theme } from "../theme.slint";
+
+// Page not ported yet.
+export component PlaceholderPage inherits Rectangle {
+    in property <string> title;
+    VerticalLayout {
+        alignment: center;
+        spacing: 8px;
+        Text {
+            text: root.title;
+            horizontal-alignment: center;
+            font-size: Theme.text-xl;
+            font-weight: 600;
+            color: Theme.foreground;
+        }
+        Text {
+            text: @tr("home.portInProgress");
+            horizontal-alignment: center;
+            color: Theme.muted-foreground;
+        }
+    }
+}

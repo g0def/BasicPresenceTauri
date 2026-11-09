@@ -1,0 +1,75 @@
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Field } from "../components/field.slint";
+import { Modal } from "../components/modal.slint";
+import { AppState, ProfileState, ProfileItem } from "../state.slint";
+
+// Create / edit a profile (port of `profile-form-dialog.tsx`).
+export component ProfileFormDialog inherits Modal {
+    /// Profile being edited; an empty id means creation.
+    in property <ProfileItem> profile;
+
+    property <bool> is-edit: root.profile.id != "";
+    property <bool> valid: first.text != "" && last.text != "" && enterprise.text != "";
+
+    title: root.is-edit ? @tr("profile.editTitle") : @tr("profile.addTitle");
+    description: @tr("profile.formSubtitle");
+    dismissable: !ProfileState.busy;
+    close => { ProfileState.form-open = false; }
+
+    function submit() {
+        if (!root.valid || ProfileState.busy) { return; }
+        ProfileState.save(root.profile.id, first.text, last.text, enterprise.text, poste.text);
+    }
+
+    init => {
+        first.text = root.profile.first-name;
+        last.text = root.profile.last-name;
+        enterprise.text = root.profile.enterprise;
+        poste.text = root.profile.poste;
+        first.focus-input();
+    }
+
+    first := Field {
+        label: @tr("profile.firstName");
+        enabled: !ProfileState.busy;
+        accepted => { last.focus-input(); }
+    }
+    last := Field {
+        label: @tr("profile.lastName");
+        enabled: !ProfileState.busy;
+        accepted => { enterprise.focus-input(); }
+    }
+    enterprise := Field {
+        label: @tr("profile.enterprise");
+        enabled: !ProfileState.busy;
+        accepted => { poste.focus-input(); }
+    }
+    poste := Field {
+        label: @tr("profile.poste") + " " + @tr("profile.optional");
+        enabled: !ProfileState.busy;
+        accepted => { root.submit(); }
+    }
+
+    if ProfileState.error-code != "": Text {
+        text: AppState.error-text(ProfileState.error-code, ProfileState.error-arg);
+        wrap: word-wrap;
+        color: Theme.destructive;
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            variant: ButtonVariant.outline;
+            text: @tr("profile.cancel");
+            enabled: !ProfileState.busy;
+            clicked => { ProfileState.form-open = false; }
+        }
+        Button {
+            text: ProfileState.busy ? @tr("profile.saving") : @tr("profile.save");
+            enabled: root.valid && !ProfileState.busy;
+            clicked => { root.submit(); }
+        }
+    }
+}

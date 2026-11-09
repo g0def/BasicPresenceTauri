@@ -6,8 +6,11 @@
 
 pub mod auth;
 pub mod bridge;
+pub mod context;
 pub mod errors;
 pub mod i18n;
+pub mod profiles;
+pub mod session;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -36,10 +39,11 @@ fn data_dir() -> Result<PathBuf, DomainError> {
         .ok_or_else(|| DomainError::Storage("cannot resolve the user data directory".into()))
 }
 
-/// UI-only wiring shared by the app and the UI tests: language selection
-/// (initial + switcher) and quit.
+/// UI-only wiring shared by the app and the UI tests: version, language
+/// selection (initial + switcher) and quit.
 pub fn wire_window(ui: &AppWindow, lang: &str) {
     let state = ui.global::<AppState>();
+    state.set_version(env!("CARGO_PKG_VERSION").into());
     let lang = i18n::normalize(lang);
     i18n::select(lang);
     state.set_lang(lang.into());
@@ -53,6 +57,47 @@ pub fn wire_window(ui: &AppWindow, lang: &str) {
     });
     state.on_quit(|| {
         let _ = slint::quit_event_loop();
+    });
+}
+
+/// Wire every feature controller on the backend services. The returned timer
+/// drives the session countdown / inactivity check: keep it alive.
+pub fn wire_features(ui: &AppWindow, bridge: bridge::Bridge) -> (context::Ctx, slint::Timer) {
+    let ctx = context::Ctx {
+        ui: ui.as_weak(),
+        bridge,
+        session: session::Session::default(),
+    };
+    auth::wire(&ctx);
+    profiles::wire(&ctx);
+
+    let timer = slint::Timer::default();
+    let c = ctx.clone();
+    timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_secs(1),
+        move || auth::tick(&c, session::now_ms()),
+    );
+    (ctx, timer)
+}
+
+/// Every keyboard / pointer input on the window counts as user activity.
+fn watch_activity(ui: &AppWindow, ctx: context::Ctx) {
+    use slint::winit_030::winit::event::WindowEvent;
+    use slint::winit_030::{EventResult, WinitWindowAccessor};
+
+    ui.window().on_winit_window_event(move |_, event| {
+        if matches!(
+            event,
+            WindowEvent::KeyboardInput { .. }
+                | WindowEvent::CursorMoved { .. }
+                | WindowEvent::MouseInput { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::Touch(_)
+        ) {
+            auth::report_activity(&ctx);
+        }
+        EventResult::Propagate
     });
 }
 
@@ -82,10 +127,13 @@ pub fn run() -> ExitCode {
     wire_window(&ui, i18n::system_language());
 
     let opened = data_dir().and_then(|dir| runtime.block_on(open_services(&dir)));
+    let mut _session_timer = None;
     let bridge = match opened {
         Ok(services) => {
             let bridge = bridge::Bridge::new(runtime.handle().clone(), Arc::new(services));
-            auth::wire(&ui, bridge.clone(), auth::Session::default());
+            let (ctx, timer) = wire_features(&ui, bridge.clone());
+            watch_activity(&ui, ctx);
+            _session_timer = Some(timer);
             Some(bridge)
         }
         // A startup failure (no OS keychain, lost device key, unreadable data

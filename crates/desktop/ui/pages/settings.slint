@@ -1,0 +1,170 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Field } from "../components/field.slint";
+import { Section } from "../components/section.slint";
+import { AppState, AuthState, ProfileState, ProfileItem } from "../state.slint";
+
+component ProfileRow inherits Rectangle {
+    in property <ProfileItem> profile;
+    callback edit();
+    callback remove();
+
+    height: 52px;
+    border-radius: Theme.radius-md;
+    background: Theme.muted;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.profile.first-name + " " + root.profile.last-name
+                    + (root.profile.active ? "  ·  " + @tr("profile.active") : "");
+                font-weight: 600;
+                color: Theme.foreground;
+            }
+            Text {
+                text: root.profile.enterprise + (root.profile.poste != "" ? " — " + root.profile.poste : "");
+                font-size: Theme.text-xs;
+                color: Theme.muted-foreground;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                variant: ButtonVariant.ghost;
+                text: @tr("profile.edit");
+                clicked => { root.edit(); }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Button {
+                variant: ButtonVariant.ghost;
+                text: @tr("profile.delete");
+                clicked => { root.remove(); }
+            }
+        }
+    }
+}
+
+// Change password (port of `change-password-form.tsx`).
+component ChangePasswordForm inherits VerticalLayout {
+    spacing: 12px;
+
+    function submit() {
+        if (AuthState.password-busy || current.text == "" || next.text == "") { return; }
+        AuthState.change-password(current.text, next.text, confirm.text);
+        current.text = "";
+        next.text = "";
+        confirm.text = "";
+    }
+
+    function reset() {
+        AuthState.password-error-code = "";
+        AuthState.password-done = false;
+    }
+
+    current := Field {
+        label: @tr("auth.changePassword.current");
+        input-type: InputType.password;
+        enabled: !AuthState.password-busy;
+        edited => { root.reset(); }
+        accepted => { next.focus-input(); }
+    }
+    next := Field {
+        label: @tr("auth.changePassword.new");
+        input-type: InputType.password;
+        enabled: !AuthState.password-busy;
+        edited => { root.reset(); }
+        accepted => { confirm.focus-input(); }
+    }
+    confirm := Field {
+        label: @tr("auth.changePassword.confirm");
+        input-type: InputType.password;
+        enabled: !AuthState.password-busy;
+        edited => { root.reset(); }
+        accepted => { root.submit(); }
+    }
+    if AuthState.password-error-code != "": Text {
+        text: AppState.error-text(AuthState.password-error-code, AuthState.password-error-arg);
+        wrap: word-wrap;
+        color: Theme.destructive;
+    }
+    if AuthState.password-done: Text {
+        text: @tr("auth.changePassword.done");
+        color: Theme.success;
+    }
+    HorizontalLayout {
+        alignment: start;
+        Button {
+            text: AuthState.password-busy ? @tr("auth.submitting") : @tr("auth.changePassword.submit");
+            enabled: !AuthState.password-busy && current.text != "" && next.text != "";
+            clicked => { root.submit(); }
+        }
+    }
+}
+
+// Settings (port of `pages/settings`): profiles and security for now; CO₂,
+// preferences and data sections arrive with S6 / S10.
+export component SettingsPage inherits ScrollView {
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+        alignment: start;
+
+        HorizontalLayout {
+            alignment: center;
+            VerticalLayout {
+                width: min(720px, root.width - 48px);
+                spacing: 16px;
+
+                Text {
+                    text: @tr("settings.title");
+                    font-size: Theme.text-xl;
+                    font-weight: 600;
+                    color: Theme.foreground;
+                }
+
+                Section {
+                    title: @tr("settings.profilesSection");
+                    for p in ProfileState.profiles: ProfileRow {
+                        profile: p;
+                        edit => {
+                            ProfileState.error-code = "";
+                            ProfileState.form-profile = p;
+                            ProfileState.form-open = true;
+                        }
+                        remove => {
+                            ProfileState.error-code = "";
+                            ProfileState.delete-id = p.id;
+                            ProfileState.delete-name = p.first-name + " " + p.last-name;
+                            ProfileState.delete-open = true;
+                        }
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            variant: ButtonVariant.outline;
+                            text: @tr("profile.add");
+                            clicked => {
+                                ProfileState.error-code = "";
+                                ProfileState.form-profile = { id: "" };
+                                ProfileState.form-open = true;
+                            }
+                        }
+                    }
+                }
+
+                Section {
+                    title: @tr("settings.securitySection");
+                    ChangePasswordForm { }
+                }
+            }
+        }
+    }
+}

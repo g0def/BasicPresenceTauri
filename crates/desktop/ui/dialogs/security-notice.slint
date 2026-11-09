@@ -1,0 +1,33 @@
+import { Theme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+import { Modal } from "../components/modal.slint";
+import { AuthState } from "../state.slint";
+
+// Shown once after login when something security-relevant happened since the
+// previous one (port of `security-notice-dialog.tsx`).
+export component SecurityNoticeDialog inherits Modal {
+    title: @tr("auth.securityNotice.title");
+    close => { AuthState.notice-open = false; }
+
+    VerticalLayout {
+        spacing: 6px;
+        if AuthState.notice-failed-attempts > 0: Text {
+            text: @tr("auth.securityNotice.failedAttempts_one" | "auth.securityNotice.failedAttempts_other" % AuthState.notice-failed-attempts);
+            wrap: word-wrap;
+            color: Theme.foreground;
+        }
+        for event in AuthState.notice-events: Text {
+            text: event.at + " — " + AuthState.event-text(event.kind);
+            wrap: word-wrap;
+            color: Theme.foreground;
+        }
+    }
+
+    HorizontalLayout {
+        alignment: end;
+        Button {
+            text: @tr("auth.securityNotice.dismiss");
+            clicked => { AuthState.notice-open = false; }
+        }
+    }
+}

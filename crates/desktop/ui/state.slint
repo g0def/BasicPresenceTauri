@@ -1,0 +1,124 @@
+// UI state shared with Rust. Rust writes the `in` properties and handles the
+// callbacks (user intents); screens only bind to these globals.
+
+export enum Screen { loading, login, main, startup-error }
+
+/// Pages of the signed-in app.
+export enum Page { presence, commutes, settings, methodology, licence, about }
+
+export struct ProfileItem {
+    id: string,
+    first-name: string,
+    last-name: string,
+    enterprise: string,
+    poste: string,
+    active: bool,
+}
+
+export struct SecurityEventItem {
+    /// Already formatted, local time.
+    at: string,
+    /// `account_locked`, `unclean_shutdown`, `tamper_detected`, …
+    kind: string,
+}
+
+export global AppState {
+    in-out property <Screen> screen: Screen.loading;
+    in-out property <Page> page: Page.presence;
+    /// Active UI language ("fr" or "en").
+    in-out property <string> lang: "fr";
+    in property <string> version;
+
+    // --- Startup failure ---
+    /// "keychain", "keystore-lost" or "generic".
+    in property <string> startup-reason;
+    in property <string> startup-detail;
+
+    callback set-lang(string);
+    callback quit();
+
+    /// Localized text of an error code: the backend `AppError` codes, plus
+    /// the UI-side validation codes.
+    public pure function error-text(code: string, arg: string) -> string {
+        if (code == "") { return ""; }
+        if (code == "INVALID_CREDENTIALS") { return @tr("errors.codes.INVALID_CREDENTIALS"); }
+        if (code == "ACCOUNT_LOCKED") { return @tr("errors.codes.ACCOUNT_LOCKED", arg); }
+        if (code == "ACCOUNT_EXISTS") { return @tr("errors.codes.ACCOUNT_EXISTS"); }
+        if (code == "SESSION_EXPIRED") { return @tr("errors.codes.SESSION_EXPIRED"); }
+        if (code == "NOT_FOUND") { return @tr("errors.codes.NOT_FOUND"); }
+        if (code == "VALIDATION") { return @tr("errors.codes.VALIDATION", arg); }
+        if (code == "KEYSTORE_UNRECOVERABLE") { return @tr("errors.codes.KEYSTORE_UNRECOVERABLE"); }
+        if (code == "VAULT_TAMPERED") { return @tr("errors.codes.VAULT_TAMPERED"); }
+        if (code == "EXPORT_FAILED") { return @tr("errors.codes.EXPORT_FAILED"); }
+        if (code == "PASSWORD_TOO_SHORT") { return @tr("auth.changePassword.tooShort", arg); }
+        if (code == "PASSWORD_MISMATCH") { return @tr("auth.changePassword.mismatch"); }
+        return @tr("errors.codes.INTERNAL");
+    }
+
+    public pure function startup-text(reason: string) -> string {
+        if (reason == "keychain") { return @tr("startup.keychain"); }
+        if (reason == "keystore-lost") { return @tr("startup.keystoreLost"); }
+        return @tr("startup.generic");
+    }
+}
+
+export global AuthState {
+    in property <bool> account-exists: true;
+    in property <bool> busy;
+    /// Login / registration error, as a code + argument (see `error-text`).
+    in-out property <string> error-code;
+    in-out property <string> error-arg;
+    in property <string> username;
+
+    // Session countdown ("m:ss"), red under a minute.
+    in property <string> session-remaining;
+    in property <bool> session-warning;
+
+    // Security notice shown once after login.
+    in-out property <bool> notice-open;
+    in property <int> notice-failed-attempts;
+    in property <[SecurityEventItem]> notice-events;
+
+    // Change password.
+    in property <bool> password-busy;
+    in-out property <string> password-error-code;
+    in property <string> password-error-arg;
+    in-out property <bool> password-done;
+
+    callback login(string, string);
+    callback register(string, string);
+    callback logout();
+    callback change-password(string, string, string);
+
+    public pure function event-text(kind: string) -> string {
+        if (kind == "account_locked") { return @tr("auth.securityNotice.kinds.account_locked"); }
+        if (kind == "unclean_shutdown") { return @tr("auth.securityNotice.kinds.unclean_shutdown"); }
+        if (kind == "tamper_detected") { return @tr("auth.securityNotice.kinds.tamper_detected"); }
+        if (kind == "tamper_tolerated") { return @tr("auth.securityNotice.kinds.tamper_tolerated"); }
+        if (kind == "password_changed") { return @tr("auth.securityNotice.kinds.password_changed"); }
+        return kind;
+    }
+}
+
+export global ProfileState {
+    in property <bool> loaded;
+    in property <[ProfileItem]> profiles;
+    in property <bool> busy;
+    in-out property <string> error-code;
+    in property <string> error-arg;
+
+    // Create / edit dialog. `form-profile.id` is empty when creating.
+    in-out property <bool> form-open;
+    in-out property <ProfileItem> form-profile;
+    // Delete confirmation.
+    in-out property <bool> delete-open;
+    in-out property <string> delete-id;
+    in-out property <string> delete-name;
+
+    callback save(string, string, string, string, string);
+    callback delete(string);
+    callback set-active(string);
+
+    /// Name of the active profile (shown in the header menu button).
+    in property <string> current-name;
+}

@@ -139,6 +139,57 @@ pub fn format_co2(kg: f64, lang: Lang) -> String {
     format!("{} kg", format_decimal_1(kg, lang))
 }
 
+const MONTHS_FR: [&str; 12] = [
+    "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.",
+    "déc.",
+];
+const MONTHS_EN: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// A timestamp (epoch-ms) as a medium date + short time, in the user's local
+/// time given by `utc_offset_minutes`: `"9 nov. 2026, 09:23"` (fr),
+/// `"Nov 9, 2026, 9:23 AM"` (en) — the `Intl.DateTimeFormat` medium/short
+/// rendering of the former frontend.
+pub fn format_datetime(epoch_ms: i64, utc_offset_minutes: i32, lang: Lang) -> String {
+    use chrono::{Datelike, Timelike};
+
+    let local_ms = epoch_ms + i64::from(utc_offset_minutes) * 60_000;
+    let Some(dt) = chrono::DateTime::from_timestamp_millis(local_ms) else {
+        return String::new();
+    };
+    let dt = dt.naive_utc();
+    let month = dt.month0() as usize;
+    match lang {
+        Lang::Fr => format!(
+            "{} {} {}, {:02}:{:02}",
+            dt.day(),
+            MONTHS_FR[month],
+            dt.year(),
+            dt.hour(),
+            dt.minute()
+        ),
+        Lang::En => {
+            let (pm, hour12) = dt.hour12();
+            format!(
+                "{} {}, {}, {}:{:02} {}",
+                MONTHS_EN[month],
+                dt.day(),
+                dt.year(),
+                hour12,
+                dt.minute(),
+                if pm { "PM" } else { "AM" }
+            )
+        }
+    }
+}
+
+/// Remaining time as `m:ss` (the session countdown); negative clamps to `0:00`.
+pub fn format_countdown(remaining_ms: i64) -> String {
+    let total = remaining_ms.max(0) / 1000;
+    format!("{}:{:02}", total / 60, total % 60)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,6 +260,26 @@ mod tests {
         assert_eq!(format_co2(1234.56, Lang::Fr), "1\u{202f}234,6 kg");
         assert_eq!(format_co2(1234.56, Lang::En), "1,234.6 kg");
         assert_eq!(format_co2(1_000_000.0, Lang::En), "1,000,000 kg");
+    }
+
+    #[test]
+    fn datetime_is_localized_and_offset() {
+        // 2026-11-09 08:23:00 UTC.
+        let ms = 1_794_212_580_000;
+        assert_eq!(format_datetime(ms, 0, Lang::Fr), "9 nov. 2026, 08:23");
+        assert_eq!(format_datetime(ms, 60, Lang::Fr), "9 nov. 2026, 09:23");
+        assert_eq!(format_datetime(ms, 60, Lang::En), "Nov 9, 2026, 9:23 AM");
+        assert_eq!(format_datetime(ms, 600, Lang::En), "Nov 9, 2026, 6:23 PM");
+        // Offsets can cross the day boundary.
+        assert_eq!(format_datetime(ms, -600, Lang::Fr), "8 nov. 2026, 22:23");
+    }
+
+    #[test]
+    fn countdown_is_minutes_and_padded_seconds() {
+        assert_eq!(format_countdown(900_000), "15:00");
+        assert_eq!(format_countdown(61_500), "1:01");
+        assert_eq!(format_countdown(999), "0:00");
+        assert_eq!(format_countdown(-5), "0:00");
     }
 
     #[test]

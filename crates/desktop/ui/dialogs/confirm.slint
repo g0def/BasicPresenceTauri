@@ -1,0 +1,30 @@
+import { Button, ButtonVariant } from "../components/button.slint";
+import { Modal } from "../components/modal.slint";
+
+// Yes / no confirmation of a destructive action.
+export component ConfirmDialog inherits Modal {
+    in property <string> confirm-text;
+    in property <string> cancel-text;
+    in property <bool> busy;
+    callback confirmed();
+
+    dismissable: !root.busy;
+    card-width: 400px;
+
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            variant: ButtonVariant.outline;
+            text: root.cancel-text;
+            enabled: !root.busy;
+            clicked => { root.close(); }
+        }
+        Button {
+            variant: ButtonVariant.destructive;
+            text: root.confirm-text;
+            enabled: !root.busy;
+            clicked => { root.confirmed(); }
+        }
+    }
+}

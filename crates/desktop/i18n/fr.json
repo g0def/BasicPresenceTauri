@@ -1,6 +1,8 @@
 {
   "common": {
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "back": "Retour au calendrier",
+    "close": "Fermer"
   },
   "errors": {
     "generic": "Une erreur est survenue",
@@ -520,5 +522,12 @@
     "generic": "Les données locales de BasicPresence sont inaccessibles.",
     "detail": "Détail technique : {{detail}}",
     "quit": "Quitter"
+  },
+  "about": {
+    "menuItem": "À propos",
+    "title": "À propos de Basic Presence",
+    "version": "Version {{version}}",
+    "description": "Suivi de présence (bureau, télétravail) et de l’empreinte CO₂ des trajets. Données 100 % locales et chiffrées.",
+    "builtWith": "Interface réalisée avec Slint."
   }
 }

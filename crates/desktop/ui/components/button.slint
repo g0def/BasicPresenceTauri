@@ -13,6 +13,9 @@ export component Button inherits Rectangle {
     property <bool> active: root.enabled && touch.has-hover;
 
     min-height: 36px;
+    // Keep the natural width in rows; columns still stretch it.
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
     border-radius: Theme.radius-md;
     border-width: root.variant == ButtonVariant.outline ? 1px : 0px;
     border-color: Theme.input;

@@ -13,11 +13,15 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use basic_presence::auth::{self, Session};
 use basic_presence::bridge::Bridge;
-use basic_presence::{AppState, AppWindow, Screen, Theme, wire_window};
+use basic_presence::session::{IDLE_TIMEOUT_MS, now_ms};
+use basic_presence::{
+    AppState, AppWindow, AuthState, Page, ProfileState, Screen, Theme, auth, wire_features,
+    wire_window,
+};
 use basic_presence_core::infrastructure::config::AppConfig;
 use basic_presence_core::services::build_services;
+use slint::Model;
 use slint::Rgb8Pixel;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
@@ -114,7 +118,7 @@ impl Harness {
 }
 
 #[test]
-fn login_flow_renders_and_works_end_to_end() {
+fn app_flows_render_and_work_end_to_end() {
     let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     window.set_size(PhysicalSize::new(WIDTH, HEIGHT));
     let queue: Queue = Arc::default();
@@ -145,66 +149,196 @@ fn login_flow_renders_and_works_end_to_end() {
 
     let ui = AppWindow::new().expect("window");
     wire_window(&ui, "fr");
-    auth::wire(&ui, bridge.clone(), Session::default());
+    let (ctx, _timer) = wire_features(&ui, bridge.clone());
     ui.show().unwrap();
-    let state = ui.global::<AppState>();
+    let app = ui.global::<AppState>();
+    let auth_state = ui.global::<AuthState>();
+    let profiles = ui.global::<ProfileState>();
 
-    // Fresh device → registration screen.
-    h.pump_until("login screen", || state.get_screen() == Screen::Login);
-    assert!(!state.get_account_exists());
+    // ---------- Login / registration (S3) ----------
+    h.pump_until("login screen", || app.get_screen() == Screen::Login);
+    assert!(!auth_state.get_account_exists());
     h.snapshot("01-register-fr");
 
     // Translations (bundled .po), with placeholders.
     assert_eq!(
-        state.invoke_error_text("INVALID_CREDENTIALS".into(), "".into()),
+        app.invoke_error_text("INVALID_CREDENTIALS".into(), "".into()),
         "Identifiants invalides"
     );
     assert_eq!(
-        state.invoke_error_text("ACCOUNT_LOCKED".into(), "30".into()),
+        app.invoke_error_text("ACCOUNT_LOCKED".into(), "30".into()),
         "Compte verrouillé. Réessayez dans 30 s."
     );
     assert_eq!(
-        state.invoke_error_text("SOMETHING_ELSE".into(), "".into()),
+        app.invoke_error_text("SOMETHING_ELSE".into(), "".into()),
         "Erreur interne"
     );
 
-    // Register, then the gate switches to login.
-    state.invoke_register("alice".into(), "password123".into());
+    auth_state.invoke_register("alice".into(), "password123".into());
     h.pump_until("account created", || {
-        state.get_account_exists() && !state.get_busy()
+        auth_state.get_account_exists() && !auth_state.get_busy()
     });
-    assert_eq!(state.get_error_code(), "");
+    assert_eq!(auth_state.get_error_code(), "");
 
     // A wrong password is reported with a localized error.
-    state.invoke_login("alice".into(), "wrong-password".into());
+    auth_state.invoke_login("alice".into(), "wrong-password".into());
     h.pump_until("login refused", || {
-        !state.get_busy() && state.get_error_code() != ""
+        !auth_state.get_busy() && auth_state.get_error_code() != ""
     });
-    assert_eq!(state.get_error_code(), "INVALID_CREDENTIALS");
+    assert_eq!(auth_state.get_error_code(), "INVALID_CREDENTIALS");
     h.snapshot("02-login-error-fr");
 
-    // Live language switch.
-    state.invoke_set_lang("en".into());
-    assert_eq!(state.get_lang(), "en");
+    // Live language switch + dark theme.
+    app.invoke_set_lang("en".into());
+    assert_eq!(app.get_lang(), "en");
     assert_eq!(
-        state.invoke_error_text("INVALID_CREDENTIALS".into(), "".into()),
+        app.invoke_error_text("INVALID_CREDENTIALS".into(), "".into()),
         "Invalid credentials"
     );
     ui.global::<Theme>().set_dark(true);
     h.snapshot("03-login-error-en-dark");
+    app.invoke_set_lang("fr".into());
+    ui.global::<Theme>().set_dark(false);
 
-    // Successful login → home, with data read through the session gate.
-    state.invoke_login("alice".into(), "password123".into());
-    h.pump_until("home", || state.get_screen() == Screen::Home);
-    assert_eq!(state.get_username(), "alice");
-    h.pump_until("profiles loaded", || !state.get_busy());
-    assert_eq!(state.get_profile_count(), 0);
-    h.snapshot("04-home-en-dark");
+    // ---------- Signed in: security notice, empty profile state (S4) ----------
+    auth_state.invoke_login("alice".into(), "password123".into());
+    h.pump_until("main", || app.get_screen() == Screen::Main);
+    h.pump_until("profiles loaded", || profiles.get_loaded());
+    assert_eq!(auth_state.get_username(), "alice");
+    assert!(auth_state.get_session_remaining().contains(':'));
+    // The failed attempt above is reported once.
+    assert!(auth_state.get_notice_open());
+    assert_eq!(auth_state.get_notice_failed_attempts(), 1);
+    h.snapshot("04-security-notice");
+    auth_state.set_notice_open(false);
+    assert_eq!(profiles.get_profiles().row_count(), 0);
+    h.snapshot("05-empty-profile");
 
-    // Logout → back to the login screen.
-    state.invoke_logout();
-    h.pump_until("logged out", || state.get_screen() == Screen::Login);
-    assert_eq!(state.get_username(), "");
+    // Create a profile through the dialog.
+    profiles.set_form_open(true);
+    h.snapshot("06-profile-form");
+    profiles.invoke_save(
+        "".into(),
+        "Ada".into(),
+        "Lovelace".into(),
+        "Analytical Engine".into(),
+        "".into(),
+    );
+    h.pump_until("profile created", || {
+        !profiles.get_busy() && profiles.get_profiles().row_count() == 1
+    });
+    assert!(!profiles.get_form_open());
+    assert_eq!(profiles.get_current_name(), "Ada Lovelace");
+    let ada = profiles.get_profiles().row_data(0).unwrap();
+    assert!(ada.active);
+
+    // A second one, then switch the active profile.
+    profiles.invoke_save(
+        "".into(),
+        "Grace".into(),
+        "Hopper".into(),
+        "Navy".into(),
+        "Rear admiral".into(),
+    );
+    h.pump_until("second profile", || {
+        profiles.get_profiles().row_count() == 2
+    });
+    let grace = profiles
+        .get_profiles()
+        .iter()
+        .find(|p| p.first_name == "Grace")
+        .unwrap();
+    assert_eq!(grace.poste, "Rear admiral");
+    profiles.invoke_set_active(grace.id.clone());
+    h.pump_until("grace active", || {
+        profiles.get_current_name() == "Grace Hopper"
+    });
+
+    // Validation errors surface in the dialog.
+    profiles.invoke_save(
+        grace.id.clone(),
+        "".into(),
+        "Hopper".into(),
+        "Navy".into(),
+        "".into(),
+    );
+    h.pump_until("validation error", || {
+        !profiles.get_busy() && profiles.get_error_code() != ""
+    });
+    assert_eq!(profiles.get_error_code(), "VALIDATION");
+
+    // Edit, then delete Ada.
+    profiles.invoke_save(
+        grace.id.clone(),
+        "Grace".into(),
+        "Hopper".into(),
+        "US Navy".into(),
+        "".into(),
+    );
+    h.pump_until("edited", || {
+        profiles
+            .get_profiles()
+            .iter()
+            .any(|p| p.enterprise == "US Navy")
+    });
+    app.set_page(Page::Settings);
+    h.snapshot("07-settings");
+    profiles.set_delete_name("Ada Lovelace".into());
+    profiles.set_delete_open(true);
+    h.snapshot("08-delete-confirm");
+    profiles.invoke_delete(ada.id.clone());
+    h.pump_until("deleted", || profiles.get_profiles().row_count() == 1);
+    assert!(!profiles.get_delete_open());
+
+    // ---------- Change password ----------
+    auth_state.invoke_change_password("password123".into(), "short".into(), "short".into());
+    assert_eq!(auth_state.get_password_error_code(), "PASSWORD_TOO_SHORT");
+    assert_eq!(
+        app.invoke_error_text(
+            "PASSWORD_TOO_SHORT".into(),
+            auth_state.get_password_error_arg()
+        ),
+        "Le mot de passe doit contenir au moins 8 caractères."
+    );
+    auth_state.invoke_change_password("password123".into(), "newpassword1".into(), "other".into());
+    assert_eq!(auth_state.get_password_error_code(), "PASSWORD_MISMATCH");
+    auth_state.invoke_change_password(
+        "nope-nope".into(),
+        "newpassword1".into(),
+        "newpassword1".into(),
+    );
+    h.pump_until("wrong current password", || {
+        !auth_state.get_password_busy() && auth_state.get_password_error_code() != ""
+    });
+    assert_eq!(auth_state.get_password_error_code(), "INVALID_CREDENTIALS");
+    auth_state.invoke_change_password(
+        "password123".into(),
+        "newpassword1".into(),
+        "newpassword1".into(),
+    );
+    h.pump_until("password changed", || auth_state.get_password_done());
+    h.snapshot("09-password-changed");
+
+    // ---------- About (Slint licence attribution) ----------
+    app.set_page(Page::About);
+    h.snapshot("10-about");
+
+    // ---------- Session end: inactivity, then absolute expiry ----------
+    auth::tick(&ctx, now_ms() + IDLE_TIMEOUT_MS + 1_000);
+    h.pump_until("idle logout", || app.get_screen() == Screen::Login);
+    assert_eq!(auth_state.get_error_code(), "SESSION_EXPIRED");
+    assert!(!profiles.get_loaded());
+    assert_eq!(app.get_page(), Page::Presence);
+    h.snapshot("11-session-expired");
+
+    // The new password works; logout goes back to the login screen.
+    auth_state.invoke_login("alice".into(), "newpassword1".into());
+    h.pump_until("main again", || app.get_screen() == Screen::Main);
+    h.pump_until("profiles again", || profiles.get_loaded());
+    assert_eq!(profiles.get_current_name(), "Grace Hopper");
+    auth_state.invoke_logout();
+    assert_eq!(app.get_screen(), Screen::Login);
+    assert_eq!(auth_state.get_error_code(), "");
 
     bridge.lock_blocking();
     drop(ui);

@@ -1,6 +1,8 @@
 {
   "common": {
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "back": "Back to the calendar",
+    "close": "Close"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -520,5 +522,12 @@
     "generic": "BasicPresence's local data is not accessible.",
     "detail": "Technical detail: {{detail}}",
     "quit": "Quit"
+  },
+  "about": {
+    "menuItem": "About",
+    "title": "About Basic Presence",
+    "version": "Version {{version}}",
+    "description": "Presence tracking (office, remote) and the CO₂ footprint of your commutes. 100% local, encrypted data.",
+    "builtWith": "User interface built with Slint."
   }
 }

@@ -61,10 +61,7 @@ un commit sur `feat/slint`.
   (voir les notes S3). Prévu à l'origine :
   - `slint-build`, bridge tokio, thème, i18n `.po` + test de parité, navigation ;
   - **mesure de la RAM (PSS)** legacy vs Slint, VM sans GPU, touches mortes.
-- [ ] **S4 — Coquille applicative** :
-  - composants partagés, header, session (compte à rebours + inactivité 5 min) ;
-  - avis de sécurité, mot de passe, profils ;
-  - écran À propos (`AboutSlint`).
+- [x] **S4 — Coquille applicative, session, profils, À propos** (2026-11-09)
 - [ ] **S5 — Calendrier de présence** : dialog jour en 2 étapes, copier/coller,
   pastilles du mois.
 - [ ] **S6 — Trajets et réglages** : préférences locales dans un fichier de config
@@ -241,3 +238,67 @@ un commit sur `feat/slint`.
     - `RUSTSEC-2026-0441` (pin-utils) : uniquement à la compilation ;
     - `RUSTSEC-2026-0192` (ttf-parser) : décorations de fenêtre winit, polices de
       confiance.
+
+### S4
+
+- **État de l'UI** (`ui/state.slint`), réparti en globals :
+  - `AppState` : écran, page, langue, version, textes d'erreur ;
+  - `AuthState` : connexion, session, avis de sécurité, mot de passe ;
+  - `ProfileState` : liste, dialogues ;
+  - `Theme`.
+  - Navigation : `Screen` (`loading`, `login`, `main`, `startup-error`) et
+    `Page` (`presence`, `commutes`, `settings`, `methodology`, `licence`, `about`).
+  - Les pages pas encore portées affichent `PlaceholderPage`.
+- **Côté Rust**, un contrôleur par fonctionnalité, partageant le même `Ctx`
+  (`src/context.rs`) :
+  - `call` : exécute un use case ;
+  - `call_authed` : passe d'abord par `require_session`. Une erreur
+    `SESSION_EXPIRED` ferme la session, ramène à la connexion et ne rappelle pas
+    `done`.
+  - Contrôleurs : `auth.rs` (connexion, inscription, fin de session, mot de
+    passe), `profiles.rs` (CRUD et profil actif), `session.rs` (règles de temps).
+  - `wire_features()` renvoie le minuteur de session, qu'il faut garder en vie.
+- **Session**, calculée sur l'heure murale en ms (la mise en veille ne donne
+  jamais de temps en plus) :
+  - un compte à rebours `m:ss`, qui passe en rouge sous 60 s ;
+  - une **inactivité de 5 min** qui ramène à la connexion avec « Session expirée ».
+  - L'activité est captée via le **hook winit**
+    (`slint` feature `unstable-winit-030`, `on_winit_window_event`) : clavier,
+    souris, molette, tactile.
+  - Toute activité relance un `check_session`, au plus une fois par minute, pour
+    tenir à jour le minuteur d'inactivité du backend.
+  - Une session que le backend ne reconnaît plus est fermée aussi.
+- **En-tête** : logo, badge de version, bouton retour, compte à rebours et
+  **menu du compte**. Le menu est une `PopupWindow` qui contient :
+  - les profils, avec le profil actif coché ;
+  - Trajets ;
+  - langue et thème ;
+  - Paramètres, Méthodologie, Licence, **À propos** ;
+  - Déconnexion.
+- **Dialogues** : composant `Modal` (fond assombri ; fermeture par Échap ou clic
+  sur le fond), `ProfileFormDialog` (création et modification), `ConfirmDialog`,
+  `SecurityNoticeDialog`. Les dates des événements sont affichées à l'heure locale
+  (`format_datetime`, ajouté au core).
+- **Paramètres** : section Profils (modifier, supprimer avec confirmation, ajouter)
+  et section Sécurité (changement de mot de passe).
+  - Validations côté UI : `PASSWORD_TOO_SHORT` (8 caractères minimum) et
+    `PASSWORD_MISMATCH`.
+  - Les sections CO₂, préférences et données arrivent en S6 et S10.
+- **À propos** : contient **`AboutSlint`** (obligation de la licence Slint).
+- **Pièges de mise en page Slint** :
+  - un élément dans un layout ne peut pas avoir de `x` / `y` ;
+  - pour centrer verticalement dans une rangée, l'envelopper dans
+    `VerticalLayout { alignment: center; }` ;
+  - `Button` a `horizontal-stretch: 0`, et c'est la colonne de texte qui doit
+    prendre `horizontal-stretch: 1`.
+- **Test headless étendu** :
+  - avis de sécurité après un échec de connexion ;
+  - état sans profil, puis création, second profil et changement de profil actif ;
+  - erreur de validation, modification, suppression avec confirmation ;
+  - mot de passe trop court, non concordant, actuel erroné, puis réussi ;
+  - page À propos ;
+  - inactivité qui ramène à la connexion avec `SESSION_EXPIRED` ;
+  - reconnexion avec le nouveau mot de passe ;
+  - 11 captures.
+- **Non couvert par le test** : le rendu de la `PopupWindow` du menu. À vérifier à
+  la main.

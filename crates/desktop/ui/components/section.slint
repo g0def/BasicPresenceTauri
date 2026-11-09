@@ -1,0 +1,18 @@
+import { Theme } from "../theme.slint";
+import { Card } from "card.slint";
+
+// A titled card section of a settings-like page.
+export component Section inherits Card {
+    in property <string> title;
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        Text {
+            text: root.title;
+            font-size: Theme.text-base;
+            font-weight: 600;
+            color: Theme.card-foreground;
+        }
+        @children
+    }
+}

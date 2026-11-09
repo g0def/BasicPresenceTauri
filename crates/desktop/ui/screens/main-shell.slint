@@ -1,0 +1,230 @@
+import { Theme } from "../theme.slint";
+import { Button, ButtonVariant } from "../components/button.slint";
+import { MenuItem, MenuLabel, MenuSeparator } from "../components/menu.slint";
+import { AppState, AuthState, Page, ProfileState } from "../state.slint";
+import { AboutPage } from "../pages/about.slint";
+import { EmptyProfilePage } from "../pages/empty-profile.slint";
+import { PlaceholderPage } from "../pages/placeholder.slint";
+import { SettingsPage } from "../pages/settings.slint";
+import { ConfirmDialog } from "../dialogs/confirm.slint";
+import { ProfileFormDialog } from "../dialogs/profile-form.slint";
+import { SecurityNoticeDialog } from "../dialogs/security-notice.slint";
+
+// Account menu (port of `profile-badge.tsx`).
+component AccountMenu inherits Rectangle {
+    width: button.preferred-width;
+    height: 36px;
+
+    button := Button {
+        width: parent.width;
+        height: parent.height;
+        variant: ButtonVariant.outline;
+        text: (ProfileState.current-name != "" ? ProfileState.current-name : AuthState.username) + "  ▾";
+        accessible-label: @tr("profile.menu");
+        clicked => { popup.show(); }
+    }
+
+    popup := PopupWindow {
+        x: root.width - 260px;
+        y: root.height + 4px;
+        width: 260px;
+
+        Rectangle {
+            background: Theme.popover;
+            border-radius: Theme.radius-md;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: 12px;
+            drop-shadow-color: #00000030;
+
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+
+                if ProfileState.profiles.length > 0: MenuLabel {
+                    text: @tr("profile.profilesLabel");
+                }
+                for p in ProfileState.profiles: MenuItem {
+                    text: p.first-name + " " + p.last-name;
+                    checkable: true;
+                    checked: p.active;
+                    activated => { ProfileState.set-active(p.id); }
+                }
+                if ProfileState.profiles.length > 0: MenuSeparator { }
+
+                MenuItem {
+                    text: @tr("commute.menuItem");
+                    activated => { AppState.page = Page.commutes; }
+                }
+                MenuSeparator { }
+
+                MenuLabel { text: @tr("language.label"); }
+                MenuItem {
+                    text: @tr("language.fr");
+                    checkable: true;
+                    checked: AppState.lang == "fr";
+                    activated => { AppState.set-lang("fr"); }
+                }
+                MenuItem {
+                    text: @tr("language.en");
+                    checkable: true;
+                    checked: AppState.lang == "en";
+                    activated => { AppState.set-lang("en"); }
+                }
+                MenuItem {
+                    text: Theme.dark ? @tr("theme.light") : @tr("theme.dark");
+                    activated => { Theme.dark = !Theme.dark; }
+                }
+                MenuSeparator { }
+
+                MenuItem {
+                    text: @tr("settings.menuItem");
+                    activated => { AppState.page = Page.settings; }
+                }
+                MenuItem {
+                    text: @tr("methodology.menuItem");
+                    activated => { AppState.page = Page.methodology; }
+                }
+                MenuItem {
+                    text: @tr("licence.menuItem");
+                    activated => { AppState.page = Page.licence; }
+                }
+                MenuItem {
+                    text: @tr("about.menuItem");
+                    activated => { AppState.page = Page.about; }
+                }
+                MenuSeparator { }
+                MenuItem {
+                    text: @tr("home.logout");
+                    destructive: true;
+                    activated => { AuthState.logout(); }
+                }
+            }
+        }
+    }
+}
+
+// Signed-in app: header + current page + dialogs (port of the
+// `_authenticated.tsx` AppShell).
+export component MainShell inherits Rectangle {
+    background: Theme.background;
+
+    VerticalLayout {
+        padding-left: 24px;
+        padding-right: 24px;
+        padding-top: 16px;
+        spacing: 12px;
+
+        // --- Header ---
+        HorizontalLayout {
+            spacing: 12px;
+            height: 40px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        width: 28px;
+                        height: 28px;
+                        source: Theme.dark ? @image-url("../../assets/icons/icon-512-dark.png") : @image-url("../../assets/icons/icon-512.png");
+                        accessible-role: none;
+                    }
+                }
+                Text {
+                    text: "Basic Presence";
+                    vertical-alignment: center;
+                    font-family: Theme.brand-font;
+                    font-weight: 600;
+                    color: Theme.foreground;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: version.preferred-width + 14px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: Theme.muted;
+                        version := Text {
+                            text: "v" + AppState.version;
+                            font-size: Theme.text-xs;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                            color: Theme.muted-foreground;
+                        }
+                    }
+                }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            if AppState.page != Page.presence: VerticalLayout {
+                alignment: center;
+                Button {
+                    variant: ButtonVariant.ghost;
+                    text: "← " + @tr("common.back");
+                    clicked => { AppState.page = Page.presence; }
+                }
+            }
+
+            Text {
+                text: @tr("session.label", AuthState.session-remaining);
+                vertical-alignment: center;
+                font-weight: AuthState.session-warning ? 600 : 400;
+                color: AuthState.session-warning ? Theme.destructive : Theme.muted-foreground;
+                accessible-description: @tr("session.tooltip");
+            }
+
+            VerticalLayout {
+                alignment: center;
+                AccountMenu { }
+            }
+        }
+
+        // --- Page ---
+        Rectangle {
+            vertical-stretch: 1;
+
+            if !ProfileState.loaded: Text {
+                text: @tr("common.loading");
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: Theme.muted-foreground;
+            }
+            // Settings / about stay reachable without a profile.
+            if ProfileState.loaded && ProfileState.profiles.length == 0
+                && AppState.page != Page.settings && AppState.page != Page.about: EmptyProfilePage { }
+
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.presence: PlaceholderPage {
+                title: ProfileState.current-name;
+            }
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.commutes: PlaceholderPage {
+                title: @tr("commute.menuItem");
+            }
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.methodology: PlaceholderPage {
+                title: @tr("methodology.title");
+            }
+            if ProfileState.loaded && ProfileState.profiles.length > 0 && AppState.page == Page.licence: PlaceholderPage {
+                title: @tr("licence.title");
+            }
+            if AppState.page == Page.settings: SettingsPage { }
+            if AppState.page == Page.about: AboutPage { }
+        }
+    }
+
+    // --- Dialogs (drawn above the page) ---
+    if ProfileState.form-open: ProfileFormDialog {
+        profile: ProfileState.form-profile;
+    }
+    if ProfileState.delete-open: ConfirmDialog {
+        title: @tr("profile.deleteConfirmTitle");
+        description: @tr("profile.deleteConfirmBody", ProfileState.delete-name);
+        confirm-text: @tr("profile.delete");
+        cancel-text: @tr("profile.cancel");
+        busy: ProfileState.busy;
+        close => { ProfileState.delete-open = false; }
+        confirmed => { ProfileState.delete(ProfileState.delete-id); }
+    }
+    if AuthState.notice-open: SecurityNoticeDialog { }
+}

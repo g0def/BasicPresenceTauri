@@ -1,0 +1,35 @@
+import { Theme } from "../theme.slint";
+import { Button } from "../components/button.slint";
+import { ProfileState } from "../state.slint";
+
+// No profile yet (port of `empty-profile-state.tsx`).
+export component EmptyProfilePage inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: 12px;
+        Text {
+            text: @tr("profile.emptyTitle");
+            horizontal-alignment: center;
+            font-size: Theme.text-xl;
+            font-weight: 600;
+            color: Theme.foreground;
+        }
+        Text {
+            text: @tr("profile.emptySubtitle");
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            color: Theme.muted-foreground;
+        }
+        HorizontalLayout {
+            alignment: center;
+            Button {
+                text: @tr("profile.add");
+                clicked => {
+                    ProfileState.error-code = "";
+                    ProfileState.form-profile = { id: "" };
+                    ProfileState.form-open = true;
+                }
+            }
+        }
+    }
+}

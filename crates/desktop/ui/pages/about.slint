@@ -1,0 +1,57 @@
+import { AboutSlint, ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Card } from "../components/card.slint";
+import { AppState } from "../state.slint";
+
+// About page. Shows the `AboutSlint` attribution required by the Slint
+// royalty-free licence (keep it reachable from the main menu).
+export component AboutPage inherits ScrollView {
+    VerticalLayout {
+        padding: 24px;
+        alignment: start;
+        HorizontalLayout {
+            alignment: center;
+            Card {
+                width: min(560px, root.width - 48px);
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Image {
+                            width: 56px;
+                            height: 56px;
+                            source: Theme.dark ? @image-url("../../assets/icons/icon-512-dark.png") : @image-url("../../assets/icons/icon-512.png");
+                            accessible-role: none;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("about.title");
+                                font-size: Theme.text-lg;
+                                font-weight: 600;
+                                color: Theme.card-foreground;
+                            }
+                            Text {
+                                text: @tr("about.version", AppState.version);
+                                color: Theme.muted-foreground;
+                            }
+                        }
+                    }
+                    Text {
+                        text: @tr("about.description");
+                        wrap: word-wrap;
+                        color: Theme.card-foreground;
+                    }
+                    Text {
+                        text: @tr("about.builtWith");
+                        color: Theme.muted-foreground;
+                    }
+                    AboutSlint {
+                        height: 200px;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -26,6 +26,9 @@ slint = { version = "=1.18.1", default-features = false, features = [
     "renderer-femtovg",
     "renderer-software",
     "accessibility",
+    # Raw winit events: user activity for the idle timeout (API pinned with
+    # the exact Slint version).
+    "unstable-winit-030",
 ] }
 # Runtime des use cases (libSQL, spawn_blocking d'Argon2…), distinct de la
 # boucle d'événements de l'UI.
@@ -33,6 +36,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 # Répertoire de données : même emplacement que l'`app_data_dir` de Tauri.
 dirs = "7"
 zeroize = "1"
+# Local time zone for displayed timestamps.
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
 
 [dev-dependencies]
 # Headless UI tests: screenshots of the software-rendered window.
