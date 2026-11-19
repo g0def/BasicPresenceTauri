@@ -5,21 +5,28 @@ import { PRESENCE_TYPES } from "@/entities/presence/model/presence";
 import { PRESENCE_STYLES } from "@/entities/presence/ui/presence-colors";
 import { cn } from "@/lib/utils";
 
-interface PresenceTypeFilterProps {
-  enabled: ReadonlySet<PresenceType>;
-  onToggle: (type: PresenceType) => void;
+interface PresenceTypeFilterProps<T extends PresenceType> {
+  enabled: ReadonlySet<T>;
+  onToggle: (type: T) => void;
+  /** Types offered, in display order (default: all four). */
+  types?: readonly T[];
+  className?: string;
 }
 
-/** Include/exclude checkboxes for the breakdown pie — one per presence type,
- * reusing the calendar legend's icon + the app's raw-checkbox idiom. */
-export function PresenceTypeFilter({
+/** Include/exclude checkboxes, one per presence type, reusing the calendar
+ * legend's icon + the app's raw-checkbox idiom (Stats breakdown, Odoo export). */
+export function PresenceTypeFilter<T extends PresenceType = PresenceType>({
   enabled,
   onToggle,
-}: PresenceTypeFilterProps) {
+  types = PRESENCE_TYPES as readonly PresenceType[] as readonly T[],
+  className,
+}: PresenceTypeFilterProps<T>) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">
-      {PRESENCE_TYPES.map((type) => {
+    <div
+      className={cn("flex flex-wrap justify-center gap-x-5 gap-y-2", className)}
+    >
+      {types.map((type) => {
         const style = PRESENCE_STYLES[type];
         const Icon = style.Icon;
         return (

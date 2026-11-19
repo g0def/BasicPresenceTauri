@@ -272,7 +272,37 @@
     "errors": {
       "failed": "Export failed: the file could not be written."
     },
-    "unencryptedWarning": "The exported file is not encrypted: keep it somewhere safe and delete it once you no longer need it."
+    "unencryptedWarning": "The exported file is not encrypted: keep it somewhere safe and delete it once you no longer need it.",
+    "odoo": {
+      "menuItem": "Export for Odoo (.csv)",
+      "title": "Export attendances for Odoo",
+      "description": "Creates a .csv file to import into Odoo (Attendances): one line per day with the check-in and check-out time.",
+      "fileBaseName": "odoo-attendances",
+      "employee": "Employee (employee_id)",
+      "employeeHint": "Must exactly match the employee's name in Odoo.",
+      "period": "Period",
+      "from": "From",
+      "to": "To",
+      "datePlaceholder": "dd/mm/yyyy",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "types": "Day types",
+      "fallback": "Default hours",
+      "fallbackHint": "Used for days with no recorded hours (no task).",
+      "applyToAll": "Apply these hours to every day",
+      "applyToAllHint": "Recorded hours are ignored for this export only: they are not changed in the app.",
+      "fallbackStart": "Check-in",
+      "fallbackEnd": "Check-out",
+      "invalidHours": "Check-out must be after check-in.",
+      "days": "Days to export",
+      "selectedCount": "{{count}} of {{total}} day(s) selected",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "noDays": "No office or remote day in this period.",
+      "defaultBadge": "default",
+      "result": "{{rows}} attendance(s) exported, {{fallbackRows}} of them with the default hours.",
+      "timezoneHint": "Times are local: Odoo reads them in the timezone of the user who imports the file."
+    }
   },
   "commute": {
     "menuItem": "Commute modes",

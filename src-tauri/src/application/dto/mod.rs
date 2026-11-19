@@ -1,3 +1,4 @@
+pub mod attendance_export_dto;
 pub mod commute_dto;
 pub mod day_note_dto;
 pub mod emission_factor_dto;

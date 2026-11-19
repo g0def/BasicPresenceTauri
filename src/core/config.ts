@@ -50,6 +50,8 @@ export const COMMANDS = {
   getLicence: "get_licence",
   isPackageManaged: "is_package_managed",
   exportProfileData: "export_profile_data",
+  listAttendanceDays: "list_attendance_days",
+  exportAttendance: "export_attendance",
   exportProfileBundle: "export_profile_bundle",
   inspectProfileBundle: "inspect_profile_bundle",
   importProfileBundle: "import_profile_bundle",

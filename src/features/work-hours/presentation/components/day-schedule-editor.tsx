@@ -2,7 +2,7 @@ import { MoveRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { WorkDaySchedule } from "@/entities/work-day/model/work-hours";
-import { StartTimePicker } from "@/features/work-hours/presentation/components/start-time-picker";
+import { TimePicker } from "@/shared/components/time-picker";
 import { formatClockTime } from "@/shared/format/duration-format";
 
 interface DayScheduleEditorProps {
@@ -12,7 +12,7 @@ interface DayScheduleEditorProps {
 
 /**
  * The day's start-time picker plus the derived end time. The start is edited
- * via the shared {@link StartTimePicker}; the end is never entered — the backend
+ * via the shared {@link TimePicker}; the end is never entered — the backend
  * recomputes and stores it on every save, and the stored value is shown here.
  */
 export function DayScheduleEditor({
@@ -23,7 +23,7 @@ export function DayScheduleEditor({
 
   return (
     <div className="flex items-end gap-3">
-      <StartTimePicker
+      <TimePicker
         id="day-start-time"
         value={schedule?.startMinutes ?? null}
         onCommit={onChange}

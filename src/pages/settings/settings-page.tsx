@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { fullName } from "@/entities/profile/model/profile";
 import { useProfile } from "@/entities/profile/model/use-profile";
 import { Co2Section } from "@/pages/settings/sections/co2-section";
 import {
@@ -36,7 +37,10 @@ export function SettingsPage() {
         <>
           <PreferencesSection />
           <Co2Section />
-          <ExportSection profileId={activeProfile.id} />
+          <ExportSection
+            profileId={activeProfile.id}
+            employeeName={fullName(activeProfile)}
+          />
           <TransferSection profileId={activeProfile.id} />
         </>
       )}

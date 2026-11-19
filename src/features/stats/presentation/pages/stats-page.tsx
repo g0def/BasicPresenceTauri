@@ -16,7 +16,7 @@ import {
 } from "@/features/stats/domain/aggregate";
 import { GranularityToggle } from "@/features/stats/presentation/components/granularity-toggle";
 import { PeriodRangeSelect } from "@/features/stats/presentation/components/period-range-select";
-import { PresenceTypeFilter } from "@/features/stats/presentation/components/presence-type-filter";
+import { PresenceTypeFilter } from "@/entities/presence/ui/presence-type-filter";
 import {
   localeFor,
   monthLabel,

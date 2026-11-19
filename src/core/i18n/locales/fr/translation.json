@@ -272,7 +272,37 @@
     "errors": {
       "failed": "Échec de l'export : le fichier n'a pas pu être écrit."
     },
-    "unencryptedWarning": "Le fichier exporté n'est pas chiffré : conservez-le en lieu sûr et supprimez-le quand il n'est plus utile."
+    "unencryptedWarning": "Le fichier exporté n'est pas chiffré : conservez-le en lieu sûr et supprimez-le quand il n'est plus utile.",
+    "odoo": {
+      "menuItem": "Exporter pour Odoo (.csv)",
+      "title": "Exporter les présences pour Odoo",
+      "description": "Génère un fichier .csv à importer dans Odoo (Présences) : une ligne par jour avec l'heure d'arrivée et de départ.",
+      "fileBaseName": "odoo-presences",
+      "employee": "Employé (employee_id)",
+      "employeeHint": "Doit correspondre exactement au nom de l'employé dans Odoo.",
+      "period": "Période",
+      "from": "Du",
+      "to": "Au",
+      "datePlaceholder": "jj/mm/aaaa",
+      "thisMonth": "Mois en cours",
+      "lastMonth": "Mois précédent",
+      "types": "Types de jour",
+      "fallback": "Heures par défaut",
+      "fallbackHint": "Utilisées pour les jours sans heures encodées (aucune tâche).",
+      "applyToAll": "Appliquer ces heures à tous les jours",
+      "applyToAllHint": "Les heures encodées sont ignorées pour cet export uniquement : elles ne sont pas modifiées dans l'application.",
+      "fallbackStart": "Arrivée",
+      "fallbackEnd": "Départ",
+      "invalidHours": "L'heure de départ doit être après l'heure d'arrivée.",
+      "days": "Jours à exporter",
+      "selectedCount": "{{count}} jour(s) sélectionné(s) sur {{total}}",
+      "selectAll": "Tout cocher",
+      "selectNone": "Tout décocher",
+      "noDays": "Aucun jour au bureau ou en télétravail sur cette période.",
+      "defaultBadge": "par défaut",
+      "result": "{{rows}} présence(s) exportée(s), dont {{fallbackRows}} avec les heures par défaut.",
+      "timezoneHint": "Les heures sont en heure locale : Odoo les interprète dans le fuseau horaire de l'utilisateur qui importe."
+    }
   },
   "commute": {
     "menuItem": "Modes de déplacement",

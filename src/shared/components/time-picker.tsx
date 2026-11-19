@@ -12,29 +12,35 @@ const STEP_MINUTES = 5;
 /** Where arrow-stepping starts when no time is set yet. */
 const DEFAULT_START_MINUTES = 8 * 60;
 
-interface StartTimePickerProps {
+interface TimePickerProps {
   /** Current value in minutes since midnight, or `null` when unset. */
   value: number | null;
-  /** Called with the new start time when a valid, changed value is committed. */
-  onCommit: (startMinutes: number) => void;
+  /** Called with the new time when a valid, changed value is committed. */
+  onCommit: (minutes: number) => void;
   id?: string;
   label: string;
   hint?: string;
+  /** Flags the field invalid for a rule checked by the caller (e.g. end
+   *  before start), on top of unparsable text. */
+  invalid?: boolean;
 }
 
 /**
- * A start-time picker as a single free-text field — WebKitGTK has no usable
- * `<input type="time">`. Typing is parsed leniently ("8", "830", "8h30"…),
- * ↑/↓ nudge by 5 min (Shift = 1 h), and the value commits on blur/Enter.
- * Shared by the work-hours day editor and the per-profile default in settings.
+ * A 24-hour clock-time picker as a single free-text field — WebKitGTK has no
+ * usable `<input type="time">` (it follows the OS locale, e.g. "5:00 PM").
+ * Typing is parsed leniently ("8", "830", "8h30"…), ↑/↓ nudge by 5 min
+ * (Shift = 1 h), and the value commits on blur/Enter. Shared by the
+ * work-hours day editor, the per-profile default start in settings and the
+ * Odoo export's fallback hours.
  */
-export function StartTimePicker({
+export function TimePicker({
   value,
   onCommit,
   id = "start-time",
   label,
   hint,
-}: StartTimePickerProps) {
+  invalid: invalidByCaller = false,
+}: TimePickerProps) {
   const [text, setText] = useState(() =>
     value === null ? "" : formatClockTime(value),
   );
@@ -48,13 +54,13 @@ export function StartTimePicker({
   }
 
   const commit = () => {
-    const startMinutes = parseClockTime(text);
-    if (startMinutes === null || value === startMinutes) {
+    const minutes = parseClockTime(text);
+    if (minutes === null || value === minutes) {
       // Invalid or unchanged: snap the display back to the bound value.
       setText(value === null ? "" : formatClockTime(value));
       return;
     }
-    onCommit(startMinutes);
+    onCommit(minutes);
   };
 
   const step = (direction: -1 | 1, wholeHour: boolean) => {
@@ -69,7 +75,8 @@ export function StartTimePicker({
     setText(formatClockTime(next));
   };
 
-  const invalid = text !== "" && parseClockTime(text) === null;
+  const invalid =
+    invalidByCaller || (text !== "" && parseClockTime(text) === null);
 
   return (
     <div className="grid gap-1">
