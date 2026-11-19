@@ -1,6 +1,10 @@
 use tauri::{AppHandle, State};
 
+use crate::application::dto::attendance_export_dto::{
+    AttendanceDayDto, AttendanceExportRequestDto, AttendanceExportSummaryDto,
+};
 use crate::application::dto::export_dto::{ExportLabelsDto, ExportOptionsDto, ExportSummaryDto};
+use crate::application::use_cases::export_attendance::ExportAttendanceUseCase;
 use crate::presentation::commands::error::AppError;
 use crate::presentation::file_dialogs::pick_save_path;
 use crate::presentation::state::AppState;
@@ -28,6 +32,44 @@ pub async fn export_profile_data(
         state
             .export_profile_data
             .execute(&profile_id, options, labels, &path)
+            .await?,
+    ))
+}
+
+/// The profile's worked (office/remote) days with their stored schedule — the
+/// candidates of the attendance (Odoo) export.
+#[tauri::command]
+pub async fn list_attendance_days(
+    profile_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<AttendanceDayDto>, AppError> {
+    state.require_session.execute().await?;
+    Ok(state.list_attendance_days.execute(&profile_id).await?)
+}
+
+/// Export the selected worked days as an Odoo attendance CSV. Like the ODS
+/// export, the backend shows the native "save as" dialog itself. Returns
+/// `None` when the user cancels the dialog.
+#[tauri::command]
+pub async fn export_attendance(
+    profile_id: String,
+    request: AttendanceExportRequestDto,
+    default_file_name: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<AttendanceExportSummaryDto>, AppError> {
+    state.require_session.execute().await?;
+    // Reject a bad request before bothering the user with a dialog.
+    ExportAttendanceUseCase::validate(&request)?;
+    let Some(path) = pick_save_path(&app, &default_file_name, "CSV", "csv").await? else {
+        return Ok(None);
+    };
+    // The dialog may have stayed open past the session's end: check again.
+    state.require_session.execute().await?;
+    Ok(Some(
+        state
+            .export_attendance
+            .execute(&profile_id, request, &path)
             .await?,
     ))
 }

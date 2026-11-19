@@ -1,3 +1,4 @@
+pub mod attendance_export;
 pub mod clock;
 pub mod co2_calculator;
 pub mod key_service;

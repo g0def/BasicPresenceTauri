@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use crate::application::dto::attendance_export_dto::AttendanceExportRequestDto;
 use crate::application::dto::commute_dto::CommuteSegmentInputDto;
 use crate::application::dto::profile_bundle_dto::{
     BundleExportOptionsDto, BundleImportSelectionDto, BundleImportTargetDto, ConflictStrategy,
@@ -1590,6 +1591,162 @@ fn day_note_persists_and_is_rendered_to_safe_html() {
             state.get_day_note.execute(&presence.id).await,
             Err(DomainError::Unauthorized)
         ));
+
+        let _ = std::fs::remove_dir_all(dir);
+    });
+}
+
+#[test]
+fn attendance_export_writes_odoo_csv_for_selected_worked_days() {
+    tauri::async_runtime::block_on(async {
+        let (config, dir) = temp_config("attendance_export");
+        let state = build_state(config, &TEST_DEVICE_KEY)
+            .await
+            .expect("build_state");
+        state
+            .register_account
+            .execute("alice", "password123")
+            .await
+            .expect("register");
+        let _session = state
+            .login
+            .execute("alice", "password123")
+            .await
+            .expect("login");
+        let profile = state
+            .create_profile
+            .execute("Ada", "Lovelace", "Analytical Engine", None)
+            .await
+            .expect("profile");
+
+        // 2024-06-01 .. 2024-06-04 (epoch ms at UTC midnight).
+        const D1: i64 = 1_717_200_000_000;
+        const D2: i64 = D1 + 86_400_000;
+        const D3: i64 = D2 + 86_400_000;
+        const D4: i64 = D3 + 86_400_000;
+
+        // D1: office, 9:00 + 2h of tasks -> actual schedule 09:00-11:00.
+        let office = state
+            .set_presence
+            .execute(&profile.id, D1, "office", vec![])
+            .await
+            .expect("office");
+        state
+            .set_work_entries
+            .execute(
+                &office.id,
+                vec![work_entry("Dev", 90), work_entry("Sync", 30)],
+            )
+            .await
+            .expect("entries");
+        state
+            .set_work_schedule
+            .execute(&office.id, 540)
+            .await
+            .expect("schedule");
+        // D2: remote without tasks (start == end) -> fallback hours.
+        state
+            .set_presence
+            .execute(&profile.id, D2, "remote", vec![])
+            .await
+            .expect("remote");
+        // D3: vacation -> never an attendance, even if selected.
+        state
+            .set_presence
+            .execute(&profile.id, D3, "vacation", vec![])
+            .await
+            .expect("vacation");
+        // D4: office, but not selected.
+        state
+            .set_presence
+            .execute(&profile.id, D4, "office", vec![])
+            .await
+            .expect("office 2");
+
+        let days = state
+            .list_attendance_days
+            .execute(&profile.id)
+            .await
+            .expect("list days");
+        let listed: Vec<(i64, &str)> = days.iter().map(|d| (d.day, d.kind.as_str())).collect();
+        assert_eq!(listed, vec![(D1, "office"), (D2, "remote"), (D4, "office")]);
+        assert_eq!(days[0].start_minutes, Some(540));
+        assert_eq!(days[0].end_minutes, Some(660));
+
+        let path = dir.join("odoo.csv");
+        let summary = state
+            .export_attendance
+            .execute(
+                &profile.id,
+                AttendanceExportRequestDto {
+                    employee_name: " Ada Lovelace ".into(),
+                    days: vec![D1, D2, D3],
+                    fallback_start_minutes: 8 * 60,
+                    fallback_end_minutes: 17 * 60,
+                    apply_to_all: false,
+                },
+                &path,
+            )
+            .await
+            .expect("export");
+        assert_eq!(summary.rows, 2);
+        assert_eq!(summary.fallback_rows, 1);
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read csv"),
+            "employee_id,check_in,check_out\n\
+             Ada Lovelace,2024-06-01 09:00:00,2024-06-01 11:00:00\n\
+             Ada Lovelace,2024-06-02 08:00:00,2024-06-02 17:00:00\n"
+        );
+
+        // "Apply to all": the actual 09:00-11:00 of D1 is overridden too.
+        let all_path = dir.join("odoo-all.csv");
+        let summary = state
+            .export_attendance
+            .execute(
+                &profile.id,
+                AttendanceExportRequestDto {
+                    employee_name: "Ada Lovelace".into(),
+                    days: vec![D1, D2],
+                    fallback_start_minutes: 8 * 60,
+                    fallback_end_minutes: 17 * 60,
+                    apply_to_all: true,
+                },
+                &all_path,
+            )
+            .await
+            .expect("export all");
+        assert_eq!((summary.rows, summary.fallback_rows), (2, 2));
+        assert_eq!(
+            std::fs::read_to_string(&all_path).expect("read csv"),
+            "employee_id,check_in,check_out\n\
+             Ada Lovelace,2024-06-01 08:00:00,2024-06-01 17:00:00\n\
+             Ada Lovelace,2024-06-02 08:00:00,2024-06-02 17:00:00\n"
+        );
+        // The stored schedule is untouched.
+        let days = state
+            .list_attendance_days
+            .execute(&profile.id)
+            .await
+            .expect("list days");
+        assert_eq!(days[0].end_minutes, Some(660));
+
+        // Invalid fallback hours are rejected before anything is written.
+        let bad = state
+            .export_attendance
+            .execute(
+                &profile.id,
+                AttendanceExportRequestDto {
+                    employee_name: "Ada".into(),
+                    days: vec![D1],
+                    fallback_start_minutes: 600,
+                    fallback_end_minutes: 600,
+                    apply_to_all: false,
+                },
+                &dir.join("bad.csv"),
+            )
+            .await;
+        assert!(matches!(bad, Err(DomainError::Validation(_))));
+        assert!(!dir.join("bad.csv").exists());
 
         let _ = std::fs::remove_dir_all(dir);
     });

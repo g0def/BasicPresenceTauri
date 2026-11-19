@@ -54,6 +54,8 @@
     "get_licence",
     "is_package_managed",
     "export_profile_data",
+    "list_attendance_days",
+    "export_attendance",
     "export_profile_bundle",
     "inspect_profile_bundle",
     "import_profile_bundle",

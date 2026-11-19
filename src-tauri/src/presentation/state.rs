@@ -8,6 +8,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_attendance::ExportAttendanceUseCase;
 use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
@@ -18,6 +19,7 @@ use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
 use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
+use crate::application::use_cases::list_attendance_days::ListAttendanceDaysUseCase;
 use crate::application::use_cases::list_co2_referential::ListCo2ReferentialUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
@@ -82,6 +84,8 @@ pub struct AppState {
     pub set_day_note: SetDayNoteUseCase,
     pub get_licence: GetLicenceUseCase,
     pub export_profile_data: ExportProfileDataUseCase,
+    pub list_attendance_days: ListAttendanceDaysUseCase,
+    pub export_attendance: ExportAttendanceUseCase,
     pub export_profile_bundle: ExportProfileBundleUseCase,
     pub inspect_profile_bundle: InspectProfileBundleUseCase,
     pub import_profile_bundle: ImportProfileBundleUseCase,

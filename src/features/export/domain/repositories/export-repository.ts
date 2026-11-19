@@ -1,4 +1,9 @@
 import type {
+  AttendanceDay,
+  AttendanceExportRequest,
+  AttendanceExportSummary,
+} from "@/features/export/domain/entities/attendance-export";
+import type {
   ExportLabels,
   ExportOptions,
   ExportSummary,
@@ -17,4 +22,17 @@ export interface ExportRepository {
     labels: ExportLabels,
     defaultFileName: string,
   ): Promise<ExportSummary | null>;
+
+  /** The profile's office/remote days with their stored schedule. */
+  listAttendanceDays(profileId: string): Promise<AttendanceDay[]>;
+
+  /**
+   * Open a native "save as" dialog, then write the selected days as an Odoo
+   * attendance CSV. Resolves to `null` when the user cancels the dialog.
+   */
+  exportAttendance(
+    profileId: string,
+    request: AttendanceExportRequest,
+    defaultFileName: string,
+  ): Promise<AttendanceExportSummary | null>;
 }

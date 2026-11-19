@@ -37,6 +37,8 @@ pub const MAX_OCCUPANTS: i64 = 9;
 pub const MAX_WORK_ENTRIES: usize = 50;
 /// Labels supplied for a spreadsheet export.
 pub const MAX_EXPORT_LABELS: usize = 200;
+/// Days selected for one attendance export (a decade of working days).
+pub const MAX_ATTENDANCE_DAYS: usize = 4_000;
 /// Emission-factor vintages shipped in the vault referential.
 pub const KNOWN_FACTOR_YEARS: &[i32] = &[2025, 2026];
 
@@ -269,9 +271,65 @@ pub fn profile_settings(s: &ProfileSettings) -> Result<(), DomainError> {
     Ok(())
 }
 
+/// The employee name written in an attendance export: required, bounded, and
+/// free of control characters (it becomes a CSV field).
+pub fn employee_name(name: &str) -> Result<String, DomainError> {
+    let name = required_text("employeeName", name, MAX_PROFILE_FIELD_LEN)?;
+    if name.chars().any(char::is_control) {
+        return Err(invalid("employeeName must not contain control characters"));
+    }
+    Ok(name)
+}
+
+/// Fallback clock times of an attendance export: `0 <= start < end <= 1440`.
+pub fn attendance_fallback(start: i64, end: i64) -> Result<(i64, i64), DomainError> {
+    start_minutes(start)?;
+    if end <= start || end > MINUTES_PER_DAY {
+        return Err(invalid(
+            "fallbackEndMinutes must be after the start and at most 1440",
+        ));
+    }
+    Ok((start, end))
+}
+
+/// The days chosen for an attendance export: bounded, each a valid day key.
+pub fn attendance_days(days: &[i64]) -> Result<(), DomainError> {
+    if days.len() > MAX_ATTENDANCE_DAYS {
+        return Err(invalid(format!(
+            "at most {MAX_ATTENDANCE_DAYS} days can be exported at once"
+        )));
+    }
+    days.iter().try_for_each(|d| day(*d).map(|_| ()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn employee_name_is_trimmed_required_and_has_no_control_chars() {
+        assert_eq!(employee_name("  Ada Lovelace ").unwrap(), "Ada Lovelace");
+        assert!(employee_name("   ").is_err());
+        assert!(employee_name("Ada\nLovelace").is_err());
+        assert!(employee_name(&"a".repeat(MAX_PROFILE_FIELD_LEN + 1)).is_err());
+    }
+
+    #[test]
+    fn attendance_fallback_needs_start_before_end_within_a_day() {
+        assert!(attendance_fallback(480, 1020).is_ok());
+        assert!(attendance_fallback(0, 1440).is_ok());
+        assert!(attendance_fallback(480, 480).is_err());
+        assert!(attendance_fallback(600, 480).is_err());
+        assert!(attendance_fallback(480, 1441).is_err());
+        assert!(attendance_fallback(-1, 480).is_err());
+    }
+
+    #[test]
+    fn attendance_days_are_bounded_valid_day_keys() {
+        assert!(attendance_days(&[0, MS_PER_DAY]).is_ok());
+        assert!(attendance_days(&[1]).is_err());
+        assert!(attendance_days(&vec![0; MAX_ATTENDANCE_DAYS + 1]).is_err());
+    }
 
     #[test]
     fn day_is_epoch_ms_at_utc_midnight() {

@@ -21,6 +21,7 @@ use crate::application::use_cases::delete_commute::DeleteCommuteUseCase;
 use crate::application::use_cases::delete_presence::DeletePresenceUseCase;
 use crate::application::use_cases::delete_profile::DeleteProfileUseCase;
 use crate::application::use_cases::delete_task_preset::DeleteTaskPresetUseCase;
+use crate::application::use_cases::export_attendance::ExportAttendanceUseCase;
 use crate::application::use_cases::export_profile_bundle::ExportProfileBundleUseCase;
 use crate::application::use_cases::export_profile_data::ExportProfileDataUseCase;
 use crate::application::use_cases::get_day_note::GetDayNoteUseCase;
@@ -31,6 +32,7 @@ use crate::application::use_cases::get_work_entries::GetWorkEntriesUseCase;
 use crate::application::use_cases::get_work_schedule::GetWorkScheduleUseCase;
 use crate::application::use_cases::import_profile_bundle::ImportProfileBundleUseCase;
 use crate::application::use_cases::inspect_profile_bundle::InspectProfileBundleUseCase;
+use crate::application::use_cases::list_attendance_days::ListAttendanceDaysUseCase;
 use crate::application::use_cases::list_co2_referential::ListCo2ReferentialUseCase;
 use crate::application::use_cases::list_commutes::ListCommutesUseCase;
 use crate::application::use_cases::list_emission_factors::ListEmissionFactorsUseCase;
@@ -60,6 +62,7 @@ use crate::domain::repositories::profile_settings_repository::ProfileSettingsRep
 use crate::domain::repositories::security_log::SecurityLog;
 use crate::domain::repositories::task_preset_repository::TaskPresetRepository;
 use crate::domain::repositories::work_entry_repository::WorkEntryRepository;
+use crate::domain::services::attendance_export::AttendanceExporter;
 use crate::domain::services::clock::Clock;
 use crate::domain::services::key_service::KeyService;
 use crate::domain::services::markdown::MarkdownRenderer;
@@ -75,6 +78,7 @@ use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::crypto::argon2_hasher::Argon2PasswordHasher;
 use crate::infrastructure::crypto::key_service::Argon2KeyService;
 use crate::infrastructure::crypto::token_generator::RandomTokenGenerator;
+use crate::infrastructure::export::odoo_csv_writer::OdooCsvAttendanceExporter;
 use crate::infrastructure::export::ods_writer::OdsSpreadsheetExporter;
 use crate::infrastructure::markdown::comrak_renderer::ComrakMarkdownRenderer;
 use crate::infrastructure::persistence::account_repository::LibsqlAccountRepository;
@@ -166,6 +170,8 @@ pub fn run() {
             legal::get_licence,
             install::is_package_managed,
             export::export_profile_data,
+            export::list_attendance_days,
+            export::export_attendance,
             transfer::export_profile_bundle,
             transfer::inspect_profile_bundle,
             transfer::import_profile_bundle
@@ -306,6 +312,8 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
     const LICENCE_MD: &str = include_str!("../../LICENCE");
     let exporter: Arc<dyn SpreadsheetExporter> = Arc::new(OdsSpreadsheetExporter::new());
     let bundle_codec: Arc<dyn ProfileBundleCodec> = Arc::new(JsonProfileBundleCodec::new());
+    let attendance_exporter: Arc<dyn AttendanceExporter> =
+        Arc::new(OdooCsvAttendanceExporter::new());
 
     Ok(AppState {
         register_account: RegisterAccountUseCase::new(
@@ -387,6 +395,15 @@ async fn build_state(config: AppConfig, device_key: &[u8]) -> Result<AppState, D
             presences.clone(),
             work_entries.clone(),
             exporter.clone(),
+        ),
+        list_attendance_days: ListAttendanceDaysUseCase::new(
+            presences.clone(),
+            work_entries.clone(),
+        ),
+        export_attendance: ExportAttendanceUseCase::new(
+            presences.clone(),
+            work_entries.clone(),
+            attendance_exporter.clone(),
         ),
         export_profile_bundle: ExportProfileBundleUseCase::new(
             profiles.clone(),

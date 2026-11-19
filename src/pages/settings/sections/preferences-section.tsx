@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { useProfileSettings } from "@/features/profile-settings/presentation/hooks/use-profile-settings";
-import { StartTimePicker } from "@/features/work-hours/presentation/components/start-time-picker";
+import { TimePicker } from "@/shared/components/time-picker";
 import type { CellDisplayMode } from "@/shared/cell-display/cell-display-context";
 import { NOTE_FONTS } from "@/shared/note-font/use-note-font";
 
@@ -22,7 +22,7 @@ export function PreferencesSection() {
         <p className="text-sm text-muted-foreground">
           {t("settings.defaultStartTimeHint")}
         </p>
-        <StartTimePicker
+        <TimePicker
           id="default-start-time"
           value={settings.startMinutes}
           onCommit={(startMinutes) => void update({ startMinutes })}

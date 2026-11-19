@@ -3,14 +3,24 @@ import { Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { AttendanceExportDialog } from "@/features/export/presentation/components/attendance-export-dialog";
 import { ExportDialog } from "@/features/export/presentation/components/export-dialog";
 import { ExportProfileDialog } from "@/features/profile-transfer/presentation/components/export-profile-dialog";
 import { ImportProfileDialog } from "@/features/profile-transfer/presentation/components/import-profile-dialog";
 
-/** Spreadsheet export (.ods) of the active profile's data. */
-export function ExportSection({ profileId }: { profileId: string }) {
+/** Spreadsheet export (.ods) of the active profile's data, and the Odoo
+ *  attendance export (.csv). */
+export function ExportSection({
+  profileId,
+  employeeName,
+}: {
+  profileId: string;
+  /** The active profile's display name, pre-filled as Odoo's employee. */
+  employeeName: string;
+}) {
   const { t } = useTranslation();
   const [exportOpen, setExportOpen] = useState(false);
+  const [odooOpen, setOdooOpen] = useState(false);
 
   return (
     <>
@@ -19,10 +29,14 @@ export function ExportSection({ profileId }: { profileId: string }) {
         <p className="text-sm text-muted-foreground">
           {t("export.description")}
         </p>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => setExportOpen(true)}>
             <Download />
             {t("export.menuItem")}
+          </Button>
+          <Button variant="outline" onClick={() => setOdooOpen(true)}>
+            <Download />
+            {t("export.odoo.menuItem")}
           </Button>
         </div>
       </div>
@@ -30,6 +44,12 @@ export function ExportSection({ profileId }: { profileId: string }) {
         open={exportOpen}
         onOpenChange={setExportOpen}
         profileId={profileId}
+      />
+      <AttendanceExportDialog
+        open={odooOpen}
+        onOpenChange={setOdooOpen}
+        profileId={profileId}
+        defaultEmployeeName={employeeName}
       />
     </>
   );
